@@ -1,13 +1,18 @@
+import { createServer, type Server as HttpServer } from 'node:http';
+import { type AddressInfo } from 'node:net';
+
 import Redis, { type Redis as RedisClient } from 'ioredis';
 import { pino, type Logger } from 'pino';
 
 import { createApp } from '../../src/app.js';
 import { createSequelize } from '../../src/config/mysql.js';
+import { attachIo } from '../../src/io/index.js';
 import { initModels } from '../../src/models/index.js';
-import { createServices } from '../../src/services/index.js';
+import { createServices, type Services } from '../../src/services/index.js';
 
 import type { Express } from 'express';
 import type { Sequelize } from 'sequelize';
+import type { Server as IoServer } from 'socket.io';
 import type { Env } from '../../src/config/env.js';
 
 /**
@@ -30,7 +35,7 @@ export function testEnv(): Env {
     JWT_REFRESH_SECRET: 'test-refresh-secret-' + Math.random().toString(36).slice(2),
     JWT_ACCESS_EXPIRES_IN: '15m',
     JWT_REFRESH_EXPIRES_IN: '7d',
-    COOKIE_SECRET: 'test-cookie',
+    COOKIE_SECRET: 'test-cookie-secret-' + Math.random().toString(36).slice(2),
     APP_URL: 'http://localhost:25174',
     API_URL: 'http://localhost:23001',
     WIDGET_URL: 'http://localhost:25175',
@@ -50,13 +55,20 @@ export function testEnv(): Env {
   } as unknown as Env;
 }
 
-interface TestHarness {
+export interface TestHarness {
   env: Env;
   logger: Logger;
   sequelize: Sequelize;
   redis: RedisClient;
   app: Express;
+  services: Services;
   cleanup: () => Promise<void>;
+}
+
+export interface LiveTestHarness extends TestHarness {
+  httpServer: HttpServer;
+  io: IoServer;
+  baseUrl: string;
 }
 
 /**
@@ -96,9 +108,48 @@ export async function probeHarness(): Promise<TestHarness | null> {
     sequelize,
     redis,
     app,
+    services,
     cleanup: async () => {
       await sequelize.close().catch(() => undefined);
       await redis.quit().catch(() => undefined);
+    },
+  };
+}
+
+/**
+ * Probe + bind a real HTTP server on an ephemeral port, with Socket.IO
+ * attached. Used by socket integration tests.
+ * @returns A live harness or `null` if the stack isn't up.
+ */
+export async function probeLiveHarness(): Promise<LiveTestHarness | null> {
+  const base = await probeHarness();
+  if (base === null) return null;
+  const httpServer = createServer(base.app);
+  const io = attachIo(httpServer, { env: base.env, services: base.services });
+  await new Promise<void>((resolve) => {
+    httpServer.listen(0, '127.0.0.1', () => {
+      resolve();
+    });
+  });
+  const addr = httpServer.address() as AddressInfo;
+  const baseUrl = `http://127.0.0.1:${addr.port.toString()}`;
+  return {
+    ...base,
+    httpServer,
+    io,
+    baseUrl,
+    cleanup: async () => {
+      await new Promise<void>((resolve) => {
+        void io.close(() => {
+          resolve();
+        });
+      });
+      await new Promise<void>((resolve) => {
+        httpServer.close(() => {
+          resolve();
+        });
+      });
+      await base.cleanup();
     },
   };
 }

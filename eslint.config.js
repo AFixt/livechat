@@ -121,6 +121,7 @@ export default tseslint.config(
         { selector: 'import', format: ['camelCase', 'PascalCase'] },
         { selector: 'typeLike', format: ['PascalCase'] },
         { selector: 'enumMember', format: ['PascalCase', 'UPPER_CASE'] },
+        { selector: 'typeMethod', modifiers: ['requiresQuotes'], format: null },
       ],
 
       // React
@@ -173,8 +174,8 @@ export default tseslint.config(
       'max-nested-callbacks': ['error', 3],
       'max-params': ['error', 4],
 
-      // Security
-      'security/detect-object-injection': 'warn',
+      // Security — detect-object-injection is too noisy in TS-typed code
+      'security/detect-object-injection': 'off',
       'security/detect-non-literal-regexp': 'error',
       'security/detect-non-literal-fs-filename': 'error',
       'security/detect-unsafe-regex': 'error',
@@ -286,22 +287,34 @@ export default tseslint.config(
       'unicorn/filename-case': 'off',
       '@typescript-eslint/naming-convention': 'off',
       'n/no-unpublished-require': 'off',
+      'max-lines': 'off',
     },
   },
 
-  // Factory functions (services + routes) — aggregators that return objects
-  // with many methods; the 75-line cap and explicit-module-boundary-types
-  // don't fit the pattern. Callers use `ReturnType<typeof createXxx>`.
+  // Factory functions (services + routes + io namespaces) — aggregators that
+  // return objects with many methods; the 75-line cap and
+  // explicit-module-boundary-types don't fit the pattern. Callers use
+  // `ReturnType<typeof createXxx>`.
   {
     files: [
       '**/api/src/services/**/*.ts',
       '**/api/src/routes/**/*.ts',
       '**/api/src/models/**/*.ts',
+      '**/api/src/io/**/*.ts',
       '**/api/src/app.ts',
     ],
     rules: {
       'max-lines-per-function': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
+    },
+  },
+
+  // Socket.IO namespaces: event-name strings are API contracts, not
+  // duplication — they appear once per `.on`/`.emit` by design.
+  {
+    files: ['**/api/src/io/**/*.ts'],
+    rules: {
+      'sonarjs/no-duplicate-string': 'off',
     },
   },
 

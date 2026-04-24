@@ -5,6 +5,7 @@ import { loadEnv } from './config/env.js';
 import { createLogger } from './config/logger.js';
 import { createSequelize } from './config/mysql.js';
 import { createRedis } from './config/redis.js';
+import { attachIo } from './io/index.js';
 import { initModels } from './models/index.js';
 import { createServices } from './services/index.js';
 
@@ -18,6 +19,7 @@ const services = createServices({ env, logger, redis });
 
 const app = createApp({ env, logger, redis, services });
 const server = createServer(app);
+attachIo(server, { env, services });
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 

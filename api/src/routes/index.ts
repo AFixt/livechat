@@ -1,10 +1,12 @@
 import { Router } from 'express';
 
 import { buildAuthRouter } from './auth.js';
+import { buildChatsRouter } from './chats.js';
 import healthRouter from './health.js';
 import { buildInvitationsRouter } from './invitations.js';
 import { buildTenantsRouter } from './tenants.js';
 import { buildUsersRouter } from './users.js';
+import { buildVisitorRouter } from './visitor.js';
 
 import type { Redis } from 'ioredis';
 import type { Env } from '../config/env.js';
@@ -49,6 +51,22 @@ export function buildRouter(deps: RouterDeps): Router {
       env: deps.env,
       redis: deps.redis,
       invitation: deps.services.invitation,
+    }),
+  );
+  router.use(
+    '/visitor',
+    buildVisitorRouter({
+      env: deps.env,
+      visitorSession: deps.services.visitorSession,
+      chat: deps.services.chat,
+    }),
+  );
+  router.use(
+    '/chats',
+    buildChatsRouter({
+      env: deps.env,
+      redis: deps.redis,
+      chat: deps.services.chat,
     }),
   );
   return router;
