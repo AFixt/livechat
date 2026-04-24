@@ -1,13 +1,55 @@
 import { Router } from 'express';
 
+import { buildAuthRouter } from './auth.js';
 import healthRouter from './health.js';
+import { buildInvitationsRouter } from './invitations.js';
+import { buildTenantsRouter } from './tenants.js';
+import { buildUsersRouter } from './users.js';
+
+import type { Redis } from 'ioredis';
+import type { Env } from '../config/env.js';
+import type { Services } from '../services/index.js';
+
+interface RouterDeps {
+  env: Env;
+  redis: Redis;
+  services: Services;
+  /** Skip all rate limiters (for unit tests). */
+  skipRateLimit?: boolean;
+}
 
 /**
- * Build the top-level `/api/v1` router.
- * @returns Express router with all v1 sub-routes mounted.
+ * Build the top-level `/api/v1` router with all sub-routes mounted.
+ * @param deps - Env, redis, services, and flags.
+ * @returns Express router.
  */
-export function buildRouter(): Router {
+export function buildRouter(deps: RouterDeps): Router {
   const router = Router();
   router.use('/health', healthRouter);
+  router.use(
+    '/auth',
+    buildAuthRouter({
+      env: deps.env,
+      redis: deps.redis,
+      auth: deps.services.auth,
+      ...(deps.skipRateLimit === true && { skipRateLimit: true }),
+    }),
+  );
+  router.use(
+    '/tenants',
+    buildTenantsRouter({ env: deps.env, redis: deps.redis, tenant: deps.services.tenant }),
+  );
+  router.use(
+    '/users',
+    buildUsersRouter({ env: deps.env, redis: deps.redis, user: deps.services.user }),
+  );
+  router.use(
+    '/invitations',
+    buildInvitationsRouter({
+      env: deps.env,
+      redis: deps.redis,
+      invitation: deps.services.invitation,
+    }),
+  );
   return router;
 }

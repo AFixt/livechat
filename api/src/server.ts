@@ -5,13 +5,18 @@ import { loadEnv } from './config/env.js';
 import { createLogger } from './config/logger.js';
 import { createSequelize } from './config/mysql.js';
 import { createRedis } from './config/redis.js';
+import { initModels } from './models/index.js';
+import { createServices } from './services/index.js';
 
 const env = loadEnv();
 const logger = createLogger(env);
 const sequelize = createSequelize(env, logger);
 const redis = createRedis(env, logger);
 
-const app = createApp({ env, logger, redis });
+initModels(sequelize);
+const services = createServices({ env, logger, redis });
+
+const app = createApp({ env, logger, redis, services });
 const server = createServer(app);
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;

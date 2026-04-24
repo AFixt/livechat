@@ -3,6 +3,7 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 
 import { createApp } from '../../src/app.js';
+import { createServices } from '../../src/services/index.js';
 
 import type { Redis } from 'ioredis';
 import type { Env } from '../../src/config/env.js';
@@ -53,7 +54,8 @@ describe('GET /api/v1/health', () => {
     const env = makeEnv();
     const logger = pino({ level: 'silent' });
     const redis = makeStubRedis();
-    const app = createApp({ env, logger, redis, skipRateLimit: true });
+    const services = createServices({ env, logger, redis });
+    const app = createApp({ env, logger, redis, services, skipRateLimit: true });
 
     const res = await request(app).get('/api/v1/health');
 

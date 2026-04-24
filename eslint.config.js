@@ -12,6 +12,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import security from 'eslint-plugin-security';
 import sonarjs from 'eslint-plugin-sonarjs';
 import unicorn from 'eslint-plugin-unicorn';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -257,18 +258,23 @@ export default tseslint.config(
     rules: { 'import-x/no-default-export': 'off' },
   },
 
-  // Config files: disable all type-checked rules (they live outside tsconfig project)
+  // Config + migration files: disable all type-checked rules (outside tsconfig project)
   {
     files: [
       '**/*.config.{ts,js,mjs,cjs}',
+      '**/*.cjs',
       'eslint.config.js',
       'commitlint.config.js',
       'vite.config.*',
       'vitest.config.*',
       'playwright.config.*',
+      '**/db/migrations/**',
+      '**/db/seeders/**',
+      '**/db/config.cjs',
     ],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
+      globals: { ...globals.node, ...globals.commonjs },
       parserOptions: {
         projectService: false,
         project: null,
@@ -277,6 +283,25 @@ export default tseslint.config(
     rules: {
       'import-x/no-default-export': 'off',
       'jsdoc/require-jsdoc': 'off',
+      'unicorn/filename-case': 'off',
+      '@typescript-eslint/naming-convention': 'off',
+      'n/no-unpublished-require': 'off',
+    },
+  },
+
+  // Factory functions (services + routes) — aggregators that return objects
+  // with many methods; the 75-line cap and explicit-module-boundary-types
+  // don't fit the pattern. Callers use `ReturnType<typeof createXxx>`.
+  {
+    files: [
+      '**/api/src/services/**/*.ts',
+      '**/api/src/routes/**/*.ts',
+      '**/api/src/models/**/*.ts',
+      '**/api/src/app.ts',
+    ],
+    rules: {
+      'max-lines-per-function': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
     },
   },
 
@@ -285,9 +310,23 @@ export default tseslint.config(
     files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', '**/test/**', '**/tests/**'],
     rules: {
       'max-lines-per-function': 'off',
+      'max-lines': 'off',
+      'complexity': 'off',
       'sonarjs/no-duplicate-string': 'off',
+      'sonarjs/cognitive-complexity': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/non-nullable-type-assertion-style': 'off',
+      '@typescript-eslint/dot-notation': 'off',
+      '@typescript-eslint/naming-convention': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/unbound-method': 'off',
       'jsdoc/require-jsdoc': 'off',
+      'unicorn/filename-case': 'off',
     },
   },
 

@@ -16,11 +16,13 @@ import { buildRouter } from './routes/index.js';
 import type { Redis } from 'ioredis';
 import type { Logger } from 'pino';
 import type { Env } from './config/env.js';
+import type { Services } from './services/index.js';
 
 interface AppDeps {
   env: Env;
   logger: Logger;
   redis: Redis;
+  services: Services;
   /**
    * Skip global rate limiting. Set to `true` in unit tests where the Redis
    * stub can't satisfy the rate-limit-redis Lua protocol.
@@ -30,11 +32,11 @@ interface AppDeps {
 
 /**
  * Assemble the Express application with all middleware and routes.
- * @param deps - Runtime dependencies (env, logger, redis).
+ * @param deps - Runtime dependencies.
  * @returns A configured Express instance; call `.listen(port)` to start it.
  */
 export function createApp(deps: AppDeps): Express {
-  const { env, logger, redis } = deps;
+  const { env, logger, redis, services } = deps;
   const app = express();
 
   app.disable('x-powered-by');
@@ -67,7 +69,12 @@ export function createApp(deps: AppDeps): Express {
 
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(buildOpenApiSpec(env)));
 
-  const v1 = buildRouter();
+  const v1 = buildRouter({
+    env,
+    redis,
+    services,
+    ...(deps.skipRateLimit === true && { skipRateLimit: true }),
+  });
   if (deps.skipRateLimit === true) {
     app.use('/api/v1', v1);
     app.use('/v1', v1);
