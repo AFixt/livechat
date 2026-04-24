@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnp.*
+.yarn/
+
+# Build outputs
+dist/
+build/
+out/
+coverage/
+.vite/
+.turbo/
+
+# Generated code (by usecase-runner)
+**/e2e/generated/
+
+# Env files (commit .env.example only)
+.env
+.env.*
+!.env.example
+
+# Logs & caches
+*.log
+.cache/
+.eslintcache
+.stylelintcache
+reports/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Test artifacts
+test-results/
+playwright-report/
+a11y-reports/
+
+# TypeScript
+*.tsbuildinfo

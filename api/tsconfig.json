@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "lib": ["ES2022"],
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "@livechat/shared": ["../shared/src/index.ts"],
+      "@livechat/shared/*": ["../shared/src/*"]
+    }
+  },
+  "include": ["src/**/*", "tests/**/*"],
+  "exclude": ["node_modules", "dist", "coverage"]
+}

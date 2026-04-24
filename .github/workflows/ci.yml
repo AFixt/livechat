@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Install OSV-Scanner
+        run: |
+          curl -sSL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 -o osv-scanner
+          chmod +x osv-scanner
+          sudo mv osv-scanner /usr/local/bin/
+
+      - name: Install gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz | tar -xz
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Install lychee
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --no-progress '**/*.md'
+
+      - run: npm run check:all
+
+  usecases-diff-gate:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enforce usecase coverage
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          changed=$(git diff --name-only "$base" "$head")
+          ui_changed=$(echo "$changed" | grep -E '^(ui|widget)/src/' || true)
+          uc_changed=$(echo "$changed" | grep -E '^usecases/' || true)
+          if [ -n "$ui_changed" ] && [ -z "$uc_changed" ]; then
+            echo "::error::UI changed without corresponding usecases/ update."
+            echo "Changed UI files:"
+            echo "$ui_changed"
+            exit 1
+          fi

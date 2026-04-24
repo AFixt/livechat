@@ -1,0 +1,28 @@
+{
+  "name": "@livechat/widget",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:e2e": "playwright test",
+    "size": "size-limit",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix"
+  },
+  "size-limit": [
+    {
+      "name": "widget bundle",
+      "path": "dist/widget.js",
+      "limit": "50 KB"
+    }
+  ]
+}

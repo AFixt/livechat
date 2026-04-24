@@ -1,0 +1,29 @@
+{
+  "config": {
+    "default": true,
+    "MD003": { "style": "atx" },
+    "MD004": { "style": "dash" },
+    "MD007": { "indent": 2 },
+    "MD013": false,
+    "MD024": { "siblings_only": true },
+    "MD025": true,
+    "MD029": { "style": "ordered" },
+    "MD033": { "allowed_elements": ["br", "details", "summary", "kbd", "sub", "sup"] },
+    "MD040": true,
+    "MD041": true,
+    "MD046": { "style": "fenced" },
+    "MD048": { "style": "backtick" },
+    "MD049": { "style": "asterisk" },
+    "MD050": { "style": "asterisk" },
+    "MD053": true
+  },
+  "ignores": [
+    "node_modules/",
+    "**/node_modules/",
+    "dist/",
+    "build/",
+    "coverage/",
+    "CHANGELOG.md",
+    ".github/PULL_REQUEST_TEMPLATE.md"
+  ]
+}
