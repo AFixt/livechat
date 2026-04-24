@@ -15,10 +15,11 @@ coverage/
 # doesn't need usecase-runner to execute the Playwright suite. Never
 # hand-edit; rerun `npm run usecases:generate` instead.
 
-# Env files (commit .env.example only)
+# Env files (commit only the example templates)
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # Logs & caches
 *.log

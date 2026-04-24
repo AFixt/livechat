@@ -1,0 +1,132 @@
+# DigitalOcean App Platform spec for livechat.
+#
+# See docs/deploy.md for the full deploy flow. This file is the source of
+# truth; change via PR, never via the DO web UI.
+#
+# Components:
+#   - api         (service)     — Express + Socket.IO, listens on $PORT
+#   - ui          (static)      — support console SPA
+#   - widget      (static)      — customer widget (served cross-origin)
+#   - migrate     (job, pre-deploy) — sequelize-cli db:migrate
+#   - seed-first-tenant (job, one-off) — disabled after initial run
+#
+# External:
+#   - managed MySQL 8 cluster (db)
+#   - managed Redis cluster   (redis)
+#
+# Secrets are set via the App Platform UI / doctl. Never commit real values.
+
+name: livechat
+region: nyc
+
+services:
+  - name: api
+    dockerfile_path: api/Dockerfile
+    source_dir: /
+    http_port: 3000
+    instance_count: 2
+    instance_size_slug: basic-xxs
+    health_check:
+      http_path: /api/v1/health
+      initial_delay_seconds: 10
+      period_seconds: 10
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 3
+    routes:
+      - path: /api
+    envs:
+      - { key: NODE_ENV, value: production }
+      - { key: PORT, value: "3000" }
+      - { key: LOG_LEVEL, value: info }
+      - { key: APP_URL, value: https://console.livechat.afixt.com }
+      - { key: API_URL, value: https://api.livechat.afixt.com }
+      - { key: WIDGET_URL, value: https://widget.livechat.afixt.com }
+      - { key: DB_HOST, value: "${db.HOSTNAME}" }
+      - { key: DB_PORT, value: "${db.PORT}" }
+      - { key: DB_NAME, value: "${db.DATABASE}" }
+      - { key: DB_USER, value: "${db.USERNAME}" }
+      - { key: DB_PASS, value: "${db.PASSWORD}", type: SECRET }
+      - { key: REDIS_HOST, value: "${redis.HOSTNAME}" }
+      - { key: REDIS_PORT, value: "${redis.PORT}" }
+      - { key: JWT_ACCESS_SECRET, value: "", type: SECRET }
+      - { key: JWT_REFRESH_SECRET, value: "", type: SECRET }
+      - { key: COOKIE_SECRET, value: "", type: SECRET }
+      - { key: SMTP_HOST, value: "" }
+      - { key: SMTP_PORT, value: "587" }
+      - { key: SMTP_FROM, value: "no-reply@afixt.com" }
+      - { key: S3_ENDPOINT, value: "" }
+      - { key: S3_REGION, value: "us-east-1" }
+      - { key: S3_ACCESS_KEY, value: "", type: SECRET }
+      - { key: S3_SECRET_KEY, value: "", type: SECRET }
+      - { key: S3_BUCKET, value: "livechat-attachments" }
+
+static_sites:
+  - name: ui
+    dockerfile_path: ui/Dockerfile
+    source_dir: /
+    routes:
+      - path: /
+    output_dir: /usr/share/nginx/html
+    catchall_document: index.html
+
+  - name: widget
+    dockerfile_path: widget/Dockerfile
+    source_dir: /
+    # Widget lives on its own subdomain so the cross-origin embed contract
+    # in requirements.md §6.2 doesn't tangle with the console domain.
+    domains:
+      - domain: widget.livechat.afixt.com
+        type: PRIMARY
+    output_dir: /usr/share/nginx/html
+    catchall_document: index.html
+
+domains:
+  - domain: api.livechat.afixt.com
+    type: ALIAS
+  - domain: console.livechat.afixt.com
+    type: PRIMARY
+
+databases:
+  - name: db
+    engine: MYSQL
+    production: true
+    version: "8"
+  - name: redis
+    engine: REDIS
+    production: true
+    version: "7"
+
+jobs:
+  # Runs BEFORE every deploy — applies any new Sequelize migrations
+  # before the new code starts serving traffic.
+  - name: migrate
+    kind: PRE_DEPLOY
+    dockerfile_path: api/Dockerfile
+    source_dir: /
+    run_command: npm --workspace @livechat/api run migrate
+    envs:
+      - { key: DB_HOST, value: "${db.HOSTNAME}" }
+      - { key: DB_PORT, value: "${db.PORT}" }
+      - { key: DB_NAME, value: "${db.DATABASE}" }
+      - { key: DB_USER, value: "${db.USERNAME}" }
+      - { key: DB_PASS, value: "${db.PASSWORD}", type: SECRET }
+
+  # One-off — run manually via `doctl apps create-deployment` with this job
+  # enabled, then set `instance_count: 0` in a PR to disable.
+  - name: seed-first-tenant
+    kind: POST_DEPLOY
+    dockerfile_path: api/Dockerfile
+    source_dir: /
+    run_command: npx tsx api/src/scripts/seed-first-tenant.ts
+    instance_count: 0
+    envs:
+      - { key: DB_HOST, value: "${db.HOSTNAME}" }
+      - { key: DB_PORT, value: "${db.PORT}" }
+      - { key: DB_NAME, value: "${db.DATABASE}" }
+      - { key: DB_USER, value: "${db.USERNAME}" }
+      - { key: DB_PASS, value: "${db.PASSWORD}", type: SECRET }
+      - { key: FIRST_TENANT_SLUG, value: "afixt" }
+      - { key: FIRST_TENANT_NAME, value: "AFixt" }
+      - { key: FIRST_ADMIN_EMAIL, value: "", type: SECRET }
+      - { key: FIRST_ADMIN_PASSWORD, value: "", type: SECRET }
