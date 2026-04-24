@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { createServices } from '../../src/services/index.js';
 
-import type { Redis } from 'ioredis';
 import type { Env } from '../../src/config/env.js';
+import type { Redis } from 'ioredis';
 
 function makeEnv(): Env {
   return {

@@ -1,6 +1,6 @@
-import type { Namespace, Server, Socket } from 'socket.io';
-import type { Services } from '../services/index.js';
 import type { ServerToClientEvents, VisitorSocketData, VisitorToServerEvents } from './types.js';
+import type { Services } from '../services/index.js';
+import type { Namespace, Server, Socket } from 'socket.io';
 
 /** Socket.IO namespace typed for the visitor-side vocabulary. */
 type VisitorNamespace = Namespace<

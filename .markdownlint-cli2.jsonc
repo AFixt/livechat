@@ -15,7 +15,7 @@
     "MD048": { "style": "backtick" },
     "MD049": { "style": "underscore" },
     "MD050": { "style": "asterisk" },
-    "MD053": true
+    "MD053": true,
   },
   "ignores": [
     "node_modules/",
@@ -24,6 +24,6 @@
     "build/",
     "coverage/",
     "CHANGELOG.md",
-    ".github/PULL_REQUEST_TEMPLATE.md"
-  ]
+    ".github/PULL_REQUEST_TEMPLATE.md",
+  ],
 }

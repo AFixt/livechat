@@ -8,9 +8,9 @@ import { buildTenantsRouter } from './tenants.js';
 import { buildUsersRouter } from './users.js';
 import { buildVisitorRouter } from './visitor.js';
 
-import type { Redis } from 'ioredis';
 import type { Env } from '../config/env.js';
 import type { Services } from '../services/index.js';
+import type { Redis } from 'ioredis';
 
 interface RouterDeps {
   env: Env;

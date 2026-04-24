@@ -11,9 +11,9 @@ import { requireRole } from '../middlewares/authorize.js';
 import { parsedBody, validate } from '../middlewares/validate.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
-import type { Redis } from 'ioredis';
 import type { Env } from '../config/env.js';
 import type { TenantService } from '../services/index.js';
+import type { Redis } from 'ioredis';
 
 interface TenantsRouterDeps {
   env: Env;

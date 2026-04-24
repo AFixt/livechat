@@ -1,7 +1,7 @@
 import Redis, { type Redis as RedisClient } from 'ioredis';
 
-import type { Logger } from 'pino';
 import type { Env } from './env.js';
+import type { Logger } from 'pino';
 
 /**
  * Build an ioredis client for the livechat Redis.

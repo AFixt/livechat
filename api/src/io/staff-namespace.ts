@@ -1,9 +1,9 @@
 import jwt from 'jsonwebtoken';
 
-import type { Namespace, Server, Socket } from 'socket.io';
+import type { ServerToClientEvents, StaffSocketData, StaffToServerEvents } from './types.js';
 import type { Env } from '../config/env.js';
 import type { Services } from '../services/index.js';
-import type { ServerToClientEvents, StaffSocketData, StaffToServerEvents } from './types.js';
+import type { Namespace, Server, Socket } from 'socket.io';
 
 /**
  *

@@ -10,10 +10,10 @@ import { attachIo } from '../../src/io/index.js';
 import { initModels } from '../../src/models/index.js';
 import { createServices, type Services } from '../../src/services/index.js';
 
+import type { Env } from '../../src/config/env.js';
 import type { Express } from 'express';
 import type { Sequelize } from 'sequelize';
 import type { Server as IoServer } from 'socket.io';
-import type { Env } from '../../src/config/env.js';
 
 /**
  * A fresh test env. Uses the same `livechat_db` the dev docker-compose

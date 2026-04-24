@@ -8,9 +8,6 @@ import { createTenantService } from './tenant-service.js';
 import { createUserService } from './user-service.js';
 import { createVisitorSessionService } from './visitor-session-service.js';
 
-import type { Redis } from 'ioredis';
-import type { Logger } from 'pino';
-import type { Env } from '../config/env.js';
 import type { AuditService } from './audit-service.js';
 import type { AuthService } from './auth-service.js';
 import type { ChatService } from './chat-service.js';
@@ -20,6 +17,9 @@ import type { PresenceService } from './presence-service.js';
 import type { TenantService } from './tenant-service.js';
 import type { UserService } from './user-service.js';
 import type { VisitorSessionService } from './visitor-session-service.js';
+import type { Env } from '../config/env.js';
+import type { Redis } from 'ioredis';
+import type { Logger } from 'pino';
 
 export type {
   AuditService,

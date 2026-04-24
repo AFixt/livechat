@@ -1,4 +1,3 @@
- 
 // Sequelize CLI config — intentionally CommonJS so `sequelize-cli` can require it.
 // Reads from process.env directly; no envalid here because the CLI is run
 // out-of-band (migrations) and may legitimately run with a subset of the

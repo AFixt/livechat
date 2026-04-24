@@ -3,9 +3,9 @@ import jwt from 'jsonwebtoken';
 import { Tenant, User } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
 
+import type { Env } from '../config/env.js';
 import type { RequestHandler } from 'express';
 import type { Redis } from 'ioredis';
-import type { Env } from '../config/env.js';
 
 declare module 'express-serve-static-core' {
   interface Request {

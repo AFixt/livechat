@@ -1,8 +1,8 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 
-import type { Logger } from 'pino';
 import type { Env } from '../config/env.js';
 import type { User } from '../models/index.js';
+import type { Logger } from 'pino';
 
 interface EmailDeps {
   env: Pick<Env, 'SMTP_HOST' | 'SMTP_PORT' | 'SMTP_FROM' | 'APP_URL'>;

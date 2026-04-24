@@ -8,10 +8,10 @@ import { ApiError } from '../utils/api-error.js';
 
 import { generateAccessToken, generateRefreshToken } from './tokens.js';
 
+import type { EmailService } from './email-service.js';
+import type { Env } from '../config/env.js';
 import type { UserSafe } from '@livechat/shared';
 import type { Redis } from 'ioredis';
-import type { Env } from '../config/env.js';
-import type { EmailService } from './email-service.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const VERIFY_TTL_MS = DAY_MS;

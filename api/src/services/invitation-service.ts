@@ -3,8 +3,8 @@ import { randomBytes } from 'node:crypto';
 import { Invitation, Tenant } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
 
-import type { CreateInvitationInput } from '@livechat/shared';
 import type { EmailService } from './email-service.js';
+import type { CreateInvitationInput } from '@livechat/shared';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

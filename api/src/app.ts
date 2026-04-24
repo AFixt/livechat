@@ -13,10 +13,10 @@ import { notFoundHandler } from './middlewares/not-found-handler.js';
 import { createGlobalLimiter } from './middlewares/rate-limit.js';
 import { buildRouter } from './routes/index.js';
 
-import type { Redis } from 'ioredis';
-import type { Logger } from 'pino';
 import type { Env } from './config/env.js';
 import type { Services } from './services/index.js';
+import type { Redis } from 'ioredis';
+import type { Logger } from 'pino';
 
 interface AppDeps {
   env: Env;

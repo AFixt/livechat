@@ -1,7 +1,7 @@
 import { Sequelize, type Options } from 'sequelize';
 
-import type { Logger } from 'pino';
 import type { Env } from './env.js';
+import type { Logger } from 'pino';
 
 /**
  * Build the Sequelize instance for the livechat MySQL database.

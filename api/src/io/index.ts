@@ -3,9 +3,9 @@ import { Server } from 'socket.io';
 import { registerStaffNamespace } from './staff-namespace.js';
 import { registerVisitorNamespace } from './visitor-namespace.js';
 
-import type { Server as HttpServer } from 'node:http';
 import type { Env } from '../config/env.js';
 import type { Services } from '../services/index.js';
+import type { Server as HttpServer } from 'node:http';
 
 interface IoDeps {
   env: Pick<Env, 'JWT_ACCESS_SECRET' | 'APP_URL'>;

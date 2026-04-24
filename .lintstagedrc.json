@@ -1,6 +1,6 @@
 {
-  "*.{ts,tsx,js,jsx}": ["eslint --fix --max-warnings=0", "prettier --write"],
-  "*.{css,scss}": ["stylelint --fix", "prettier --write"],
-  "*.md": ["markdownlint-cli2 --fix", "prettier --write"],
+  "*.{ts,tsx,js,jsx}": ["prettier --write", "eslint --fix --max-warnings=0"],
+  "*.{css,scss}": ["prettier --write", "stylelint --fix"],
+  "*.md": ["prettier --write", "markdownlint-cli2 --fix"],
   "*.{json,yml,yaml}": ["prettier --write"]
 }

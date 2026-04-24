@@ -12,7 +12,6 @@
   "endOfLine": "lf",
   "quoteProps": "consistent",
   "embeddedLanguageFormatting": "auto",
-  "plugins": ["prettier-plugin-organize-imports"],
   "overrides": [
     { "files": "*.md", "options": { "printWidth": 80, "proseWrap": "always" } },
     { "files": "*.{yml,yaml}", "options": { "singleQuote": false } },
