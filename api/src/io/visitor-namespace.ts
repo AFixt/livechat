@@ -76,10 +76,6 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
       tenantId,
       visitorSessionId,
     });
-    deps.io.of(STAFF_NS).to('staff').emit('visitor:joined', {
-      tenantId,
-      visitorSessionId,
-    });
 
     socket.on('chat:join', (payload) => {
       void socket.join(`chat:${payload.chatId}`);
@@ -102,7 +98,7 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
         };
         nsp.to(`chat:${payload.chatId}`).emit('chat:message', event);
         deps.io.of(STAFF_NS).to(`chat:${payload.chatId}`).emit('chat:message', event);
-        deps.io.of(STAFF_NS).to('staff').emit('chat:message', event);
+        deps.io.of(STAFF_NS).to(`tenant:${tenantId}`).emit('chat:message', event);
       })();
     });
 

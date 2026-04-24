@@ -33,7 +33,11 @@ async function start(): Promise<void> {
     await sequelize.authenticate();
     logger.info('database connection established');
 
-    await redis.connect();
+    // `lazyConnect: true` on the ioredis client plus the rate limiter
+    // constructed inside `createApp` already issues a command, so ioredis
+    // is connecting by the time we get here. A ping is the simplest way to
+    // both wait for readiness and surface connection failures at boot.
+    await redis.ping();
     logger.info('redis connection established');
 
     server.listen(env.PORT, () => {

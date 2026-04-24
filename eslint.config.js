@@ -277,6 +277,7 @@ export default tseslint.config(
       '**/db/migrations/**',
       '**/db/seeders/**',
       '**/db/config.cjs',
+      '**/api/scripts/**',
     ],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {

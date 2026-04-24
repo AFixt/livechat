@@ -24,7 +24,7 @@ async function seedTenantAndStaff(
     firstName: 'St',
     lastName: 'Aff',
     role: 'staff',
-    tenantId: null,
+    tenantId: tenant.id,
     status: 'active',
     emailVerified: true,
     emailVerificationToken: null,

@@ -67,7 +67,9 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
       void (async () => {
         const chat = await deps.services.chat.assign(payload.chatId, userId);
         void socket.join(`chat:${chat.id}`);
-        nsp.to(`chat:${chat.id}`).emit('chat:assigned', { chatId: chat.id, assignedTo: userId });
+        const assigned = { chatId: chat.id, assignedTo: userId };
+        nsp.to(`chat:${chat.id}`).emit('chat:assigned', assigned);
+        deps.io.of('/visitor').to(`chat:${chat.id}`).emit('chat:assigned', assigned);
       })();
     });
 
@@ -79,23 +81,27 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
           senderUserId: userId,
           body: payload.body,
         });
-        nsp.to(`chat:${payload.chatId}`).emit('chat:message', {
+        const event = {
           chatId: payload.chatId,
           messageId: msg.id,
-          senderKind: 'user',
+          senderKind: 'user' as const,
           senderUserId: userId,
           body: msg.body,
           deliveredAt: msg.deliveredAt.toISOString(),
-        });
+        };
+        nsp.to(`chat:${payload.chatId}`).emit('chat:message', event);
+        deps.io.of('/visitor').to(`chat:${payload.chatId}`).emit('chat:message', event);
       })();
     });
 
     socket.on('chat:typing', (payload) => {
-      nsp.to(`chat:${payload.chatId}`).emit('chat:typing', {
+      const typingEvent = {
         chatId: payload.chatId,
-        actor: 'user',
+        actor: 'user' as const,
         isTyping: payload.isTyping,
-      });
+      };
+      nsp.to(`chat:${payload.chatId}`).emit('chat:typing', typingEvent);
+      deps.io.of('/visitor').to(`chat:${payload.chatId}`).emit('chat:typing', typingEvent);
     });
 
     socket.on('chat:end', (payload) => {
@@ -104,10 +110,9 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
           chatId: payload.chatId,
           endedBy: 'support',
         });
-        nsp.to(`chat:${chat.id}`).emit('chat:ended', {
-          chatId: chat.id,
-          endedBy: 'support',
-        });
+        const endEvent = { chatId: chat.id, endedBy: 'support' as const };
+        nsp.to(`chat:${chat.id}`).emit('chat:ended', endEvent);
+        deps.io.of('/visitor').to(`chat:${chat.id}`).emit('chat:ended', endEvent);
       })();
     });
 
@@ -120,7 +125,7 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
           supportUserId: userId,
         });
         void socket.join(`chat:${chat.id}`);
-        nsp.to('staff').emit('chat:requested', {
+        nsp.to(`tenant:${chat.tenantId}`).emit('chat:requested', {
           chatId: chat.id,
           tenantId: chat.tenantId,
         });
