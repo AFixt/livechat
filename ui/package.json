@@ -14,9 +14,18 @@
     "test:unit": "vitest run --passWithNoTests",
     "test:unit:watch": "vitest",
     "test:e2e": "playwright test",
+    "size": "size-limit",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix"
   },
+  "size-limit": [
+    {
+      "name": "ui initial bundle (brotli)",
+      "path": "dist/assets/*.js",
+      "limit": "350 KB",
+      "brotli": true
+    }
+  ],
   "dependencies": {
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
@@ -42,6 +51,7 @@
     "@afixt/a11y-assert": "2.1.1",
     "@afixt/a11y-assert-reporter": "1.1.0",
     "@playwright/test": "1.59.1",
+    "@size-limit/preset-app": "12.1.0",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
@@ -50,6 +60,7 @@
     "@vitejs/plugin-react": "5.2.0",
     "@vitest/coverage-v8": "4.1.5",
     "jsdom": "29.0.2",
+    "size-limit": "12.1.0",
     "typescript": "5.7.2",
     "vite": "7.1.1",
     "vitest": "4.1.5"
