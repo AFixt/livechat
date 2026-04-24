@@ -1,0 +1,18 @@
+id: admin-view-tenants
+title: "Super admin views the tenants list"
+type: positive
+description: |
+  As the only admin-console flow with a real page right now, a super_admin
+  lands on /admin/tenants and sees the page heading in the accessibility
+  tree. The CRUD forms land in a later phase; when they do, this file
+  grows additional steps.
+
+start_location: "http://localhost:5174/admin/tenants"
+
+preconditions:
+  - A super_admin user is already authenticated.
+
+data: {}
+
+steps:
+  - locate: heading "Tenants"

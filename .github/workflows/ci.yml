@@ -53,16 +53,33 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Enforce usecase coverage
+      - name: Enforce usecase coverage (ADR-0002)
+        if: "!contains(github.event.pull_request.labels.*.name, 'skip-usecases')"
         run: |
-          base="${{ github.event.pull_request.base.sha }}"
-          head="${{ github.event.pull_request.head.sha }}"
-          changed=$(git diff --name-only "$base" "$head")
-          ui_changed=$(echo "$changed" | grep -E '^(ui|widget)/src/' || true)
-          uc_changed=$(echo "$changed" | grep -E '^usecases/' || true)
-          if [ -n "$ui_changed" ] && [ -z "$uc_changed" ]; then
-            echo "::error::UI changed without corresponding usecases/ update."
-            echo "Changed UI files:"
-            echo "$ui_changed"
+          bash scripts/ci-usecases-gate.sh \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}"
+
+  usecases-specs-in-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Regenerate Playwright specs from usecases/
+        run: npm run usecases:generate
+
+      - name: Verify generated specs match what is committed
+        run: |
+          if ! git diff --quiet --exit-code -- '**/e2e/generated/'; then
+            echo "::error::Generated Playwright specs are out of sync with usecases/."
+            echo "Run 'npm run usecases:generate' locally and commit the result."
+            git --no-pager diff -- '**/e2e/generated/' | head -60
             exit 1
           fi

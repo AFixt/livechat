@@ -13,6 +13,7 @@ node_modules/
 *.min.css
 *.generated.*
 **/generated/**
+**/e2e/generated/**
 *.d.ts.map
 *.js.map
 package-lock.json
