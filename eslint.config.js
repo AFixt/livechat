@@ -126,6 +126,7 @@ export default tseslint.config(
         { selector: 'typeLike', format: ['PascalCase'] },
         { selector: 'enumMember', format: ['PascalCase', 'UPPER_CASE'] },
         { selector: 'typeMethod', modifiers: ['requiresQuotes'], format: null },
+        { selector: 'objectLiteralMethod', format: ['camelCase', 'snake_case'] },
       ],
 
       // React
@@ -320,6 +321,9 @@ export default tseslint.config(
     rules: {
       'max-lines-per-function': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
+      // widget-element.tsx exports both a class and a helper — fast-refresh
+      // doesn't apply to Web Components anyway.
+      'react-refresh/only-export-components': 'off',
     },
   },
 

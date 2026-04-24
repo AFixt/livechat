@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AFixt livechat widget — dev host</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        padding: 2rem;
+        max-width: 60ch;
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>AFixt livechat — widget dev host</h1>
+    <p>
+      This page hosts the widget in dev mode. Configure the tenant slug below and the widget will
+      bootstrap itself into the custom element.
+    </p>
+    <p>Keyboard tab should move focus into the widget; Escape closes it.</p>
+    <afixt-livechat data-tenant-key="acme"></afixt-livechat>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

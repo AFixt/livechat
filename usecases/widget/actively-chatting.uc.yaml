@@ -1,0 +1,24 @@
+id: widget-actively-chatting
+title: "Visitor sends messages in an active chat"
+type: positive
+description: |
+  §5.1.6 — once a chat is active, the visitor can type into the compose box
+  and their messages appear in the transcript. The transcript must be a
+  log role with aria-live so screen readers announce new messages.
+
+start_location: "http://localhost:5175/"
+
+preconditions:
+  - A chat is already active (see widget-customer-initiates.uc.yaml).
+
+data:
+  followup_message: "I still need help — can someone look?"
+
+steps:
+  - locate: region "Chat transcript"
+  - locate: field "Message"
+  - focus: field "Message"
+  - enter: field "Message" value "{{ followup_message }}"
+  - locate: button "Send"
+  - activate: button "Send"
+  - verify: text "{{ followup_message }}"

@@ -1,0 +1,20 @@
+id: widget-close
+title: "Visitor can close the widget and focus returns to the trigger"
+type: positive
+description: |
+  Activating the Close button should dismiss the panel and return keyboard
+  focus to the original trigger button. This is the core focus-management
+  contract documented in ADR-0003.
+
+start_location: "http://localhost:5175/"
+
+preconditions:
+  - Widget is open (visitor has activated the trigger).
+
+data: {}
+
+steps:
+  - locate: button "Close chat widget"
+  - focus: button "Close chat widget"
+  - activate: button "Close chat widget"
+  - focus: button "Chat with support"
