@@ -25,6 +25,7 @@ export const tenantSchema = z.object({
   status: tenantStatusSchema,
   expiresAt: z.iso.datetime().nullable(),
   settings: z.record(z.string(), z.unknown()).nullable(),
+  allowedOrigins: z.array(z.string()).nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

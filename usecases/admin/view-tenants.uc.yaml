@@ -2,10 +2,9 @@ id: admin-view-tenants
 title: "Super admin views the tenants list"
 type: positive
 description: |
-  As the only admin-console flow with a real page right now, a super_admin
-  lands on /admin/tenants and sees the page heading in the accessibility
-  tree. The CRUD forms land in a later phase; when they do, this file
-  grows additional steps.
+  A super_admin lands on /admin/tenants and sees the Tenants heading and
+  a Create tenant button in the accessibility tree. The table exposes
+  column headers that screen readers can navigate.
 
 start_location: "http://localhost:5174/admin/tenants"
 
@@ -16,3 +15,4 @@ data: {}
 
 steps:
   - locate: heading "Tenants"
+  - locate: button "Create tenant"

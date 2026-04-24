@@ -16,5 +16,8 @@ test.describe('Super admin views the tenants list', () => {
     // Step 2: Locate heading "Tenants" (view-tenants.uc.yaml:1)
     await expect(page.getByRole('heading', { name: 'Tenants' })).toBeVisible();
 
+    // Step 3: Locate button "Create tenant" (view-tenants.uc.yaml:2)
+    await expect(page.getByRole('button', { name: 'Create tenant' })).toBeVisible();
+
   });
 });

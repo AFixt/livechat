@@ -49,5 +49,51 @@
     "newMessage": "New message in chat with {{name}}",
     "soundMuted": "Alert sound muted",
     "soundUnmuted": "Alert sound enabled"
+  },
+  "admin": {
+    "common": {
+      "create": "Create",
+      "cancel": "Cancel",
+      "save": "Save",
+      "edit": "Edit",
+      "delete": "Delete",
+      "actions": "Actions",
+      "loading": "Loading…",
+      "empty": "No results"
+    },
+    "tenants": {
+      "heading": "Tenants",
+      "create": "Create tenant",
+      "name": "Name",
+      "slug": "Slug",
+      "domain": "Domain",
+      "status": "Status",
+      "rotateSecret": "Rotate embed secret",
+      "newSecret": "New embed secret (save this — it won't be shown again)",
+      "allowedOrigins": "Allowed origins",
+      "allowedOriginsHelp": "One origin per line, e.g. https://example.com",
+      "embedSnippet": "Embed snippet",
+      "embedSnippetHelp": "Paste this before </body> on every page that should show the widget."
+    },
+    "users": {
+      "heading": "Users",
+      "email": "Email",
+      "name": "Name",
+      "role": "Role",
+      "status": "Status",
+      "tenant": "Tenant",
+      "filterByTenant": "Filter by tenant"
+    },
+    "invitations": {
+      "heading": "Invitations",
+      "create": "Invite user",
+      "email": "Email",
+      "role": "Role",
+      "tenant": "Tenant",
+      "expiresInDays": "Expires in (days)",
+      "inviteStatus": "Status",
+      "revoke": "Revoke",
+      "expires": "Expires at"
+    }
   }
 }

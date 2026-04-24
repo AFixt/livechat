@@ -1,0 +1,18 @@
+id: admin-view-users
+title: "Admin views the users list with tenant filter"
+type: positive
+description: |
+  An admin lands on /admin/users, sees the table of users, and can filter
+  by tenant. The filter select must be in the accessibility tree as a
+  named select control.
+
+start_location: "http://localhost:5174/admin/users"
+
+preconditions:
+  - An admin or super_admin is authenticated.
+
+data: {}
+
+steps:
+  - locate: heading "Users"
+  - locate: select "Filter by tenant"
