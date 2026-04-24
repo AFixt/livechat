@@ -13,6 +13,13 @@
     "ui",
     "widget"
   ],
+  "overrides": {
+    "zod": "4.3.6",
+    "vite": "7.1.1",
+    "@afixt/usecase-runner": {
+      "zod": "3.25.76"
+    }
+  },
   "scripts": {
     "prepare": "husky",
     "dev": "npm-run-all -p dev:*",

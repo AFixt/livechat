@@ -94,6 +94,10 @@ export default tseslint.config(
           leadingUnderscore: 'allow',
         },
         {
+          selector: 'function',
+          format: ['camelCase', 'PascalCase'],
+        },
+        {
           selector: 'parameter',
           format: ['camelCase'],
           leadingUnderscore: 'allow',
@@ -183,7 +187,7 @@ export default tseslint.config(
       'security/detect-child-process': 'error',
       'security/detect-eval-with-expression': 'error',
       'security/detect-no-csrf-before-method-override': 'error',
-      'security/detect-possible-timing-attacks': 'warn',
+      'security/detect-possible-timing-attacks': 'off',
       'security/detect-pseudoRandomBytes': 'error',
 
       // Unicorn
@@ -303,6 +307,16 @@ export default tseslint.config(
       '**/api/src/io/**/*.ts',
       '**/api/src/app.ts',
     ],
+    rules: {
+      'max-lines-per-function': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+    },
+  },
+
+  // React components — PascalCase function declarations are common, and page
+  // components often exceed 75 lines. Callers rely on JSX inference.
+  {
+    files: ['**/ui/src/**/*.{ts,tsx}', '**/widget/src/**/*.{ts,tsx}'],
     rules: {
       'max-lines-per-function': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',

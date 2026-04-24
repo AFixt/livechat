@@ -38,7 +38,6 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
 
   nsp.use((socket, next) => {
     const token = socket.handshake.auth.token as string | undefined;
-    // eslint-disable-next-line security/detect-possible-timing-attacks -- comparing against undefined literal
     if (token === undefined) {
       next(new Error('Authentication required'));
       return;

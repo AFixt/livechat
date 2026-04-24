@@ -1,0 +1,31 @@
+id: support-login
+title: "Support staff signs in"
+type: positive
+description: |
+  A staff user navigates to the support console, enters valid credentials, and
+  lands on the dashboard. Exercised in Playwright against a real browser;
+  requires the api + docker-compose stack to be running so the
+  POST /auth/login round-trips successfully.
+
+start_location: "http://localhost:5174/login"
+
+preconditions:
+  - A staff user exists in the database with the credentials below.
+
+data:
+  email: "staff@acme.example"
+  password: "Staff!Password1"
+
+steps:
+  - locate: heading "Sign in"
+  - locate: field "Email address"
+  - focus: field "Email address"
+  - enter: field "Email address" value "{{ email }}"
+  - locate: field "Password"
+  - focus: field "Password"
+  - enter: field "Password" value "{{ password }}"
+  - locate: button "Sign in"
+  - focus: button "Sign in"
+  - activate: button "Sign in"
+  - verify: url "http://localhost:5174/"
+  - locate: heading "Dashboard"

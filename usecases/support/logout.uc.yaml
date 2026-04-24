@@ -1,0 +1,20 @@
+id: support-logout
+title: "Support staff signs out"
+type: positive
+description: |
+  From the app shell, the authenticated user activates the Log out button
+  and is returned to the login page with all session state cleared.
+
+start_location: "http://localhost:5174/"
+
+preconditions:
+  - A staff user is already authenticated.
+
+data: {}
+
+steps:
+  - locate: button "Log out"
+  - focus: button "Log out"
+  - activate: button "Log out"
+  - verify: url "http://localhost:5174/login"
+  - locate: heading "Sign in"

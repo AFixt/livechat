@@ -60,14 +60,19 @@ export function createApp(deps: AppDeps): Express {
   app.use(
     pinoHttp({
       logger,
-      customProps: (req) => ({ correlationId: req.correlationId }),
+      customProps: (req) => ({
+        correlationId: (req as unknown as { correlationId?: string }).correlationId,
+      }),
       autoLogging: {
         ignore: (req) => req.url === '/api/v1/health',
       },
     }),
   );
 
-  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(buildOpenApiSpec(env)));
+  /* eslint-disable @typescript-eslint/no-deprecated -- swagger-ui-express 5 still ships .setup; replacement API not yet stable */
+  const openApiSpec = buildOpenApiSpec(env) as unknown as Parameters<typeof swaggerUi.setup>[0];
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
+  /* eslint-enable @typescript-eslint/no-deprecated */
 
   const v1 = buildRouter({
     env,
