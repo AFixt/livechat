@@ -1,4 +1,4 @@
-import { Tenant } from '../models/index.js';
+import { generateEmbedSecret, Tenant } from '../models/tenant.js';
 import { ApiError } from '../utils/api-error.js';
 
 import type { CreateTenantInput, UpdateTenantInput } from '@livechat/shared';
@@ -72,6 +72,36 @@ export function createTenantService() {
     async remove(id: string): Promise<void> {
       const tenant = await this.getById(id);
       await tenant.destroy();
+    },
+
+    /**
+     * Generate a fresh embed secret for a tenant and return it. Any
+     * identity tokens signed with the old secret become invalid
+     * immediately. The new secret is returned exactly once — the caller
+     * must hand it off to the client's backend.
+     * @param id - Tenant UUID.
+     * @returns The new secret (raw hex string, not hashed).
+     */
+    async rotateEmbedSecret(id: string): Promise<string> {
+      const tenant = await this.getById(id);
+      const secret = generateEmbedSecret();
+      tenant.embedSecret = secret;
+      await tenant.save();
+      return secret;
+    },
+
+    /**
+     * Replace the allowed-origins list for a tenant.
+     * @param id - Tenant UUID.
+     * @param origins - List of exact origin strings (e.g., `https://acme.com`).
+     *   Pass `null` to clear (no restriction).
+     * @returns The updated tenant.
+     */
+    async setAllowedOrigins(id: string, origins: string[] | null): Promise<Tenant> {
+      const tenant = await this.getById(id);
+      tenant.allowedOrigins = origins;
+      await tenant.save();
+      return tenant;
     },
   };
 }

@@ -1,5 +1,7 @@
 import { Router } from 'express';
 
+import { originAllowed } from '../middlewares/origin-allowed.js';
+
 import { buildAuthRouter } from './auth.js';
 import { buildChatsRouter } from './chats.js';
 import healthRouter from './health.js';
@@ -7,6 +9,7 @@ import { buildInvitationsRouter } from './invitations.js';
 import { buildTenantsRouter } from './tenants.js';
 import { buildUsersRouter } from './users.js';
 import { buildVisitorRouter } from './visitor.js';
+import { buildWidgetRouter } from './widget.js';
 
 import type { Env } from '../config/env.js';
 import type { Services } from '../services/index.js';
@@ -53,8 +56,10 @@ export function buildRouter(deps: RouterDeps): Router {
       invitation: deps.services.invitation,
     }),
   );
+  router.use('/widget', originAllowed(), buildWidgetRouter());
   router.use(
     '/visitor',
+    originAllowed(),
     buildVisitorRouter({
       env: deps.env,
       visitorSession: deps.services.visitorSession,

@@ -47,7 +47,7 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
       if (body.language !== undefined) initArgs.language = body.language;
       if (body.currentUrl !== undefined) initArgs.currentUrl = body.currentUrl;
       if (body.referrer !== undefined) initArgs.referrer = body.referrer;
-      if (body.identityToken !== undefined) initArgs.identityTokenSub = body.identityToken;
+      if (body.identityToken !== undefined) initArgs.identityToken = body.identityToken;
 
       const { session, cookieValue } = await deps.visitorSession.init(initArgs);
       res.cookie(VISITOR_COOKIE_NAME, cookieValue, {

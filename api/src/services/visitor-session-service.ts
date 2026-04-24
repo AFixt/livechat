@@ -1,3 +1,5 @@
+import jwt from 'jsonwebtoken';
+
 import { Tenant, VisitorSession } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
 
@@ -16,12 +18,48 @@ interface InitParams {
   language?: string;
   currentUrl?: string;
   referrer?: string;
-  identityTokenSub?: string;
+  /**
+   * Raw HS256 JWT minted by the client's backend with the tenant's
+   * `embed_secret`. When present and valid, the decoded `sub` claim is
+   * stored on the visitor session so staff can correlate the chat with
+   * the client's own user record.
+   */
+  identityToken?: string;
+}
+
+interface IdentityTokenPayload {
+  sub: string;
+  email?: string;
+  name?: string;
 }
 
 interface InitResult {
   session: VisitorSession;
   cookieValue: string;
+}
+
+/**
+ * Verify the optional identity-token JWT against a tenant's embed secret.
+ * Extracted so the reducer in `init()` stays under the complexity cap.
+ * @param token - Raw JWT (or undefined, in which case returns null).
+ * @param secret - Tenant `embed_secret` (HS256).
+ * @returns The `sub` claim, or null when no token was provided.
+ * @throws 400 ApiError on any verification failure.
+ */
+function verifyIdentityToken(token: string | undefined, secret: string): string | null {
+  if (token === undefined) return null;
+  try {
+    const decoded = jwt.verify(token, secret, {
+      algorithms: ['HS256'],
+    }) as IdentityTokenPayload;
+    if (typeof decoded.sub !== 'string' || decoded.sub.length === 0) {
+      throw ApiError.badRequest('Identity token missing sub claim');
+    }
+    return decoded.sub;
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    throw ApiError.badRequest('Invalid identity token');
+  }
 }
 
 /**
@@ -42,13 +80,15 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
       });
       if (tenant === null) throw ApiError.badRequest('Unknown tenant');
 
+      const identityTokenSub = verifyIdentityToken(params.identityToken, tenant.embedSecret);
+
       const { sessionId, cookieValue } = mintVisitorCookie(deps.env.COOKIE_SECRET);
       const hash = hashSessionId(sessionId, deps.env.COOKIE_SECRET);
       const now = new Date();
       const session = await VisitorSession.create({
         tenantId: tenant.id,
         sessionCookieHash: hash,
-        identityTokenSub: params.identityTokenSub ?? null,
+        identityTokenSub,
         userAgent: params.userAgent ?? null,
         ipAddress: params.ipAddress ?? null,
         country: null,

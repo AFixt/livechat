@@ -84,5 +84,31 @@ export function buildTenantsRouter(deps: TenantsRouterDeps): Router {
     }),
   );
 
+  router.post(
+    '/:id/rotate-embed-secret',
+    requireRole('super_admin'),
+    asyncHandler(async (req, res) => {
+      const id = req.params.id;
+      if (typeof id !== 'string') return;
+      const secret = await deps.tenant.rotateEmbedSecret(id);
+      res.json({ success: true, data: { embedSecret: secret } });
+    }),
+  );
+
+  router.put(
+    '/:id/allowed-origins',
+    requireRole('super_admin'),
+    asyncHandler(async (req, res) => {
+      const id = req.params.id;
+      if (typeof id !== 'string') return;
+      const body = req.body as { origins?: unknown } | undefined;
+      const origins = Array.isArray(body?.origins)
+        ? (body.origins as string[]).filter((s) => typeof s === 'string')
+        : null;
+      const tenant = await deps.tenant.setAllowedOrigins(id, origins);
+      res.json({ success: true, data: tenant });
+    }),
+  );
+
   return router;
 }

@@ -292,6 +292,7 @@ export default tseslint.config(
       'jsdoc/require-jsdoc': 'off',
       'unicorn/filename-case': 'off',
       '@typescript-eslint/naming-convention': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
       'n/no-unpublished-require': 'off',
       'max-lines': 'off',
     },
