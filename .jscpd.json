@@ -25,6 +25,5 @@
   ],
   "absolute": true,
   "gitignore": true,
-  "silent": false,
-  "exitCode": 1
+  "silent": false
 }
