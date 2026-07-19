@@ -4,20 +4,18 @@ import {
   type CreateTenantInput,
   type UpdateTenantInput,
 } from '@livechat/shared';
-import { Router } from 'express';
 
-import { authenticate } from '../middlewares/authenticate.js';
 import { requireRole } from '../middlewares/authorize.js';
 import { parsedBody, validate } from '../middlewares/validate.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
-import type { Env } from '../config/env.js';
-import type { TenantService } from '../services/index.js';
-import type { Redis } from 'ioredis';
+import { buildAdminRouter } from './admin-router.js';
 
-interface TenantsRouterDeps {
-  env: Env;
-  redis: Redis;
+import type { AdminRouterDeps } from './admin-router.js';
+import type { TenantService } from '../services/index.js';
+import type { Router } from 'express';
+
+interface TenantsRouterDeps extends AdminRouterDeps {
   tenant: TenantService;
 }
 
@@ -27,9 +25,7 @@ interface TenantsRouterDeps {
  * @returns Express router.
  */
 export function buildTenantsRouter(deps: TenantsRouterDeps): Router {
-  const router = Router();
-  router.use(authenticate({ env: deps.env, redis: deps.redis }));
-  router.use(requireRole('super_admin', 'admin'));
+  const router = buildAdminRouter(deps);
 
   router.get(
     '/',

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+build/
+coverage/
+reports/
+a11y-reports/
+playwright-report/
+**/*.min.css

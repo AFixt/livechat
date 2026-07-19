@@ -2,27 +2,25 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Collapse from '@mui/material/Collapse';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AdminTable } from '../../components/admin/admin-table.js';
 import { CreateTenantDialog } from '../../components/admin/create-tenant-dialog.js';
 import { EmbedSnippet } from '../../components/admin/embed-snippet.js';
+import { PageHeader } from '../../components/admin/page-header.js';
 import {
   useRotateEmbedSecret,
   useSetAllowedOrigins,
   useTenants,
 } from '../../hooks/use-admin-queries.js';
 
+import type { AdminTableColumn } from '../../components/admin/admin-table.js';
 import type { Tenant } from '@livechat/shared';
 
 /**
@@ -36,61 +34,41 @@ export function AdminTenantsPage(): React.JSX.Element {
   const [createOpen, setCreateOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  const columns: AdminTableColumn[] = [
+    { label: t('admin.tenants.name') },
+    { label: t('admin.tenants.slug') },
+    { label: t('admin.tenants.domain') },
+    { label: t('admin.tenants.status') },
+    { label: t('admin.common.actions'), align: 'right' },
+  ];
+
   return (
     <Stack spacing={3}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography component="h2" variant="h4">
-          {t('admin.tenants.heading')}
-        </Typography>
-        <Button
-          variant="contained"
-          onClick={() => {
+      <PageHeader
+        heading={t('admin.tenants.heading')}
+        action={{
+          label: t('admin.tenants.create'),
+          onClick: () => {
             setCreateOpen(true);
-          }}
-        >
-          {t('admin.tenants.create')}
-        </Button>
-      </Box>
+          },
+        }}
+      />
 
-      {tenantsQuery.isLoading ? <Typography>{t('admin.common.loading')}</Typography> : null}
-      {tenantsQuery.isError ? (
-        <Alert severity="error" role="alert">
-          {tenantsQuery.error.message}
-        </Alert>
-      ) : null}
-
-      {tenantsQuery.data !== undefined && (
-        <TableContainer component={Paper} variant="outlined">
-          <Table aria-label={t('admin.tenants.heading')}>
-            <TableHead>
-              <TableRow>
-                <TableCell>{t('admin.tenants.name')}</TableCell>
-                <TableCell>{t('admin.tenants.slug')}</TableCell>
-                <TableCell>{t('admin.tenants.domain')}</TableCell>
-                <TableCell>{t('admin.tenants.status')}</TableCell>
-                <TableCell align="right">{t('admin.common.actions')}</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {tenantsQuery.data.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5}>{t('admin.common.empty')}</TableCell>
-                </TableRow>
-              )}
-              {tenantsQuery.data.map((tenant) => (
-                <TenantRow
-                  key={tenant.id}
-                  tenant={tenant}
-                  expanded={expandedId === tenant.id}
-                  onToggle={() => {
-                    setExpandedId((prev) => (prev === tenant.id ? null : tenant.id));
-                  }}
-                />
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
+      <AdminTable
+        label={t('admin.tenants.heading')}
+        columns={columns}
+        query={tenantsQuery}
+        rowKey={(tenant) => tenant.id}
+        renderRow={(tenant) => (
+          <TenantRow
+            tenant={tenant}
+            expanded={expandedId === tenant.id}
+            onToggle={() => {
+              setExpandedId((prev) => (prev === tenant.id ? null : tenant.id));
+            }}
+          />
+        )}
+      />
 
       <CreateTenantDialog
         open={createOpen}

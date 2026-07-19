@@ -9,6 +9,7 @@
   "format": ["typescript", "tsx", "javascript", "jsx", "css", "scss", "markdown"],
   "ignore": [
     "**/node_modules/**",
+    "**/db/migrations/**",
     "**/dist/**",
     "**/build/**",
     "**/coverage/**",
