@@ -258,3 +258,7 @@ Once scaffolded, root-level scripts mirror the house pattern:
   accessibility tree across shadow DOM) get their own `CLAUDE.md`.
 - Strict types + Zod schemas + TSDoc exist so Claude can read _signatures_
   rather than implementations.
+
+## Reviewing PRs
+
+Whenever I ask to review a PR (pull request), use the `pr-review` skill.
