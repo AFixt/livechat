@@ -7,14 +7,15 @@ import TextField from '@mui/material/TextField';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AdminTable } from '../../components/admin/admin-table.js';
-import { FormDialog } from '../../components/admin/form-dialog.js';
-import { PageHeader } from '../../components/admin/page-header.js';
 import {
+  AdminTable,
+  FormDialog,
+  PageHeader,
   SelectField,
   toTenantOptions,
   toValueOptions,
-} from '../../components/admin/select-field.js';
+  useDialogForm,
+} from '../../components/admin/index.js';
 import {
   useCreateInvitation,
   useInvitations,
@@ -22,7 +23,7 @@ import {
   useTenants,
 } from '../../hooks/use-admin-queries.js';
 
-import type { AdminTableColumn } from '../../components/admin/admin-table.js';
+import type { AdminTableColumn } from '../../components/admin/index.js';
 import type { Role } from '@livechat/shared';
 
 const ROLE_OPTIONS = toValueOptions(roleSchema.options);
@@ -112,51 +113,38 @@ function CreateInvitationDialog(props: CreateInvitationDialogProps): React.JSX.E
   const [role, setRole] = useState<Role>('staff');
   const [tenantId, setTenantId] = useState<string>('');
   const [expiresInDays, setExpiresInDays] = useState(7);
-  const [error, setError] = useState<string | null>(null);
   const mutation = useCreateInvitation();
   const tenantsQuery = useTenants();
 
-  const reset = (): void => {
-    setEmail('');
-    setRole('staff');
-    setTenantId('');
-    setExpiresInDays(7);
-    setError(null);
-  };
+  const form = useDialogForm({
+    onClose: props.onClose,
+    reset: () => {
+      setEmail('');
+      setRole('staff');
+      setTenantId('');
+      setExpiresInDays(7);
+    },
+  });
 
-  const handleClose = (): void => {
-    reset();
-    props.onClose();
-  };
-
-  const handleSubmit = (e: React.SyntheticEvent): void => {
-    e.preventDefault();
-    setError(null);
+  const onSubmit = form.handleSubmit((handlers) => {
     const input: Parameters<typeof mutation.mutate>[0] = {
       email,
       role,
       expiresInDays,
     };
     if (tenantId !== '') input.tenantId = tenantId;
-    mutation.mutate(input, {
-      onSuccess: () => {
-        handleClose();
-      },
-      onError: (err) => {
-        setError(err.message || t('app.error'));
-      },
-    });
-  };
+    mutation.mutate(input, handlers);
+  });
 
   return (
     <FormDialog
       open={props.open}
       title={t('admin.invitations.create')}
-      error={error}
+      error={form.error}
       submitLabel={t('admin.common.create')}
       submitting={mutation.isPending}
-      onClose={handleClose}
-      onSubmit={handleSubmit}
+      onClose={form.close}
+      onSubmit={onSubmit}
     >
       <TextField
         label={t('admin.invitations.email')}

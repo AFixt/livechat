@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useCreateTenant } from '../../hooks/use-admin-queries.js';
 
 import { FormDialog } from './form-dialog.js';
+import { useDialogForm } from './use-dialog-form.js';
 
 interface CreateTenantDialogProps {
   open: boolean;
@@ -21,44 +22,35 @@ export function CreateTenantDialog(props: CreateTenantDialogProps): React.JSX.El
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [domain, setDomain] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const mutation = useCreateTenant();
 
-  const handleClose = (): void => {
-    setName('');
-    setSlug('');
-    setDomain('');
-    setError(null);
-    props.onClose();
-  };
+  const form = useDialogForm({
+    onClose: props.onClose,
+    reset: () => {
+      setName('');
+      setSlug('');
+      setDomain('');
+    },
+  });
 
-  const handleSubmit = (e: React.SyntheticEvent): void => {
-    e.preventDefault();
-    setError(null);
+  const onSubmit = form.handleSubmit((handlers) => {
     const input: Parameters<typeof mutation.mutate>[0] = {
       name,
       slug,
     };
     if (domain.trim() !== '') input.domain = domain.trim();
-    mutation.mutate(input, {
-      onSuccess: () => {
-        handleClose();
-      },
-      onError: (err) => {
-        setError(err.message || t('app.error'));
-      },
-    });
-  };
+    mutation.mutate(input, handlers);
+  });
 
   return (
     <FormDialog
       open={props.open}
       title={t('admin.tenants.create')}
-      error={error}
+      error={form.error}
       submitLabel={t('admin.common.create')}
       submitting={mutation.isPending}
-      onClose={handleClose}
-      onSubmit={handleSubmit}
+      onClose={form.close}
+      onSubmit={onSubmit}
     >
       <TextField
         label={t('admin.tenants.name')}

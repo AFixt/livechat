@@ -7,17 +7,18 @@ import TableRow from '@mui/material/TableRow';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AdminTable } from '../../components/admin/admin-table.js';
-import { FormDialog } from '../../components/admin/form-dialog.js';
-import { PageHeader } from '../../components/admin/page-header.js';
 import {
+  AdminTable,
+  FormDialog,
+  PageHeader,
   SelectField,
   toTenantOptions,
   toValueOptions,
-} from '../../components/admin/select-field.js';
+  useDialogForm,
+} from '../../components/admin/index.js';
 import { useTenants, useUpdateUser, useUsers } from '../../hooks/use-admin-queries.js';
 
-import type { AdminTableColumn } from '../../components/admin/admin-table.js';
+import type { AdminTableColumn } from '../../components/admin/index.js';
 import type { Role, UserSafe, UserStatus } from '@livechat/shared';
 
 const ROLE_OPTIONS = toValueOptions(roleSchema.options);
@@ -109,36 +110,24 @@ function EditUserDialog(props: EditUserDialogProps): React.JSX.Element | null {
   const mutation = useUpdateUser();
   const [role, setRole] = useState<Role>(props.user?.role ?? 'staff');
   const [status, setStatus] = useState<UserStatus>(props.user?.status ?? 'active');
-  const [error, setError] = useState<string | null>(null);
+  const form = useDialogForm({ onClose: props.onClose });
 
   if (props.user === null) return null;
   const user = props.user;
 
-  const handleSubmit = (e: React.SyntheticEvent): void => {
-    e.preventDefault();
-    setError(null);
-    mutation.mutate(
-      { id: user.id, input: { role, status } },
-      {
-        onSuccess: () => {
-          props.onClose();
-        },
-        onError: (err) => {
-          setError(err.message || t('app.error'));
-        },
-      },
-    );
-  };
+  const onSubmit = form.handleSubmit((handlers) => {
+    mutation.mutate({ id: user.id, input: { role, status } }, handlers);
+  });
 
   return (
     <FormDialog
       open
       title={user.email}
-      error={error}
+      error={form.error}
       submitLabel={t('admin.common.save')}
       submitting={mutation.isPending}
       onClose={props.onClose}
-      onSubmit={handleSubmit}
+      onSubmit={onSubmit}
     >
       <SelectField
         label={t('admin.users.role')}

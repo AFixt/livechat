@@ -10,17 +10,19 @@ import Typography from '@mui/material/Typography';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AdminTable } from '../../components/admin/admin-table.js';
-import { CreateTenantDialog } from '../../components/admin/create-tenant-dialog.js';
-import { EmbedSnippet } from '../../components/admin/embed-snippet.js';
-import { PageHeader } from '../../components/admin/page-header.js';
+import {
+  AdminTable,
+  CreateTenantDialog,
+  EmbedSnippet,
+  PageHeader,
+} from '../../components/admin/index.js';
 import {
   useRotateEmbedSecret,
   useSetAllowedOrigins,
   useTenants,
 } from '../../hooks/use-admin-queries.js';
 
-import type { AdminTableColumn } from '../../components/admin/admin-table.js';
+import type { AdminTableColumn } from '../../components/admin/index.js';
 import type { Tenant } from '@livechat/shared';
 
 /**
