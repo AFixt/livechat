@@ -23,6 +23,13 @@
     "dist/",
     "build/",
     "coverage/",
+    // Generated artifacts. Playwright writes Markdown failure contexts into
+    // test-results/, so without these a failing e2e run also fails the
+    // markdownlint gate and blocks the push.
+    "**/test-results/",
+    "**/playwright-report/",
+    "reports/",
+    "a11y-reports/",
     "CHANGELOG.md",
     ".github/PULL_REQUEST_TEMPLATE.md",
   ],
