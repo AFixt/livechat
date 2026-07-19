@@ -5,7 +5,7 @@ arbitrary client websites via a JS snippet.
 
 This repo started life as a Tenon.io-era spec that was written but never built
 (see the original post,
-[Build vs. Buy is even harder when you care about accessibility](http://blog.tenon.io/build-vs-buy-is-even-harder-when-you-care-about-accessibility/)).
+[Build vs. Buy is even harder when you care about accessibility](https://web.archive.org/web/20230606121614/https://blog.tenon.io/build-vs-buy-is-even-harder-when-you-care-about-accessibility/)).
 It is now being built as an AFixt product.
 
 ## Status
