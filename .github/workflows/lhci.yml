@@ -20,8 +20,14 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+          # Writes a runner-local .npmrc so NODE_AUTH_TOKEN authenticates
+          # the private @afixt/* packages. Kept out of the committed .npmrc
+          # so local installs keep using the developer's own credentials.
+          registry-url: "https://registry.npmjs.org"
 
-      - run: npm ci --engine-strict=false
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Build shared, UI and widget
         run: npm run build
