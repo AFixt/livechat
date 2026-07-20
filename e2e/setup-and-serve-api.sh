@@ -13,8 +13,18 @@ ROOT_PASS="${DB_ROOT_PASS:-livechat_root_pass}"
 
 docker compose up -d mysql redis mailhog
 
-echo "e2e: waiting for MySQL…"
-until docker exec livechat-mysql mysqladmin ping -h localhost --silent >/dev/null 2>&1; do
+# Wait until root auth actually works, not just until the socket answers. On a
+# fresh volume (CI) the entrypoint runs a temporary server during init that
+# replies to `mysqladmin ping` before the root password is applied, so a ping
+# probe races ahead and the next command hits "Access denied". A root SELECT
+# only succeeds once the real, initialised server is up.
+echo "e2e: waiting for MySQL to accept root auth…"
+deadline=$(( SECONDS + 90 ))
+until docker exec livechat-mysql mysql -uroot "-p${ROOT_PASS}" -e 'SELECT 1' >/dev/null 2>&1; do
+  if [ "$SECONDS" -ge "$deadline" ]; then
+    echo "e2e: MySQL did not accept root auth within 90s" >&2
+    exit 1
+  fi
   sleep 1
 done
 
