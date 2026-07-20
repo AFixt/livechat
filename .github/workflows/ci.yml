@@ -40,8 +40,14 @@ jobs:
           sudo mv osv-scanner /usr/local/bin/
 
       - name: Install gitleaks
+        # Release assets embed the version (gitleaks_8.30.1_linux_x64.tar.gz),
+        # so `releases/latest/download/<unversioned>` 404s and curl pipes an
+        # HTML error page into tar. Resolve the tag, then build the real name.
         run: |
-          curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz | tar -xz
+          set -euo pipefail
+          tag=$(curl -sSf https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r .tag_name)
+          version=${tag#v}
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/${tag}/gitleaks_${version}_linux_x64.tar.gz" | tar -xz gitleaks
           sudo mv gitleaks /usr/local/bin/
 
       - name: Install lychee
