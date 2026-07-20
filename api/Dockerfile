@@ -28,5 +28,9 @@ COPY api/src api/src
 COPY shared/package.json shared/
 COPY shared/src shared/src
 
+# Drop to the unprivileged user the node images ship with. Everything above
+# is copied read-only, so no chown is needed.
+USER node
+
 EXPOSE 3000
 CMD ["npm", "--workspace", "@livechat/api", "run", "start"]

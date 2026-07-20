@@ -21,10 +21,16 @@ jobs:
 
       - name: Resolve target URL
         id: target
+        # Values reach the script through env rather than `${{ }}`
+        # interpolation, which would splice them into the shell source
+        # before it runs.
+        env:
+          INPUT_URL: ${{ github.event.inputs.target_url }}
+          VAR_URL: ${{ vars.ZAP_TARGET_URL }}
         run: |
-          url="${{ github.event.inputs.target_url }}"
+          url="$INPUT_URL"
           if [ -z "$url" ]; then
-            url="${{ vars.ZAP_TARGET_URL }}"
+            url="$VAR_URL"
           fi
           if [ -z "$url" ]; then
             echo "::warning::No ZAP_TARGET_URL configured — scan skipped. Set vars.ZAP_TARGET_URL or pass an input."
