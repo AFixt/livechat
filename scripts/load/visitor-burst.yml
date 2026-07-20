@@ -1,0 +1,70 @@
+# Artillery load scenario — visitor burst
+#
+# Simulates the plan's acceptance target: 1,000 concurrent visitors per
+# tenant, each doing the widget-init → customer-initiated-chat → message
+# send flow. Does NOT exercise Socket.IO (that needs a dedicated engine
+# plugin); this is the REST-layer shakedown.
+#
+# Usage:
+#   docker compose up -d mysql redis
+#   npm --workspace api run migrate
+#   npx tsx api/scripts/seed-dev.mjs   # creates tenant 'acme'
+#   npm --workspace api run dev &
+#   npm run load
+#
+# Tune the arrival rates to what the machine under test can handle.
+
+config:
+  target: "http://localhost:23001"
+  phases:
+    - name: Warmup
+      duration: 20
+      arrivalRate: 10
+    - name: Ramp
+      duration: 60
+      arrivalRate: 10
+      rampTo: 200
+    - name: Sustained
+      duration: 120
+      arrivalRate: 200
+  processor: ""
+  http:
+    timeout: 10
+  defaults:
+    headers:
+      Content-Type: application/json
+
+scenarios:
+  - name: visitor journey
+    flow:
+      - post:
+          url: /api/v1/visitor/session
+          json:
+            tenantKey: acme
+            currentUrl: "https://example.com/product/42"
+            language: en
+          capture:
+            - json: $.data.sessionId
+              as: sessionId
+          expect:
+            - statusCode: 201
+      - think: 1
+
+      - post:
+          url: /api/v1/visitor/chats
+          json:
+            customerName: "Load Test {{ $randomString() }}"
+            body: "Hi, I'm testing the load runner — please ignore."
+          capture:
+            - json: $.data.chat.id
+              as: chatId
+          expect:
+            - statusCode: 201
+      - think: 2
+
+      - post:
+          url: /api/v1/visitor/heartbeat
+          json:
+            currentUrl: "https://example.com/checkout"
+          expect:
+            - statusCode: 200

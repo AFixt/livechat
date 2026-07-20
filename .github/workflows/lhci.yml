@@ -1,0 +1,47 @@
+name: Lighthouse CI
+
+on:
+  pull_request:
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: lhci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lhci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          # Writes a runner-local .npmrc so NODE_AUTH_TOKEN authenticates
+          # the private @afixt/* packages. Kept out of the committed .npmrc
+          # so local installs keep using the developer's own credentials.
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Build shared, UI and widget
+        run: npm run build
+
+      - name: Run Lighthouse CI against UI preview
+        run: |
+          npx --yes @lhci/cli@0.14.x autorun \
+            --collect.staticDistDir=./ui/dist \
+            --config=./.lighthouserc.json
+        continue-on-error: false
+
+      - name: Upload Lighthouse artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: .lighthouseci/

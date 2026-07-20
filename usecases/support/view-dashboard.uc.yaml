@@ -1,0 +1,22 @@
+id: support-view-dashboard
+title: "Support staff sees empty visitor and chat lists after login"
+type: positive
+description: |
+  After signing in, the dashboard shows the Visitors and Your chats regions,
+  both with the empty-state message when no visitor has connected yet. Exists
+  primarily to verify the accessibility structure of the dashboard: headings,
+  regions, and empty-state messaging are all in the accessibility tree.
+
+start_location: "http://localhost:5174/"
+
+preconditions:
+  - A staff user is already authenticated (see support-login.uc.yaml).
+
+data: {}
+
+steps:
+  - locate: heading "Dashboard"
+  - locate: heading "Visitors on site"
+  - locate: heading "Your chats"
+  - locate: text "No visitors are currently on the site."
+  - locate: text "No active chats."

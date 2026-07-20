@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnp.*
+.yarn/
+
+# Build outputs
+dist/
+build/
+out/
+coverage/
+.vite/
+.turbo/
+
+# Generated code (by usecase-runner) — committed per ADR-0002 so CI
+# doesn't need usecase-runner to execute the Playwright suite. Never
+# hand-edit; rerun `npm run usecases:generate` instead.
+
+# Env files (commit only the example templates)
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Logs & caches
+*.log
+.cache/
+.eslintcache
+.stylelintcache
+reports/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Test artifacts
+test-results/
+playwright-report/
+a11y-reports/
+
+# TypeScript
+*.tsbuildinfo
+
+# lychee link-check cache
+.lycheecache

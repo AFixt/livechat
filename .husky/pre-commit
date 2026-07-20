@@ -1,0 +1,7 @@
+npx lint-staged
+npx tsc-files --noEmit
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --no-banner
+else
+  echo "warn: gitleaks not installed — run scripts/bootstrap.sh" >&2
+fi

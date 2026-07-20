@@ -1,0 +1,29 @@
+{
+  "threshold": 1,
+  "minTokens": 50,
+  "minLines": 5,
+  "maxLines": 1000,
+  "maxSize": "100kb",
+  "reporters": ["console", "html"],
+  "output": "./reports/jscpd",
+  "format": ["typescript", "tsx", "javascript", "jsx", "css", "scss", "markdown"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/db/migrations/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/e2e/generated/**",
+    "**/*.test.{ts,tsx,js,jsx}",
+    "**/*.spec.{ts,tsx,js,jsx}",
+    "**/*.stories.{ts,tsx}",
+    "**/__fixtures__/**",
+    "**/__snapshots__/**",
+    "**/generated/**",
+    "**/*.generated.*",
+    "**/*.min.*"
+  ],
+  "absolute": true,
+  "gitignore": true,
+  "silent": false
+}

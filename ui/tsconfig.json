@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "moduleResolution": "Bundler",
+    "outDir": "./dist",
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "@livechat/shared": ["../shared/src/index.ts"],
+      "@livechat/shared/*": ["../shared/src/*"]
+    }
+  },
+  "include": ["src/**/*", "vite.config.ts", "vitest.config.ts"],
+  "exclude": ["node_modules", "dist", "coverage", "e2e/generated"]
+}

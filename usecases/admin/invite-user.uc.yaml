@@ -1,0 +1,31 @@
+id: admin-invite-user
+title: "Admin invites a new staff user"
+type: positive
+description: |
+  An admin opens the Create invitation dialog on /admin/invitations, fills
+  in email + role + tenant + expiry, submits, and sees the new pending
+  invitation in the table.
+
+start_location: "http://localhost:5174/admin/invitations"
+
+preconditions:
+  - An admin or super_admin is authenticated.
+  - At least one tenant exists.
+
+data:
+  invitee_email: "newbie@acme.example"
+
+steps:
+  - locate: heading "Invitations"
+  - locate: button "Invite user"
+  - focus: button "Invite user"
+  - activate: button "Invite user"
+  - locate: heading "Invite user"
+  - locate: field "Email"
+  - focus: field "Email"
+  - enter: field "Email" value "{{ invitee_email }}"
+  - locate: select "Role"
+  - select: select "Role" option "staff"
+  - locate: button "Create"
+  - activate: button "Create"
+  - verify: text "{{ invitee_email }}"

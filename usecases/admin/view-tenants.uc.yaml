@@ -1,0 +1,18 @@
+id: admin-view-tenants
+title: "Super admin views the tenants list"
+type: positive
+description: |
+  A super_admin lands on /admin/tenants and sees the Tenants heading and
+  a Create tenant button in the accessibility tree. The table exposes
+  column headers that screen readers can navigate.
+
+start_location: "http://localhost:5174/admin/tenants"
+
+preconditions:
+  - A super_admin user is already authenticated.
+
+data: {}
+
+steps:
+  - locate: heading "Tenants"
+  - locate: button "Create tenant"

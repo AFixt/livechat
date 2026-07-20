@@ -1,0 +1,39 @@
+# Build outputs
+dist/
+build/
+out/
+coverage/
+.vite/
+
+# Dependencies
+node_modules/
+
+# Generated
+*.min.js
+*.min.css
+*.generated.*
+**/generated/**
+**/e2e/generated/**
+*.d.ts.map
+*.js.map
+package-lock.json
+
+# Env and secrets
+.env*
+!.env.example
+
+# Logs and caches
+*.log
+.cache/
+.eslintcache
+.stylelintcache
+reports/
+
+# Editor
+.vscode/
+.idea/
+
+# Misc
+.DS_Store
+CHANGELOG.md
+LICENSE

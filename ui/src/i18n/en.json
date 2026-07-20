@@ -1,0 +1,99 @@
+{
+  "app": {
+    "title": "livechat support console",
+    "loading": "Loading…",
+    "error": "Something went wrong"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "availability": "Availability",
+    "admin": {
+      "tenants": "Tenants",
+      "users": "Users",
+      "invitations": "Invitations"
+    },
+    "logout": "Log out"
+  },
+  "auth": {
+    "login": {
+      "heading": "Sign in",
+      "email": "Email address",
+      "password": "Password",
+      "submit": "Sign in",
+      "forgot": "Forgot password?",
+      "submitting": "Signing in…"
+    },
+    "errors": {
+      "invalidCredentials": "Invalid email or password",
+      "locked": "Account is temporarily locked. Try again later."
+    }
+  },
+  "dashboard": {
+    "heading": "Dashboard",
+    "visitors": {
+      "heading": "Visitors on site",
+      "empty": "No visitors are currently on the site.",
+      "page": "Current page"
+    },
+    "chats": {
+      "heading": "Your chats",
+      "empty": "No active chats.",
+      "accept": "Accept chat",
+      "end": "End chat",
+      "send": "Send",
+      "messageLabel": "Message",
+      "typing": "{{name}} is typing…"
+    }
+  },
+  "alerts": {
+    "newMessage": "New message in chat with {{name}}",
+    "soundMuted": "Alert sound muted",
+    "soundUnmuted": "Alert sound enabled"
+  },
+  "admin": {
+    "common": {
+      "create": "Create",
+      "cancel": "Cancel",
+      "save": "Save",
+      "edit": "Edit",
+      "delete": "Delete",
+      "actions": "Actions",
+      "loading": "Loading…",
+      "empty": "No results"
+    },
+    "tenants": {
+      "heading": "Tenants",
+      "create": "Create tenant",
+      "name": "Name",
+      "slug": "Slug",
+      "domain": "Domain",
+      "status": "Status",
+      "rotateSecret": "Rotate embed secret",
+      "newSecret": "New embed secret (save this — it won't be shown again)",
+      "allowedOrigins": "Allowed origins",
+      "allowedOriginsHelp": "One origin per line, e.g. https://example.com",
+      "embedSnippet": "Embed snippet",
+      "embedSnippetHelp": "Paste this before </body> on every page that should show the widget."
+    },
+    "users": {
+      "heading": "Users",
+      "email": "Email",
+      "name": "Name",
+      "role": "Role",
+      "status": "Status",
+      "tenant": "Tenant",
+      "filterByTenant": "Filter by tenant"
+    },
+    "invitations": {
+      "heading": "Invitations",
+      "create": "Invite user",
+      "email": "Email",
+      "role": "Role",
+      "tenant": "Tenant",
+      "expiresInDays": "Expires in (days)",
+      "inviteStatus": "Status",
+      "revoke": "Revoke",
+      "expires": "Expires at"
+    }
+  }
+}

@@ -1,0 +1,4 @@
+# ZAP baseline rule tuning. Format: <ruleId>	<threshold>	<comment>
+# Thresholds: IGNORE | WARN | FAIL (default is FAIL for HIGH/MEDIUM, WARN for LOW)
+#
+# No overrides today — start strict, relax only with a documented reason.

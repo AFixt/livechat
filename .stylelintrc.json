@@ -1,0 +1,42 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "plugins": ["@double-great/stylelint-a11y", "stylelint-declaration-strict-value"],
+  "rules": {
+    "a11y/content-property-no-static-value": true,
+    "a11y/font-size-is-readable": true,
+    "a11y/line-height-is-vertical-rhythmed": null,
+    "a11y/media-prefers-reduced-motion": true,
+    "a11y/no-display-none": true,
+    "a11y/no-obsolete-attribute": true,
+    "a11y/no-obsolete-element": true,
+    "a11y/no-outline-none": true,
+    "a11y/no-text-align-justify": true,
+    "a11y/selector-pseudo-class-focus": true,
+
+    "color-no-invalid-hex": true,
+    "color-named": "never",
+    "color-function-notation": "modern",
+    "alpha-value-notation": "percentage",
+
+    "declaration-no-important": true,
+    "declaration-block-no-redundant-longhand-properties": true,
+    "shorthand-property-no-redundant-values": true,
+
+    "no-duplicate-selectors": true,
+    "no-descending-specificity": null,
+    "selector-max-id": 0,
+    "selector-max-universal": 1,
+    "selector-no-qualifying-type": [true, { "ignore": ["attribute", "class"] }],
+
+    "unit-allowed-list": ["em", "rem", "%", "px", "vh", "vw", "svh", "lvh", "dvh", "deg", "s", "ms", "fr", "ch"],
+    "length-zero-no-unit": true,
+
+    "scale-unlimited/declaration-strict-value": [["/color$/", "z-index", "font-family"], { "ignoreValues": ["transparent", "inherit", "currentColor", "none", "unset", "initial"] }],
+
+    "media-feature-name-no-unknown": true,
+    "media-feature-range-notation": "context",
+
+    "at-rule-no-unknown": [true, { "ignoreAtRules": ["tailwind", "apply", "layer", "screen", "variants", "responsive"] }]
+  },
+  "ignoreFiles": ["node_modules/**", "**/node_modules/**", "dist/**", "build/**", "coverage/**", "**/*.min.css"]
+}

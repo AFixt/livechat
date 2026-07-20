@@ -1,0 +1,36 @@
+{
+  "config": {
+    "default": true,
+    "MD003": { "style": "atx" },
+    "MD004": { "style": "dash" },
+    "MD007": { "indent": 2 },
+    "MD013": false,
+    "MD024": { "siblings_only": true },
+    "MD025": true,
+    "MD029": { "style": "ordered" },
+    "MD033": { "allowed_elements": ["br", "details", "summary", "kbd", "sub", "sup"] },
+    "MD040": true,
+    "MD041": true,
+    "MD046": { "style": "fenced" },
+    "MD048": { "style": "backtick" },
+    "MD049": { "style": "underscore" },
+    "MD050": { "style": "asterisk" },
+    "MD053": true,
+  },
+  "ignores": [
+    "node_modules/",
+    "**/node_modules/",
+    "dist/",
+    "build/",
+    "coverage/",
+    // Generated artifacts. Playwright writes Markdown failure contexts into
+    // test-results/, so without these a failing e2e run also fails the
+    // markdownlint gate and blocks the push.
+    "**/test-results/",
+    "**/playwright-report/",
+    "reports/",
+    "a11y-reports/",
+    "CHANGELOG.md",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+  ],
+}

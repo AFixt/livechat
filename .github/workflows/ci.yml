@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          # Writes a runner-local .npmrc so NODE_AUTH_TOKEN authenticates
+          # the private @afixt/* packages. Kept out of the committed .npmrc
+          # so local installs keep using the developer's own credentials.
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Install OSV-Scanner
+        run: |
+          curl -sSL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 -o osv-scanner
+          chmod +x osv-scanner
+          sudo mv osv-scanner /usr/local/bin/
+
+      - name: Install gitleaks
+        # Release assets embed the version (gitleaks_8.30.1_linux_x64.tar.gz),
+        # so `releases/latest/download/<unversioned>` 404s and curl pipes an
+        # HTML error page into tar. Resolve the tag, then build the real name.
+        run: |
+          set -euo pipefail
+          tag=$(curl -sSf https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r .tag_name)
+          version=${tag#v}
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/${tag}/gitleaks_${version}_linux_x64.tar.gz" | tar -xz gitleaks
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Install lychee
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --no-progress '**/*.md'
+
+      - run: npm run check:all
+
+  usecases-diff-gate:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enforce usecase coverage (ADR-0002)
+        if: "!contains(github.event.pull_request.labels.*.name, 'skip-usecases')"
+        run: |
+          bash scripts/ci-usecases-gate.sh \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}"
+
+  usecases-specs-in-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          # Writes a runner-local .npmrc so NODE_AUTH_TOKEN authenticates
+          # the private @afixt/* packages. Kept out of the committed .npmrc
+          # so local installs keep using the developer's own credentials.
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Regenerate Playwright specs from usecases/
+        run: npm run usecases:generate
+
+      - name: Verify generated specs match what is committed
+        run: |
+          if ! git diff --quiet --exit-code -- '**/e2e/generated/'; then
+            echo "::error::Generated Playwright specs are out of sync with usecases/."
+            echo "Run 'npm run usecases:generate' locally and commit the result."
+            git --no-pager diff -- '**/e2e/generated/' | head -60
+            exit 1
+          fi

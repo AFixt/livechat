@@ -1,0 +1,49 @@
+name: OWASP ZAP baseline (scheduled)
+
+on:
+  schedule:
+    - cron: "0 6 * * 2"
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "URL to scan (e.g., https://chat.afixt.com). Falls back to ZAP_TARGET_URL repo variable."
+        required: false
+
+jobs:
+  zap-baseline:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve target URL
+        id: target
+        # Values reach the script through env rather than `${{ }}`
+        # interpolation, which would splice them into the shell source
+        # before it runs.
+        env:
+          INPUT_URL: ${{ github.event.inputs.target_url }}
+          VAR_URL: ${{ vars.ZAP_TARGET_URL }}
+        run: |
+          url="$INPUT_URL"
+          if [ -z "$url" ]; then
+            url="$VAR_URL"
+          fi
+          if [ -z "$url" ]; then
+            echo "::warning::No ZAP_TARGET_URL configured — scan skipped. Set vars.ZAP_TARGET_URL or pass an input."
+            exit 0
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: ZAP baseline scan
+        if: steps.target.outputs.url != ''
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ steps.target.outputs.url }}
+          rules_file_name: .github/zap/rules.tsv
+          fail_action: true
+          allow_issue_writing: true
+          cmd_options: "-a -j"

@@ -1,0 +1,30 @@
+id: admin-create-tenant
+title: "Super admin creates a new tenant"
+type: positive
+description: |
+  A super_admin opens the Create tenant dialog, fills in the required
+  name + slug (and optional domain), submits, and sees the new tenant
+  in the list.
+
+start_location: "http://localhost:5174/admin/tenants"
+
+preconditions:
+  - A super_admin user is authenticated.
+
+data:
+  tenant_name: "Beta Corp"
+  tenant_slug: "beta-corp"
+
+steps:
+  - locate: button "Create tenant"
+  - focus: button "Create tenant"
+  - activate: button "Create tenant"
+  - locate: heading "Create tenant"
+  - locate: field "Name"
+  - focus: field "Name"
+  - enter: field "Name" value "{{ tenant_name }}"
+  - locate: field "Slug"
+  - enter: field "Slug" value "{{ tenant_slug }}"
+  - locate: button "Create"
+  - activate: button "Create"
+  - verify: text "{{ tenant_name }}"

@@ -1,0 +1,39 @@
+# Link checking for this repo's own Markdown only.
+#
+# The `links` script globs `**/*.md`, which lychee expands itself — without
+# these exclusions it walks every dependency README (~2,400 files, ~39,000
+# links) instead of the ~31 files we actually author.
+
+exclude_path = [
+  "node_modules",
+  "dist",
+  "build",
+  "coverage",
+  "reports",
+  "playwright-report",
+  "test-results",
+  "a11y-reports",
+]
+
+# Local dev URLs documented in READMEs and deploy notes are not reachable
+# from a checker, and RFC 2606 reserves example.com/.example for docs.
+exclude = [
+  "^http://localhost",
+  "^https://localhost",
+  "^http://127\\.0\\.0\\.1",
+  "^https?://.*\\.example$",
+  "^https?://.*\\.example\\.com",
+  "^https?://example\\.com",
+  # Private AFixt repos answer 404 to an unauthenticated checker. Drop this
+  # entry once they are public, or run lychee with --github-token.
+  "^https://github\\.com/AFixt/usecase-runner",
+]
+
+# Sites that block automated checkers answer 403/429 to lychee but are fine
+# in a browser — treat those as reachable rather than broken.
+accept = ["200..=299", "403", "429"]
+
+cache = true
+max_cache_age = "2d"
+max_retries = 2
+timeout = 20

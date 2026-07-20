@@ -1,0 +1,31 @@
+id: widget-customer-initiates
+title: "Visitor opens the widget and starts a chat"
+type: positive
+description: |
+  §5.1.3 — visitor activates the trigger, lands in the name + first-message
+  form, fills both fields, submits, and the widget transitions to the active-
+  chat state with the first message already in the transcript.
+
+start_location: "http://localhost:5175/"
+
+preconditions:
+  - The API stack is running with an "acme" tenant.
+
+data:
+  visitor_name: "Pat Visitor"
+  first_message: "Hi there, I need help with my order."
+
+steps:
+  - locate: button "Chat with support"
+  - focus: button "Chat with support"
+  - activate: button "Chat with support"
+  - locate: heading "Chat with support"
+  - locate: field "Your name"
+  - focus: field "Your name"
+  - enter: field "Your name" value "{{ visitor_name }}"
+  - locate: field "How can we help?"
+  - enter: field "How can we help?" value "{{ first_message }}"
+  - locate: button "Start chat"
+  - focus: button "Start chat"
+  - activate: button "Start chat"
+  - verify: text "{{ first_message }}"
