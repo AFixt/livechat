@@ -16,8 +16,10 @@ import type { Sequelize } from 'sequelize';
 import type { Server as IoServer } from 'socket.io';
 
 /**
- * A fresh test env. Uses the same `livechat_db` the dev docker-compose
- * exposes — tests drop + recreate every table before running.
+ * A fresh test env. Defaults to a dedicated `livechat_test` database —
+ * integration tests `sync({ force: true })`, so pointing them at the shared
+ * dev `livechat_db` would wipe whatever you're working on. Override `DB_NAME`
+ * to target another database.
  * @returns Env for integration testing.
  */
 export function testEnv(): Env {
@@ -26,7 +28,7 @@ export function testEnv(): Env {
     PORT: 0,
     DB_HOST: process.env['DB_HOST'] ?? 'localhost',
     DB_PORT: process.env['DB_PORT'] === undefined ? 23307 : Number(process.env['DB_PORT']),
-    DB_NAME: process.env['DB_NAME'] ?? 'livechat_db',
+    DB_NAME: process.env['DB_NAME'] ?? 'livechat_test',
     DB_USER: process.env['DB_USER'] ?? 'livechat_user',
     DB_PASS: process.env['DB_PASS'] ?? 'livechat_pass',
     REDIS_HOST: process.env['REDIS_HOST'] ?? 'localhost',

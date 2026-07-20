@@ -31,8 +31,8 @@ interface ChatsState {
   upsertVisitor: (v: Visitor) => void;
   /** Remove a visitor. */
   removeVisitor: (visitorSessionId: string) => void;
-  /** Add or update a chat summary. */
-  upsertChat: (chat: ChatSummary) => void;
+  /** Add or update a chat summary. A partial merges onto the existing row. */
+  upsertChat: (chat: Partial<ChatSummary> & { id: string }) => void;
   /** Append a message to a chat. */
   appendMessage: (chatId: string, message: ChatMessage) => void;
   /** Mark a chat as ended. */
@@ -61,17 +61,28 @@ export const useChatsStore = create<ChatsState>()((set) => ({
     });
   },
   upsertChat: (chat) => {
-    set((state) => ({
-      chats: {
-        ...state.chats,
-        [chat.id]: { ...state.chats[chat.id], ...chat },
-      },
-    }));
+    set((state) => {
+      const existing = state.chats[chat.id] ?? {
+        id: chat.id,
+        customerName: null,
+        status: 'active' as const,
+        messages: [],
+      };
+      return { chats: { ...state.chats, [chat.id]: { ...existing, ...chat } } };
+    });
   },
   appendMessage: (chatId, message) => {
     set((state) => {
-      const existing = state.chats[chatId];
-      if (existing === undefined) return state;
+      // Register a stub if the chat isn't known yet, rather than dropping the
+      // message: a `chat:message` can race ahead of the `chat:requested` that
+      // introduces the chat, and a silently-dropped message is worse than a
+      // summary that fills in a moment later.
+      const existing = state.chats[chatId] ?? {
+        id: chatId,
+        customerName: null,
+        status: 'active' as const,
+        messages: [],
+      };
       if (existing.messages.some((m) => m.id === message.id)) return state;
       return {
         chats: {

@@ -38,6 +38,7 @@
     "chats": {
       "heading": "Your chats",
       "empty": "No active chats.",
+      "noSelection": "Select a chat to view the conversation.",
       "accept": "Accept chat",
       "end": "End chat",
       "send": "Send",

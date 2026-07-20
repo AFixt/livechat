@@ -1,0 +1,32 @@
+id: support-open-chat
+title: "Support staff opens a chat and sees the transcript and composer"
+type: positive
+description: |
+  With an active chat selected from "Your chats", the operator sees the chat
+  transcript (a live log region) and the reply composer — a labelled Message
+  field, a Send button, and an End chat control. Documents the operator side
+  of a live conversation (§5.2).
+
+  The transition into an active chat is real-time and socket-driven, so the
+  precondition below cannot be established by this single-page usecase; the
+  cross-ends e2e journey suite (ADR-0007) exercises the full round trip. This
+  file is the behavioural source of truth for the operator's chat surface.
+
+start_location: "http://localhost:5174/"
+
+preconditions:
+  - A staff user is authenticated (see support-login.uc.yaml).
+  - The operator has an active chat selected (established over sockets — see
+    the e2e journey suite).
+
+data:
+  reply: "Happy to help — let me take a look at that for you."
+
+steps:
+  - locate: heading "Your chats"
+  - locate: region "Chat transcript"
+  - locate: field "Message"
+  - focus: field "Message"
+  - enter: field "Message" value "{{ reply }}"
+  - locate: button "Send"
+  - locate: button "End chat"
