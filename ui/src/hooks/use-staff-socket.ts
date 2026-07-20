@@ -21,6 +21,13 @@ interface VisitorEvent {
   visitorSessionId: string;
 }
 
+interface ChatRequestedEvent {
+  chatId: string;
+  tenantId: string;
+  customerName: string | null;
+  status: string;
+}
+
 /**
  * Subscribe to the staff Socket.IO namespace for the lifetime of the
  * dashboard. Pipes visitor/chat events into the Zustand store and fires
@@ -30,6 +37,7 @@ export function useStaffSocket(): void {
   const { t } = useTranslation();
   const upsertVisitor = useChatsStore((s) => s.upsertVisitor);
   const removeVisitor = useChatsStore((s) => s.removeVisitor);
+  const upsertChat = useChatsStore((s) => s.upsertChat);
   const appendMessage = useChatsStore((s) => s.appendMessage);
   const markEnded = useChatsStore((s) => s.markEnded);
 
@@ -45,6 +53,14 @@ export function useStaffSocket(): void {
     };
     const onVisitorLeft = (v: VisitorEvent): void => {
       removeVisitor(v.visitorSessionId);
+    };
+    const onChatRequested = (c: ChatRequestedEvent): void => {
+      upsertChat({
+        id: c.chatId,
+        customerName: c.customerName,
+        status: c.status as 'pending' | 'active' | 'ended_by_customer' | 'ended_by_support',
+        messages: [],
+      });
     };
     const onMessage = (msg: MessageEvent): void => {
       appendMessage(msg.chatId, {
@@ -65,14 +81,16 @@ export function useStaffSocket(): void {
 
     socket.on('visitor:joined', onVisitorJoined);
     socket.on('visitor:left', onVisitorLeft);
+    socket.on('chat:requested', onChatRequested);
     socket.on('chat:message', onMessage);
     socket.on('chat:ended', onEnded);
 
     return () => {
       socket.off('visitor:joined', onVisitorJoined);
       socket.off('visitor:left', onVisitorLeft);
+      socket.off('chat:requested', onChatRequested);
       socket.off('chat:message', onMessage);
       socket.off('chat:ended', onEnded);
     };
-  }, [appendMessage, markEnded, removeVisitor, t, upsertVisitor]);
+  }, [appendMessage, markEnded, removeVisitor, t, upsertChat, upsertVisitor]);
 }

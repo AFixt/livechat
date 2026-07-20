@@ -138,6 +138,8 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
         nsp.to(`tenant:${chat.tenantId}`).emit('chat:requested', {
           chatId: chat.id,
           tenantId: chat.tenantId,
+          customerName: chat.customerName,
+          status: chat.status,
         });
       });
     });

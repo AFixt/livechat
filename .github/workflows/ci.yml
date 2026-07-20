@@ -101,3 +101,28 @@ jobs:
             git --no-pager diff -- '**/e2e/generated/' | head -60
             exit 1
           fi
+
+  e2e:
+    # Executes the cross-ends journeys and the runnable generated specs. Each
+    # Playwright config brings up the stack (docker compose infra + a seeded
+    # livechat_e2e database) via its webServer, so this only needs Node, the
+    # browser, and Docker (present on the runner).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run e2e journeys + generated specs
+        run: npm run test:e2e
