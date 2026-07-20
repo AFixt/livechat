@@ -10,8 +10,17 @@ export interface ServerToClientEvents {
   'visitor:page_changed': (payload: { visitorSessionId: string; currentUrl: string }) => void;
   /** A visitor disconnected. */
   'visitor:left': (payload: { tenantId: string; visitorSessionId: string }) => void;
-  /** A customer-initiated chat was just created. */
-  'chat:requested': (payload: { chatId: string; tenantId: string }) => void;
+  /**
+   * A chat needs an operator's attention — emitted to staff when a visitor
+   * initiates (and joins) a chat, or when support initiates one. Carries
+   * enough of a summary for the console to list it without a follow-up fetch.
+   */
+  'chat:requested': (payload: {
+    chatId: string;
+    tenantId: string;
+    customerName: string | null;
+    status: string;
+  }) => void;
   /** A chat was assigned to a staff user. */
   'chat:assigned': (payload: { chatId: string; assignedTo: string }) => void;
   /** A new message was posted to a chat. */

@@ -11,8 +11,8 @@ import Typography from '@mui/material/Typography';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useChatInbox } from '../hooks/use-chat-inbox.js';
 import { useStaffSocket } from '../hooks/use-staff-socket.js';
-import { clearBadge } from '../services/favicon-badge.js';
 import { getStaffSocket } from '../services/socket.js';
 import { useChatsStore } from '../store/chats.js';
 
@@ -23,10 +23,10 @@ import { useChatsStore } from '../store/chats.js';
 export function DashboardPage(): React.JSX.Element {
   const { t } = useTranslation();
   useStaffSocket();
+  const { selectChat } = useChatInbox();
   const visitors = useChatsStore((s) => s.visitors);
   const chats = useChatsStore((s) => s.chats);
   const activeChatId = useChatsStore((s) => s.activeChatId);
-  const setActiveChat = useChatsStore((s) => s.setActiveChat);
 
   const activeChat = activeChatId === null ? null : (chats[activeChatId] ?? null);
   const visitorList = Object.values(visitors);
@@ -79,8 +79,7 @@ export function DashboardPage(): React.JSX.Element {
                   key={c.id}
                   selected={c.id === activeChatId}
                   onClick={() => {
-                    setActiveChat(c.id);
-                    clearBadge();
+                    selectChat(c.id);
                   }}
                 >
                   <ListItemText primary={c.customerName ?? c.id.slice(0, 8)} secondary={c.status} />
@@ -134,7 +133,7 @@ function ChatPane(props: ChatPaneProps): React.JSX.Element {
     return (
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Typography component="p" color="text.secondary">
-          {t('dashboard.chats.empty')}
+          {t('dashboard.chats.noSelection')}
         </Typography>
       </Paper>
     );

@@ -11,7 +11,8 @@
     "shared",
     "api",
     "ui",
-    "widget"
+    "widget",
+    "e2e"
   ],
   "overrides": {
     "zod": "4.3.6",
@@ -93,7 +94,8 @@
     "license:report": "license-checker-rseidelsohn --production --csv --out reports/licenses.csv",
     "check": "npm-run-all -p lint typecheck stylelint markdownlint usecases:validate",
     "check:all": "npm-run-all -s check test build size dupes links security license:check",
-    "ci": "npm run check:all"
+    "ci": "npm run check:all",
+    "test:e2e:journeys": "npm --workspace @livechat/e2e run test"
   },
   "devDependencies": {
     "@afixt/usecase-runner": "1.3.2",

@@ -17,7 +17,16 @@ const redis = createRedis(env, logger);
 initModels(sequelize);
 const services = createServices({ env, logger, redis });
 
-const app = createApp({ env, logger, redis, services });
+// In test (e2e) the auth limiter's `max: 5` would trip across repeated
+// logins and CI retries; NODE_ENV is only ever 'test' for the e2e stack,
+// never a deployed server, so this is safe.
+const app = createApp({
+  env,
+  logger,
+  redis,
+  services,
+  ...(env.NODE_ENV === 'test' && { skipRateLimit: true }),
+});
 const server = createServer(app);
 attachIo(server, { env, logger, services });
 

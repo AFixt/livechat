@@ -86,9 +86,20 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
     });
 
     socket.on('chat:join', (payload) => {
-      detach(deps.logger, 'chat room join failed', async () =>
-        socket.join(`chat:${payload.chatId}`),
-      );
+      detach(deps.logger, 'chat room join failed', async () => {
+        await socket.join(`chat:${payload.chatId}`);
+        // Notify staff that this chat needs attention. Visitor-initiated
+        // chats are created over HTTP, which emits nothing — without this
+        // the chat never reaches the console's list. Idempotent: the client
+        // upserts, so re-joining (e.g. restart) is harmless.
+        const chat = await deps.services.chat.getById(payload.chatId);
+        deps.io.of(STAFF_NS).to(`tenant:${tenantId}`).emit('chat:requested', {
+          chatId: chat.id,
+          tenantId,
+          customerName: chat.customerName,
+          status: chat.status,
+        });
+      });
     });
 
     socket.on('chat:message', (payload) => {
