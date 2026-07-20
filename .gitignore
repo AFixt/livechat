@@ -41,3 +41,6 @@ a11y-reports/
 
 # TypeScript
 *.tsbuildinfo
+
+# lychee link-check cache
+.lycheecache
