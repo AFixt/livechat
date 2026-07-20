@@ -24,6 +24,8 @@
     "@babel/core": "^7.29.6",
     "basic-ftp": "^5.3.1",
     "brace-expansion@^5.0.0": "^5.0.6",
+    "brace-expansion@^1.0.0": "^1.1.16",
+    "brace-expansion@^2.0.0": "^2.1.2",
     "esbuild@>=0.26.0": "^0.28.1",
     "fast-uri": "^3.1.2",
     "form-data": "^4.0.6",
@@ -40,7 +42,8 @@
     "yaml@^2.0.0": "^2.8.3",
     "sequelize": {
       "uuid": "^11.1.1"
-    }
+    },
+    "engine.io": "^6.6.7"
   },
   "scripts": {
     "prepare": "husky",
