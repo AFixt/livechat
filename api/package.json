@@ -57,7 +57,7 @@
     "@types/cors": "2.8.19",
     "@types/express": "5.0.6",
     "@types/jsonwebtoken": "9.0.10",
-    "@types/node": "22.19.17",
+    "@types/node": "26.1.1",
     "@types/nodemailer": "8.0.0",
     "@types/supertest": "7.2.0",
     "@types/swagger-ui-express": "4.1.8",
