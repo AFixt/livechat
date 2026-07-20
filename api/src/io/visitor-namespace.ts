@@ -1,5 +1,8 @@
+import { detach } from './detach.js';
+
 import type { ServerToClientEvents, VisitorSocketData, VisitorToServerEvents } from './types.js';
 import type { Services } from '../services/index.js';
+import type { Logger } from 'pino';
 import type { Namespace, Server, Socket } from 'socket.io';
 
 /** Socket.IO namespace typed for the visitor-side vocabulary. */
@@ -18,6 +21,7 @@ const STAFF_NS = '/staff';
 
 interface VisitorDeps {
   io: Server;
+  logger: Logger;
   services: Pick<Services, 'chat' | 'presence' | 'visitorSession'>;
 }
 
@@ -67,22 +71,28 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
 
   nsp.on('connection', (socket: VisitorSocket) => {
     const { visitorSessionId, tenantId } = socket.data;
-    void socket.join(`visitor:${visitorSessionId}`);
+    detach(deps.logger, 'visitor room join failed', async () =>
+      socket.join(`visitor:${visitorSessionId}`),
+    );
 
-    void deps.services.presence.markVisitorPresent(tenantId, visitorSessionId, {
-      connectedAt: Date.now(),
-    });
+    detach(deps.logger, 'marking visitor present failed', async () =>
+      deps.services.presence.markVisitorPresent(tenantId, visitorSessionId, {
+        connectedAt: Date.now(),
+      }),
+    );
     deps.io.of(STAFF_NS).to(`tenant:${tenantId}`).emit('visitor:joined', {
       tenantId,
       visitorSessionId,
     });
 
     socket.on('chat:join', (payload) => {
-      void socket.join(`chat:${payload.chatId}`);
+      detach(deps.logger, 'chat room join failed', async () =>
+        socket.join(`chat:${payload.chatId}`),
+      );
     });
 
     socket.on('chat:message', (payload) => {
-      void (async () => {
+      detach(deps.logger, 'visitor chat:message failed', async () => {
         const msg = await deps.services.chat.sendMessage({
           chatId: payload.chatId,
           senderKind: 'visitor',
@@ -99,7 +109,7 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
         nsp.to(`chat:${payload.chatId}`).emit('chat:message', event);
         deps.io.of(STAFF_NS).to(`chat:${payload.chatId}`).emit('chat:message', event);
         deps.io.of(STAFF_NS).to(`tenant:${tenantId}`).emit('chat:message', event);
-      })();
+      });
     });
 
     socket.on('chat:typing', (payload) => {
@@ -116,7 +126,7 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
     });
 
     socket.on('chat:end', (payload) => {
-      void (async () => {
+      detach(deps.logger, 'visitor chat:end failed', async () => {
         const chat = await deps.services.chat.endChat({
           chatId: payload.chatId,
           endedBy: 'customer',
@@ -127,7 +137,7 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
         };
         nsp.to(`chat:${chat.id}`).emit('chat:ended', event);
         deps.io.of(STAFF_NS).to(`chat:${chat.id}`).emit('chat:ended', event);
-      })();
+      });
     });
 
     socket.on('visitor:page_changed', (payload) => {
@@ -138,13 +148,13 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
     });
 
     socket.on('disconnect', () => {
-      void (async () => {
+      detach(deps.logger, 'visitor disconnect cleanup failed', async () => {
         await deps.services.presence.removeVisitor(tenantId, visitorSessionId);
         deps.io.of(STAFF_NS).to(`tenant:${tenantId}`).emit('visitor:left', {
           tenantId,
           visitorSessionId,
         });
-      })();
+      });
     });
   });
 

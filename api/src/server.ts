@@ -19,7 +19,7 @@ const services = createServices({ env, logger, redis });
 
 const app = createApp({ env, logger, redis, services });
 const server = createServer(app);
-attachIo(server, { env, services });
+attachIo(server, { env, logger, services });
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 

@@ -125,7 +125,7 @@ export async function probeLiveHarness(): Promise<LiveTestHarness | null> {
   const base = await probeHarness();
   if (base === null) return null;
   const httpServer = createServer(base.app);
-  const io = attachIo(httpServer, { env: base.env, services: base.services });
+  const io = attachIo(httpServer, { env: base.env, logger: base.logger, services: base.services });
   await new Promise<void>((resolve) => {
     httpServer.listen(0, '127.0.0.1', () => {
       resolve();
