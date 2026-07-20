@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { openAdmin } from '../support/actors.js';
 import { API_URL, CONSOLE_URL } from '../support/config.js';
+import { PROVISIONING } from '../support/fixtures.js';
 import { clearInbox, extractInvitationToken, waitForEmail } from '../support/mailhog.js';
 
 /**
@@ -15,10 +16,12 @@ import { clearInbox, extractInvitationToken, waitForEmail } from '../support/mai
  * `POST /auth/register` is the real, tested path. Everything on either side
  * of that step is driven through the actual UI.
  */
-const TENANT_NAME = 'Provisioned Co';
-const TENANT_SLUG = 'provisioned-co';
-const INVITEE_EMAIL = 'newbie@provisioned.example';
-const INVITEE_PASSWORD = 'NewStaff!Pass1';
+const {
+  tenantName: TENANT_NAME,
+  tenantSlug: TENANT_SLUG,
+  inviteeEmail: INVITEE_EMAIL,
+  inviteePassword: INVITEE_PASSWORD,
+} = PROVISIONING;
 
 test('super admin provisions a tenant, invites staff, who then signs in', async ({ browser }) => {
   await clearInbox();

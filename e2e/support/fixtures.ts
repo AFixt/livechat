@@ -80,3 +80,15 @@ export const PENDING_INVITATION = {
   tenantSlug: 'acme',
   token: 'e2e-seed-invitation-token-0001',
 } as const;
+
+/**
+ * The tenant and staff account the provisioning journey creates at runtime
+ * (not seeded). Kept here with the other test credentials so specs never
+ * hold their own literal passwords.
+ */
+export const PROVISIONING = {
+  tenantName: 'Provisioned Co',
+  tenantSlug: 'provisioned-co',
+  inviteeEmail: 'newbie@provisioned.example',
+  inviteePassword: 'NewStaff!Pass1',
+} as const;
