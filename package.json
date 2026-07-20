@@ -73,7 +73,7 @@
     "test:api": "npm --workspace api run test",
     "test:ui": "npm --workspace ui run test:unit",
     "test:widget": "npm --workspace widget run test:unit",
-    "test:e2e": "npm-run-all -s usecases:generate test:e2e:ui test:e2e:widget",
+    "test:e2e": "npm-run-all -s usecases:generate test:e2e:journeys test:e2e:ui test:e2e:widget",
     "test:e2e:ui": "npm --workspace ui run test:e2e",
     "test:e2e:widget": "npm --workspace widget run test:e2e",
     "usecases:validate": "usecase-runner validate usecases/",

@@ -11,6 +11,8 @@ services:
       MYSQL_PASSWORD: livechat_pass
     volumes:
       - mysql_data:/var/lib/mysql
+      # Creates livechat_test + livechat_e2e on first init (fresh volume / CI).
+      - ./scripts/mysql-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s

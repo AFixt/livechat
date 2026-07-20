@@ -11,6 +11,6 @@
       "@livechat/shared/*": ["../shared/src/*"]
     }
   },
-  "include": ["src/**/*", "vite.config.ts", "vitest.config.ts"],
+  "include": ["src/**/*", "vite.config.ts", "vitest.config.ts", "playwright.config.ts", "e2e/**/*"],
   "exclude": ["node_modules", "dist", "coverage", "e2e/generated"]
 }
