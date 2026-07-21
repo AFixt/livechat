@@ -1,0 +1,31 @@
+id: widget-no-support
+title: "Visitor sees the offline state when no support is available"
+type: negative
+description: |
+  §5.1.4 — when a visitor initiates a chat while no support agent is online,
+  the widget shows the offline state instead of a live chat: an explanation
+  plus an email-capture form so the message reaches the support queue.
+
+  Whether this state is reached depends on staff availability at initiation
+  (the POST /visitor/chats response carries `supportAvailable`), which is
+  socket-driven, so the full path is exercised in the cross-ends journey suite
+  (ADR-0007). This file is the behavioural source of truth for the offline
+  surface itself.
+
+start_location: "http://localhost:5175/"
+
+preconditions:
+  - No support agent is available for the tenant.
+  - The visitor has initiated a chat (name + first message submitted).
+
+data:
+  fallback_email: "visitor@example.com"
+
+steps:
+  - locate: text "Our support team isn't online right now. Leave us your email and we'll reply."
+  - locate: field "Email address"
+  - focus: field "Email address"
+  - enter: field "Email address" value "{{ fallback_email }}"
+  - locate: button "Send"
+  - focus: button "Send"
+  - activate: button "Send"

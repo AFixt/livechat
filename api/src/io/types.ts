@@ -42,6 +42,12 @@ export interface ServerToClientEvents {
   'chat:ended': (payload: { chatId: string; endedBy: 'customer' | 'support' }) => void;
   /** Staff availability flipped (visitor-facing). */
   'support:availability_changed': (payload: { available: boolean }) => void;
+  /**
+   * Support proactively started a chat with this visitor (§5.1.5). Emitted to
+   * the visitor's own room so the widget can surface the `support_initiated`
+   * invitation even before it has joined a chat room.
+   */
+  'support:initiated': (payload: { chatId: string }) => void;
 }
 
 /**

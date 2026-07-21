@@ -1,0 +1,31 @@
+id: support-initiate-chat
+title: "Operator starts a chat with a visitor from the presence list"
+type: extension
+description: |
+  §5.1.5 (operator side) — each visitor in the "Visitors on site" list is an
+  activatable control that starts a support-initiated chat with that visitor
+  (emitting chat:initiate). The visitor then receives the invitation in their
+  widget.
+
+  The visitor list is populated over sockets from live presence, and the
+  resulting chat arrives back as a real-time chat:requested event, so the
+  precondition and full round trip cannot be established by this single-page
+  usecase; the cross-ends journey suite (ADR-0007) exercises it. This file is
+  the behavioural source of truth for the operator's initiate affordance.
+
+start_location: "http://localhost:5174/"
+
+preconditions:
+  - A staff user is authenticated (see support-login.uc.yaml).
+  - At least one visitor is present on the site (established over sockets — see
+    the e2e journey suite).
+
+data: {}
+
+steps:
+  - locate: heading "Visitors on site"
+  - note: |
+      Each visitor row is a button whose accessible name is
+      "Start a chat with visitor <id>"; activating it emits chat:initiate for
+      that visitor. The per-visitor name and the socket round trip are covered
+      by the cross-ends journey suite.
