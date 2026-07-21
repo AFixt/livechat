@@ -30,6 +30,10 @@ const apiEnv: Record<string, string> = {
   S3_SECRET_KEY: 'livechat_minio_pass',
   S3_BUCKET: 'livechat-attachments',
   LOG_LEVEL: 'warn',
+  // These standalone widget specs have no agent socket, so seed one available
+  // staff placeholder — otherwise a visitor-initiated chat lands in no_support
+  // and the customer-initiates happy path can't reach the active state.
+  SEED_STAFF_AVAILABLE: '1',
 };
 
 export default defineConfig({

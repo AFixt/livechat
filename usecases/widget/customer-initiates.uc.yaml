@@ -10,6 +10,9 @@ start_location: "http://localhost:5175/"
 
 preconditions:
   - The API stack is running with an "acme" tenant.
+  - At least one support agent is available (the widget harness seeds this),
+    so the chat lands in the active state rather than the offline no_support
+    state.
 
 data:
   visitor_name: "Pat Visitor"

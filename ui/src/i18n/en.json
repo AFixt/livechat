@@ -33,7 +33,8 @@
     "visitors": {
       "heading": "Visitors on site",
       "empty": "No visitors are currently on the site.",
-      "page": "Current page"
+      "page": "Current page",
+      "startChat": "Start a chat with visitor {{id}}"
     },
     "chats": {
       "heading": "Your chats",

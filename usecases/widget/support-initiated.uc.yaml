@@ -1,0 +1,27 @@
+id: widget-support-initiated
+title: "Visitor sees the invitation when support starts a chat"
+type: extension
+description: |
+  §5.1.5 — when a support agent proactively starts a chat with a visitor, the
+  widget surfaces an invitation dialog. Accepting moves the visitor into the
+  active chat; "Not now" dismisses it.
+
+  The trigger is a `support:initiated` socket event emitted when the console
+  operator activates a visitor row (chat:initiate), so the end-to-end path is
+  exercised in the cross-ends journey suite (ADR-0007). This file is the
+  behavioural source of truth for the visitor-facing invitation surface.
+
+start_location: "http://localhost:5175/"
+
+preconditions:
+  - A support agent has initiated a chat with this visitor (chat:initiate,
+    established over sockets — see the e2e journey suite).
+
+data: {}
+
+steps:
+  - locate: heading "A support agent wants to chat"
+  - locate: text "Would you like to start a conversation right now?"
+  - locate: button "Accept"
+  - focus: button "Accept"
+  - activate: button "Accept"

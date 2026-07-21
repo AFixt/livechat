@@ -35,7 +35,14 @@ docker exec livechat-mysql mysql -uroot "-p${ROOT_PASS}" -e \
 echo "e2e: seeding ${DB_NAME}…"
 node_modules/.bin/tsx e2e/support/seed.ts
 
-# Deterministic availability: reconnecting agent sockets re-add themselves.
+# Deterministic availability: start with no staff available so the journey
+# suite controls it via real agent sockets (reconnecting agents re-add
+# themselves). The widget's standalone happy-path specs have no agent socket,
+# so they opt in via SEED_STAFF_AVAILABLE=1 to seed one placeholder — otherwise
+# a visitor-initiated chat would (correctly) land in the no_support state.
 docker exec livechat-redis redis-cli DEL presence:staff:available >/dev/null 2>&1 || true
+if [ "${SEED_STAFF_AVAILABLE:-}" = "1" ]; then
+  docker exec livechat-redis redis-cli SADD presence:staff:available e2e-seed-agent >/dev/null 2>&1 || true
+fi
 
 exec node_modules/.bin/tsx api/src/server.ts

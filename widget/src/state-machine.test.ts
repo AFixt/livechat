@@ -36,22 +36,56 @@ describe('widget state machine', () => {
     expect(ended.state).toBe('ended');
   });
 
-  it('restart returns to the restart state with an empty transcript', () => {
-    const loaded = {
-      ...initialModel(),
-      state: 'ended' as const,
-      messages: [
-        {
-          id: 'x',
-          body: 'prior',
-          senderKind: 'user' as const,
-          deliveredAt: new Date().toISOString(),
-        },
-      ],
+  it('restart opens to the restart state preloaded with the prior transcript', () => {
+    const priorMessage = {
+      id: 'x',
+      body: 'prior',
+      senderKind: 'user' as const,
+      deliveredAt: new Date().toISOString(),
     };
-    const restarted = reduce(loaded, { type: 'restart' });
+    const restarted = reduce(initialModel(), {
+      type: 'restart',
+      chatId: 'chat-9',
+      customerName: 'Jamie',
+      messages: [priorMessage],
+    });
     expect(restarted.state).toBe('restart');
-    expect(restarted.messages).toHaveLength(0);
     expect(restarted.open).toBe(true);
+    expect(restarted.chatId).toBe('chat-9');
+    expect(restarted.customerName).toBe('Jamie');
+    expect(restarted.messages).toEqual([priorMessage]);
+  });
+
+  it('restart_resumed moves a resumable chat into the active state, keeping messages', () => {
+    const restarted = reduce(initialModel(), {
+      type: 'restart',
+      chatId: 'chat-9',
+      customerName: 'Jamie',
+      messages: [
+        { id: 'x', body: 'prior', senderKind: 'user', deliveredAt: new Date().toISOString() },
+      ],
+    });
+    const resumed = reduce(restarted, { type: 'restart_resumed' });
+    expect(resumed.state).toBe('active');
+    expect(resumed.chatId).toBe('chat-9');
+    expect(resumed.messages).toHaveLength(1);
+  });
+
+  it('chat_created_no_support shows the offline state without a chat id', () => {
+    const opened = reduce(initialModel(), { type: 'open' });
+    const offline = reduce(opened, { type: 'chat_created_no_support', customerName: 'Sam' });
+    expect(offline.state).toBe('no_support');
+    expect(offline.customerName).toBe('Sam');
+    expect(offline.chatId).toBeNull();
+  });
+
+  it('support_initiated opens the panel and support_accepted goes active', () => {
+    const initiated = reduce(initialModel(), { type: 'support_initiated', chatId: 'chat-5' });
+    expect(initiated.state).toBe('support_initiated');
+    expect(initiated.open).toBe(true);
+    expect(initiated.chatId).toBe('chat-5');
+    const accepted = reduce(initiated, { type: 'support_accepted' });
+    expect(accepted.state).toBe('active');
+    expect(accepted.chatId).toBe('chat-5');
   });
 });

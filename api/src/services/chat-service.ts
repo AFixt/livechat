@@ -189,6 +189,24 @@ export function createChatService() {
       if (chat === null) throw ApiError.notFound(ERR_CHAT_NOT_FOUND);
       return chat;
     },
+
+    /**
+     * Find a returning visitor's most recent resumable chat — a
+     * customer-initiated conversation that has not ended. Drives the widget's
+     * "welcome back, continue?" (restart) state on bootstrap.
+     * @param visitorSessionId - Visitor session id (from the signed cookie).
+     * @returns The resumable chat, or null if none.
+     */
+    async findResumableByVisitorSession(visitorSessionId: string): Promise<Chat | null> {
+      return Chat.findOne({
+        where: {
+          visitorSessionId,
+          initiatedBy: 'customer',
+          status: ['pending', 'active', 'waiting'],
+        },
+        order: [['createdAt', 'DESC']],
+      });
+    },
   };
 }
 

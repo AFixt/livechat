@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef } from 'preact/hooks';
 
 import { LiveRegion } from './components/live-region.js';
 import { useFocusReturn } from './hooks/use-focus-return.js';
-import { initiateChat, initVisitorSession } from './services/api.js';
+import { fetchCurrentChat, initiateChat, initVisitorSession } from './services/api.js';
 import { playAlert } from './services/audio.js';
 import { announceLiveMessage } from './services/live-region.js';
 import { disconnectVisitorSocket, getVisitorSocket } from './services/socket.js';
@@ -47,11 +47,50 @@ export function App(props: AppProps): preact.JSX.Element {
   }, [model.open]);
 
   useEffect(() => {
-    if (!model.open) return;
-    void initVisitorSession(props.tenantKey).catch(() => {
-      dispatch({ type: 'error', message: 'Unable to start a session.' });
-    });
-  }, [model.open, props.tenantKey]);
+    // Object property (not a local) so its value survives the async closure
+    // for the cleanup to flip without tripping no-unnecessary-condition.
+    const live = { current: true };
+    const onSupportInitiated = (p: { chatId: string }): void => {
+      dispatch({ type: 'support_initiated', chatId: p.chatId });
+      announceLiveMessage('A support agent wants to chat');
+      playAlert();
+    };
+    void (async () => {
+      // Reuse an existing session when the visitor already has one — a page
+      // reload must not mint a fresh session, which would orphan a prior chat
+      // and break the returning-visitor (restart) flow. Probing the resumable
+      // chat doubles as the "do I have a session?" check.
+      let resume: Awaited<ReturnType<typeof fetchCurrentChat>> | null = null;
+      try {
+        resume = await fetchCurrentChat();
+      } catch {
+        // No existing session (401) or unreachable — start a fresh session.
+        try {
+          await initVisitorSession(props.tenantKey);
+        } catch {
+          if (live.current) dispatch({ type: 'error', message: 'Unable to start a session.' });
+          return;
+        }
+      }
+      if (!live.current) return;
+      // A session now exists — connect the socket so this visitor shows up in
+      // the console's presence list and can receive proactive support events.
+      getVisitorSocket().on('support:initiated', onSupportInitiated);
+      // Returning visitor with an unfinished chat? Offer to resume it.
+      if (resume !== null && resume.chat !== null) {
+        dispatch({
+          type: 'restart',
+          chatId: resume.chat.id,
+          customerName: resume.chat.customerName ?? '',
+          messages: resume.messages,
+        });
+      }
+    })();
+    return () => {
+      live.current = false;
+      getVisitorSocket().off('support:initiated', onSupportInitiated);
+    };
+  }, [props.tenantKey]);
 
   useEffect(() => {
     if (model.chatId === null) return;
@@ -92,7 +131,11 @@ export function App(props: AppProps): preact.JSX.Element {
 
   const handleCustomerInit = async (name: string, body: string): Promise<void> => {
     try {
-      const { chat, message } = await initiateChat(name, body);
+      const { chat, message, supportAvailable } = await initiateChat(name, body);
+      if (!supportAvailable) {
+        dispatch({ type: 'chat_created_no_support', customerName: name });
+        return;
+      }
       dispatch({
         type: 'chat_created',
         chatId: chat.id,
@@ -175,7 +218,7 @@ export function App(props: AppProps): preact.JSX.Element {
             {model.state === 'support_initiated' && (
               <SupportInitiatedState
                 onAccept={() => {
-                  dispatch({ type: 'open' });
+                  dispatch({ type: 'support_accepted' });
                 }}
                 onDismiss={() => {
                   dispatch({ type: 'close' });
@@ -196,7 +239,7 @@ export function App(props: AppProps): preact.JSX.Element {
             {model.state === 'restart' && (
               <RestartState
                 onRestart={() => {
-                  dispatch({ type: 'open' });
+                  dispatch({ type: 'restart_resumed' });
                 }}
               />
             )}

@@ -64,6 +64,7 @@ export function buildRouter(deps: RouterDeps): Router {
       env: deps.env,
       visitorSession: deps.services.visitorSession,
       chat: deps.services.chat,
+      presence: deps.services.presence,
     }),
   );
   router.use(

@@ -23,7 +23,7 @@ import { useChatsStore } from '../store/chats.js';
 export function DashboardPage(): React.JSX.Element {
   const { t } = useTranslation();
   useStaffSocket();
-  const { selectChat } = useChatInbox();
+  const { selectChat, initiateChatWithVisitor } = useChatInbox();
   const visitors = useChatsStore((s) => s.visitors);
   const chats = useChatsStore((s) => s.chats);
   const activeChatId = useChatsStore((s) => s.activeChatId);
@@ -55,7 +55,15 @@ export function DashboardPage(): React.JSX.Element {
           ) : (
             <List aria-label={t('dashboard.visitors.heading')}>
               {visitorList.map((v) => (
-                <ListItemButton key={v.visitorSessionId}>
+                <ListItemButton
+                  key={v.visitorSessionId}
+                  aria-label={t('dashboard.visitors.startChat', {
+                    id: v.visitorSessionId.slice(0, 8),
+                  })}
+                  onClick={() => {
+                    initiateChatWithVisitor(v.visitorSessionId);
+                  }}
+                >
                   <ListItemText
                     primary={v.visitorSessionId.slice(0, 8)}
                     secondary={v.currentUrl ?? ''}

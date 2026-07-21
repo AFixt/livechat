@@ -141,6 +141,12 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
           customerName: chat.customerName,
           status: chat.status,
         });
+        // Notify the visitor's own room (they have not joined the chat room
+        // yet) so the widget can show the support-initiated invitation.
+        deps.io
+          .of('/visitor')
+          .to(`visitor:${payload.visitorSessionId}`)
+          .emit('support:initiated', { chatId: chat.id });
       });
     });
 
