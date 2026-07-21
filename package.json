@@ -91,7 +91,7 @@
     "security:audit": "npm audit --workspaces --include-workspace-root --audit-level=high",
     "security:osv": "osv-scanner --lockfile=package-lock.json",
     "security:semgrep": "bash scripts/semgrep.sh",
-    "security:secrets": "gitleaks detect --no-banner",
+    "security:secrets": "trufflehog git file://. --results=verified --fail --no-update",
     "security": "npm-run-all -p security:audit security:osv security:semgrep security:secrets",
     "license:check": "license-checker-rseidelsohn --production --onlyAllow 'MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;Unlicense;Python-2.0;WTFPL;BlueOak-1.0.0' --excludePrivatePackages --summary",
     "license:report": "license-checker-rseidelsohn --production --csv --out reports/licenses.csv",

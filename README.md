@@ -39,6 +39,6 @@ From the repo root:
 - Node 22 (pinned via `.nvmrc` and `engines`)
 - Conventional Commits enforced via Husky `commit-msg`
 - Run `scripts/bootstrap.sh` once to install local tool binaries (semgrep,
-  osv-scanner, gitleaks, lychee) required by pre-push hooks
+  osv-scanner, trufflehog, lychee) required by pre-push hooks
 - All user-facing changes must include a corresponding `.uc.yaml` update
   (enforced by a CI diff gate)
