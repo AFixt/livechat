@@ -47,18 +47,19 @@ EXCLUDES=(
   # add_header, repeat the server-block headers in it.
   --exclude-rule=generic.nginx.security.header-redefinition.header-redefinition
 
-  # Real, but policy decisions rather than defects — tracked in
-  # https://github.com/AFixt/livechat/issues/7. Remove each exclusion as
-  # its decision lands.
-  #
-  #   action SHA-pinning vs. mutable tags (19 findings)
+  # SHA-pinning of GitHub Actions vs. mutable tags (19 findings). Still a
+  # policy decision tracked in https://github.com/AFixt/livechat/issues/7 —
+  # pinning needs a bumper (Dependabot) to stay current, and Dependabot is
+  # currently disabled. Remove this exclusion if/when actions are pinned.
   --exclude-rule=yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag
-  #   requiring TLS on the DB connection, which must stay off for local
-  #   docker-compose (2 findings)
+
+  # TLS on the DB connection is now implemented but env-driven (DB_SSL /
+  # DB_SSL_CA in api/src/config/{env,mysql}.ts + db/config.cjs), because it
+  # must stay off for local docker-compose. The rule matches the whole
+  # Sequelize construction and cannot see that TLS is enabled at runtime via
+  # env, so it can't be satisfied without forcing TLS unconditionally. See
+  # https://github.com/AFixt/livechat/issues/7 — production sets DB_SSL=true.
   --exclude-rule=ajinabraham.njsscan.database.sequelize_tls.sequelize_tls
-  #   adoption delay for brand-new dependency releases (3 findings)
-  --exclude-rule=package_managers.dependabot.dependabot-missing-cooldown.dependabot-missing-cooldown
-  --exclude-rule=package_managers.npm.npm-missing-minimum-release-age.npm-missing-minimum-release-age
 )
 
 exec semgrep "${CONFIGS[@]}" "${EXCLUDES[@]}" --error --metrics=off "$@"
