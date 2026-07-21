@@ -260,4 +260,78 @@ describe('chat flow (integration)', () => {
     staffSocket.disconnect();
     visitorSocket.disconnect();
   }, 30_000);
+
+  test('untenanted staff watch all tenants; scoped staff stay isolated', async () => {
+    if (harness === null) return;
+    const { baseUrl } = harness;
+    // A visitor in tenant "delta", an untenanted AFixt staff (tenant_id null),
+    // and a staff scoped to an unrelated tenant "omega".
+    await seedTenantAndStaff('delta', 'd-staff@delta.example');
+    await seedTenantAndStaff('omega', 'o-staff@omega.example');
+    await User.create({
+      email: 'global@afixt.example',
+      passwordHash: 'Staff!Password1',
+      firstName: 'Gl',
+      lastName: 'Obal',
+      role: 'staff',
+      tenantId: null,
+      status: 'active',
+      emailVerified: true,
+      emailVerificationToken: null,
+      emailVerificationExpires: null,
+      passwordResetToken: null,
+      passwordResetExpires: null,
+      lockedUntil: null,
+      lastLoginAt: null,
+      phone: null,
+      timezone: null,
+      avatarUrl: null,
+      preferences: null,
+    });
+
+    const globalToken = await loginAs(baseUrl, 'global@afixt.example', 'Staff!Password1');
+    const omegaToken = await loginAs(baseUrl, 'o-staff@omega.example', 'Staff!Password1');
+    const { cookie: visitorCookie } = await initVisitor(baseUrl, 'delta');
+
+    const globalSocket: Socket = ioClient(`${baseUrl}/staff`, {
+      path: '/api/socket.io',
+      auth: { token: globalToken },
+      transports: ['websocket'],
+      forceNew: true,
+    });
+    const omegaSocket: Socket = ioClient(`${baseUrl}/staff`, {
+      path: '/api/socket.io',
+      auth: { token: omegaToken },
+      transports: ['websocket'],
+      forceNew: true,
+    });
+    await Promise.all([waitFor(globalSocket, 'connect'), waitFor(omegaSocket, 'connect')]);
+    // Let the connection handlers finish joining their rooms.
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    let leakedToOmega = false;
+    omegaSocket.on('visitor:joined', () => {
+      leakedToOmega = true;
+    });
+    const globalSeesVisitor = waitFor<{ visitorSessionId: string }>(globalSocket, 'visitor:joined');
+
+    // The delta visitor connects → visitor:joined fans out to tenant:delta and
+    // the global room, but not to omega's tenant room.
+    const visitorSocket: Socket = ioClient(`${baseUrl}/visitor`, {
+      path: '/api/socket.io',
+      auth: { cookie: visitorCookie },
+      transports: ['websocket'],
+      forceNew: true,
+    });
+    await waitFor(visitorSocket, 'connect');
+
+    const joined = await globalSeesVisitor;
+    expect(joined.visitorSessionId).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(leakedToOmega).toBe(false);
+
+    globalSocket.disconnect();
+    omegaSocket.disconnect();
+    visitorSocket.disconnect();
+  }, 30_000);
 });

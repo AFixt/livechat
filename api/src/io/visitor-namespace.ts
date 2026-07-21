@@ -1,4 +1,5 @@
 import { detach } from './detach.js';
+import { GLOBAL_STAFF_ROOM } from './rooms.js';
 
 import type { ServerToClientEvents, VisitorSocketData, VisitorToServerEvents } from './types.js';
 import type { Services } from '../services/index.js';
@@ -80,7 +81,7 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
         connectedAt: Date.now(),
       }),
     );
-    deps.io.of(STAFF_NS).to(`tenant:${tenantId}`).emit('visitor:joined', {
+    deps.io.of(STAFF_NS).to(`tenant:${tenantId}`).to(GLOBAL_STAFF_ROOM).emit('visitor:joined', {
       tenantId,
       visitorSessionId,
     });
@@ -93,7 +94,7 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
         // the chat never reaches the console's list. Idempotent: the client
         // upserts, so re-joining (e.g. restart) is harmless.
         const chat = await deps.services.chat.getById(payload.chatId);
-        deps.io.of(STAFF_NS).to(`tenant:${tenantId}`).emit('chat:requested', {
+        deps.io.of(STAFF_NS).to(`tenant:${tenantId}`).to(GLOBAL_STAFF_ROOM).emit('chat:requested', {
           chatId: chat.id,
           tenantId,
           customerName: chat.customerName,
@@ -119,7 +120,11 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
         };
         nsp.to(`chat:${payload.chatId}`).emit('chat:message', event);
         deps.io.of(STAFF_NS).to(`chat:${payload.chatId}`).emit('chat:message', event);
-        deps.io.of(STAFF_NS).to(`tenant:${tenantId}`).emit('chat:message', event);
+        deps.io
+          .of(STAFF_NS)
+          .to(`tenant:${tenantId}`)
+          .to(GLOBAL_STAFF_ROOM)
+          .emit('chat:message', event);
       });
     });
 
@@ -152,16 +157,20 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
     });
 
     socket.on('visitor:page_changed', (payload) => {
-      deps.io.of(STAFF_NS).to(`tenant:${tenantId}`).emit('visitor:page_changed', {
-        visitorSessionId,
-        currentUrl: payload.currentUrl,
-      });
+      deps.io
+        .of(STAFF_NS)
+        .to(`tenant:${tenantId}`)
+        .to(GLOBAL_STAFF_ROOM)
+        .emit('visitor:page_changed', {
+          visitorSessionId,
+          currentUrl: payload.currentUrl,
+        });
     });
 
     socket.on('disconnect', () => {
       detach(deps.logger, 'visitor disconnect cleanup failed', async () => {
         await deps.services.presence.removeVisitor(tenantId, visitorSessionId);
-        deps.io.of(STAFF_NS).to(`tenant:${tenantId}`).emit('visitor:left', {
+        deps.io.of(STAFF_NS).to(`tenant:${tenantId}`).to(GLOBAL_STAFF_ROOM).emit('visitor:left', {
           tenantId,
           visitorSessionId,
         });

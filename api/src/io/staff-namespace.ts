@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 
 import { detach } from './detach.js';
+import { GLOBAL_STAFF_ROOM } from './rooms.js';
 
 import type { ServerToClientEvents, StaffSocketData, StaffToServerEvents } from './types.js';
 import type { Env } from '../config/env.js';
@@ -63,6 +64,11 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
       await socket.join(`user:${userId}`);
       if (['super_admin', 'admin', 'staff'].includes(role)) {
         await socket.join('staff');
+        // AFixt staff with no tenant of their own serve every tenant, so they
+        // join the global room that visitor/chat events are mirrored to. Note
+        // the `staff` room is NOT used for that — it holds tenant-scoped staff
+        // too, and broadcasting there would break tenant isolation.
+        if (tenantId === null) await socket.join(GLOBAL_STAFF_ROOM);
       }
       if (tenantId !== null) await socket.join(`tenant:${tenantId}`);
     });
@@ -135,7 +141,7 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
           supportUserId: userId,
         });
         await socket.join(`chat:${chat.id}`);
-        nsp.to(`tenant:${chat.tenantId}`).emit('chat:requested', {
+        nsp.to(`tenant:${chat.tenantId}`).to(GLOBAL_STAFF_ROOM).emit('chat:requested', {
           chatId: chat.id,
           tenantId: chat.tenantId,
           customerName: chat.customerName,
