@@ -27,6 +27,10 @@ exclude = [
   # Private AFixt repos answer 404 to an unauthenticated checker. Drop this
   # entry once they are public, or run lychee with --github-token.
   "^https://github\\.com/AFixt/usecase-runner",
+  # requirements.md links two jsbin "Example output" demos; jsbin's output
+  # subdomain is unreliable and answers 503 to the checker (fine in a browser).
+  # Not our content to fix — exclude the host rather than block every PR on it.
+  "^https?://output\\.jsbin\\.com",
 ]
 
 # Sites that block automated checkers answer 403/429 to lychee but are fine
