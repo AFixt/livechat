@@ -104,8 +104,8 @@ Per issue #1 — the full stack is the mandate, not a suggestion:
 - Husky pre-push (`npm run check:all`)
 - ESLint flat config (`eslint.config.js`) with `@typescript-eslint`
   `strict-type-checked` and `stylistic-type-checked`, plus `react`,
-  `react-hooks`, `react-refresh`, `jsx-a11y`, `sonarjs`, `security`, `unicorn`,
-  `import-x`, `promise`, `n`, `jsdoc`, `no-secrets`
+  `react-hooks`, `react-refresh`, `sonarjs`, `security`, `unicorn`, `import-x`,
+  `promise`, `n`, `jsdoc`, `no-secrets`
 - Prettier + `prettier-plugin-organize-imports`
 - Stylelint + `stylelint-config-standard` + `@double-great/stylelint-a11y`
 - `markdownlint-cli2`
@@ -262,3 +262,15 @@ Once scaffolded, root-level scripts mirror the house pattern:
 ## Reviewing PRs
 
 Whenever I ask to review a PR (pull request), use the `pr-review` skill.
+
+## axe-core is banned
+
+**`axe-core` must never be used in this project — directly or transitively.**
+
+- Do not add `axe-core` or any `@axe-core/*` package.
+- Do not add any dependency that pulls in `axe-core` transitively — this
+  includes `eslint-plugin-jsx-a11y`, `lighthouse` / `@lhci/cli`, `pa11y`,
+  `@storybook/addon-a11y`, `jest-axe`, `cypress-axe`, and similar.
+- Before adding any new dependency, verify with `npm ls axe-core` that it does
+  not introduce axe-core into the tree. If it does, do not add it.
+- Use `@afixt/a11y-assert` for accessibility checks instead.
