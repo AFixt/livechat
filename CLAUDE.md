@@ -98,8 +98,8 @@ means we adopt the **target** stack without legacy carry-over.
 
 Per issue #1 — the full stack is the mandate, not a suggestion:
 
-- Husky pre-commit (`lint-staged` + `tsc-files --noEmit` +
-  `gitleaks protect --staged`)
+- Husky pre-commit (`lint-staged` + `tsc-files --noEmit` + `trufflehog` secret
+  scan of staged files)
 - Husky commit-msg (`commitlint` / Conventional Commits)
 - Husky pre-push (`npm run check:all`)
 - ESLint flat config (`eslint.config.js`) with `@typescript-eslint`
@@ -114,9 +114,9 @@ Per issue #1 — the full stack is the mandate, not a suggestion:
 - `license-checker-rseidelsohn` (allowlist-only licenses)
 - `size-limit` (build gate)
 - Lighthouse CI (perf/SEO/best-practices; a11y is covered by `a11y-assert`)
-- Security: `npm audit`, `osv-scanner`, `semgrep` (OWASP Top 10), `gitleaks`,
-  `eslint-plugin-no-secrets`, scheduled CodeQL + OWASP Dependency-Check + OWASP
-  ZAP baseline in Actions
+- Security: `npm audit`, `osv-scanner`, `semgrep` (OWASP Top 10), `trufflehog`
+  (secret scanning), `eslint-plugin-no-secrets`, scheduled CodeQL + OWASP
+  Dependency-Check + OWASP ZAP baseline in Actions
 
 **Local gates are preferred over GitHub Actions.** Keep CI as a safety net for
 `--no-verify` / web-UI merges.

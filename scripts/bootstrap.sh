@@ -24,10 +24,12 @@ if ! command -v osv-scanner >/dev/null 2>&1; then
   }
 fi
 
-if ! command -v gitleaks >/dev/null 2>&1; then
-  echo "Installing gitleaks..."
-  brew install gitleaks 2>/dev/null || {
-    echo "Install gitleaks from https://github.com/gitleaks/gitleaks/releases"
+if ! command -v trufflehog >/dev/null 2>&1; then
+  echo "Installing trufflehog..."
+  brew install trufflehog 2>/dev/null \
+    || curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin \
+    || {
+    echo "Install trufflehog from https://github.com/trufflesecurity/trufflehog"
     exit 1
   }
 fi
