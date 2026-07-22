@@ -1,14 +1,21 @@
 /**
  * Standalone seed entry — invoked by `global-setup.ts` as a `tsx` subprocess
- * against the `livechat_e2e` database. Drops and recreates every table
- * (`sync({ force: true })`) then inserts the {@link fixtures} dataset, so each
- * run starts from an identical, isolated state.
+ * against the `livechat_e2e` database. Drops every table and replays the real
+ * migrations, then inserts the {@link fixtures} dataset, so each run starts
+ * from an identical, isolated state.
+ *
+ * The schema deliberately comes from `api/src/db/migrations` rather than
+ * `sync({ force: true })`: building it from the models would make the models
+ * the source of truth for both the code under test and the schema it runs
+ * against, hiding migration drift from the one suite that drives the real
+ * browser end to end.
  *
  * Run directly: `DB_NAME=livechat_e2e tsx e2e/support/seed.ts`
  */
 import { pino } from 'pino';
 
 import { createSequelize } from '../../api/src/config/mysql.js';
+import { resetSchemaFromMigrations } from '../../api/src/db/migrator.js';
 import { initModels, Invitation, Tenant, User } from '../../api/src/models/index.js';
 
 import { PENDING_INVITATION, TENANTS, USERS } from './fixtures.js';
@@ -28,7 +35,7 @@ const logger = pino({ level: 'error' });
 const sequelize = createSequelize(env, logger);
 initModels(sequelize);
 
-await sequelize.sync({ force: true });
+await resetSchemaFromMigrations(sequelize);
 
 // Tenants first, so users/invitations can resolve their slug → id.
 const tenantIdBySlug = new Map<string, string>();
