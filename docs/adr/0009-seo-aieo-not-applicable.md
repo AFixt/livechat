@@ -33,10 +33,11 @@ never indexed if it is ever exposed — is handled directly: `ui/index.html`
 carries `<meta name="robots" content="noindex, nofollow">`.
 
 Lighthouse CI is still run (`.lighthouserc.json` / `lhci.yml`) for
-**performance** and **best-practices** budgets; only the SEO _category_ is
-treated as not-applicable, consistent with issue #1 already scoping Lighthouse
-to "performance, seo, and best-practices" with a11y covered by
-`@afixt/a11y-assert`.
+**performance** and **best-practices** budgets, but the **SEO category is
+removed** from `onlyCategories` and its assertion dropped: the console's
+deliberate `noindex` fails Lighthouse's `is-crawlable` SEO audit, which is the
+correct outcome for a private app, not a regression to gate on. (a11y is covered
+separately by `@afixt/a11y-assert`.)
 
 ## Consequences
 
