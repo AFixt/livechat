@@ -34,6 +34,19 @@ npm run dev             # run api, ui, and widget in parallel
 Then `npm run check:all` should pass on a clean clone — it is the same gate
 Husky runs on pre-push.
 
+### `@afixt/*` packages and `NPM_TOKEN`
+
+This repo installs private `@afixt/*` scoped packages (`usecase-runner`,
+`a11y-assert`). In CI, npm authenticates via an **organization-level** GitHub
+Actions secret named `NPM_TOKEN` — `actions/setup-node` writes a runner-local
+`.npmrc` from it, which is why no auth token is committed to this repo's
+`.npmrc` (local installs keep using your own credentials).
+
+If installing an `@afixt/*` package returns **404, that is an authentication
+problem, not a missing package**. The usual cause is a stale **repo-level**
+`NPM_TOKEN` secret shadowing the org-level one — delete the repo-level secret
+rather than overriding it per repository.
+
 ## Scripts
 
 From the repo root:
