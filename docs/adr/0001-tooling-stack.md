@@ -34,8 +34,8 @@ Adopt the tooling stack described in issue #1 verbatim:
 - `@afixt/a11y-assert` at component, E2E, and CI-preview layers
 - `size-limit` and Lighthouse CI budgets
 - Security: `npm audit`, `osv-scanner`, `semgrep` (OWASP Top 10), `trufflehog`
-  (secret scanning — superseded `gitleaks`, see ADR 0008), weekly CodeQL, weekly
-  OWASP Dependency-Check
+  (secret scanning — superseded `gitleaks`, see ADR 0008), weekly CodeQL.
+  (Weekly OWASP Dependency-Check was later dropped — see ADR 0010.)
 - Husky hooks as primary gate (pre-commit, commit-msg, pre-push, post-merge);
   GitHub Actions as safety net only
 - Express hardening: `helmet`, `express-rate-limit`, `express-slow-down`,

@@ -18,18 +18,3 @@ jobs:
           languages: javascript-typescript
           queries: security-extended
       - uses: github/codeql-action/analyze@v3
-
-  dependency-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dependency-check/Dependency-Check_Action@main
-        with:
-          project: ${{ github.event.repository.name }}
-          path: "."
-          format: "HTML"
-          out: "reports/dep-check"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dependency-check-report
-          path: reports/dep-check

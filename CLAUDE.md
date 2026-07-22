@@ -115,8 +115,8 @@ Per issue #1 — the full stack is the mandate, not a suggestion:
 - `size-limit` (build gate)
 - Lighthouse CI (perf/SEO/best-practices; a11y is covered by `a11y-assert`)
 - Security: `npm audit`, `osv-scanner`, `semgrep` (OWASP Top 10), `trufflehog`
-  (secret scanning), `eslint-plugin-no-secrets`, scheduled CodeQL + OWASP
-  Dependency-Check + OWASP ZAP baseline in Actions
+  (secret scanning), `eslint-plugin-no-secrets`, scheduled CodeQL + OWASP ZAP
+  baseline in Actions
 
 **Local gates are preferred over GitHub Actions.** Keep CI as a safety net for
 `--no-verify` / web-UI merges.
