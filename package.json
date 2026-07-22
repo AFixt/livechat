@@ -2,6 +2,7 @@
   "name": "livechat-root",
   "version": "0.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "Root tooling for the AFixt livechat monorepo (api, ui, widget, shared, usecases).",
   "engines": {
