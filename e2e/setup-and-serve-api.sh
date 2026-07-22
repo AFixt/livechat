@@ -13,24 +13,25 @@ ROOT_PASS="${DB_ROOT_PASS:-livechat_root_pass}"
 
 docker compose up -d mysql redis mailhog
 
-# Wait until root auth actually works, not just until the socket answers. On a
-# fresh volume (CI) the entrypoint runs a temporary server during init that
-# replies to `mysqladmin ping` before the root password is applied, so a ping
-# probe races ahead and the next command hits "Access denied". A root SELECT
-# only succeeds once the real, initialised server is up.
-echo "e2e: waiting for MySQL to accept root auth…"
-deadline=$(( SECONDS + 90 ))
-until docker exec livechat-mysql mysql -uroot "-p${ROOT_PASS}" -e 'SELECT 1' >/dev/null 2>&1; do
+# Retry the provisioning statement itself rather than probing first and acting
+# after. On a fresh volume (CI) the entrypoint runs a temporary server during
+# init: it answers `mysqladmin ping`, and even a root `SELECT 1`, then shuts
+# down before the real server starts. So a probe that passes is no guarantee
+# the *next* command finds a live socket — that window is how this failed with
+# "ERROR 2002: Can't connect to local MySQL server through socket". Making the
+# idempotent CREATE/GRANT the readiness check closes it.
+echo "e2e: waiting for MySQL and provisioning ${DB_NAME}…"
+deadline=$(( SECONDS + 120 ))
+until docker exec livechat-mysql mysql -uroot "-p${ROOT_PASS}" -e \
+  "CREATE DATABASE IF NOT EXISTS ${DB_NAME}; \
+   GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'%'; FLUSH PRIVILEGES;" >/dev/null 2>&1; do
   if [ "$SECONDS" -ge "$deadline" ]; then
-    echo "e2e: MySQL did not accept root auth within 90s" >&2
+    echo "e2e: MySQL did not become ready within 120s" >&2
+    docker logs --tail 50 livechat-mysql >&2 || true
     exit 1
   fi
   sleep 1
 done
-
-docker exec livechat-mysql mysql -uroot "-p${ROOT_PASS}" -e \
-  "CREATE DATABASE IF NOT EXISTS ${DB_NAME}; \
-   GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'%'; FLUSH PRIVILEGES;"
 
 echo "e2e: seeding ${DB_NAME}…"
 node_modules/.bin/tsx e2e/support/seed.ts
