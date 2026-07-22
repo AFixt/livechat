@@ -19,8 +19,8 @@ export default defineConfig({
     },
     testTimeout: 10_000,
     // Integration tests share a single MySQL + Redis, so test files must
-    // run sequentially — otherwise `sequelize.sync({ force: true })` in
-    // one file drops tables out from under another.
+    // run sequentially — otherwise one file's schema rebuild
+    // (`resetSchemaFromMigrations`) drops tables out from under another.
     fileParallelism: false,
   },
 });
