@@ -6,6 +6,7 @@ import { pino, type Logger } from 'pino';
 
 import { createApp } from '../../src/app.js';
 import { createSequelize } from '../../src/config/mysql.js';
+import { resetSchemaFromMigrations } from '../../src/db/migrator.js';
 import { attachIo } from '../../src/io/index.js';
 import { initModels } from '../../src/models/index.js';
 import { createServices, type Services } from '../../src/services/index.js';
@@ -17,9 +18,9 @@ import type { Server as IoServer } from 'socket.io';
 
 /**
  * A fresh test env. Defaults to a dedicated `livechat_test` database —
- * integration tests `sync({ force: true })`, so pointing them at the shared
- * dev `livechat_db` would wipe whatever you're working on. Override `DB_NAME`
- * to target another database.
+ * integration tests drop every table and re-run the migrations, so pointing
+ * them at the shared dev `livechat_db` would wipe whatever you're working on.
+ * Override `DB_NAME` to target another database.
  * @returns Env for integration testing.
  */
 export function testEnv(): Env {
@@ -92,14 +93,28 @@ export async function probeHarness(): Promise<TestHarness | null> {
   try {
     await sequelize.authenticate();
     await redis.connect();
-  } catch {
+  } catch (error) {
     await sequelize.close().catch(() => undefined);
     await redis.quit().catch(() => undefined);
+    if (process.env['REQUIRE_DB'] === '1') {
+      // Every integration test returns early on a null harness, so absent
+      // infrastructure otherwise reads as a pass — a green run that asserted
+      // nothing. CI sets REQUIRE_DB=1 so that can never be mistaken for
+      // coverage; locally the null path still skips so `npm test` works
+      // without docker.
+      throw new Error(
+        'REQUIRE_DB=1 but the integration stack is unreachable — ' +
+          `MySQL ${env.DB_HOST}:${String(env.DB_PORT)}/${env.DB_NAME}, ` +
+          `Redis ${env.REDIS_HOST}:${String(env.REDIS_PORT)}. ` +
+          'Start it with `docker compose up -d mysql redis`. ' +
+          `Cause: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     return null;
   }
 
   initModels(sequelize);
-  await sequelize.sync({ force: true });
+  await resetSchemaFromMigrations(sequelize);
   await redis.flushdb();
 
   const services = createServices({ env, logger, redis });

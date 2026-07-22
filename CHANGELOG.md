@@ -11,6 +11,49 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 _Nothing yet._
 
+## [0.1.1] - 2026-07-22
+
+A correctness release. v0.1.0 shipped a database schema the ORM could not read
+on six tables; this fixes that and closes the testing gap that let it through.
+
+### Fixed
+
+- **The widget could not start a chat.** `POST /api/v1/visitor/chats` returned
+  500 with `Unknown column 'deleted_at' in 'field list'`. `paranoid: true` is a
+  global Sequelize `define` default, so every model selects `deleted_at` and
+  filters on it, but six `createTable` migrations never created the column —
+  `visitor_sessions`, `chat_events`, `user_sessions`, `jwt_blacklist`,
+  `audit_logs`, `staff_tenants`. Any read against those tables failed on a
+  migration-created database. ([#37])
+- **e2e stack failed to start on a fresh MySQL volume.** The readiness probe
+  passed against the entrypoint's temporary init server, which then shut down
+  before the real server started, so the next statement hit a dead socket and
+  took the api webServer down with it. ([#38])
+
+### Changed
+
+- **Test schemas are built from the real migrations, not `sync({ force: true })`.**
+  Both the API integration harness and the e2e seeder now drop every table and
+  replay `api/src/db/migrations` via the new `api/src/db/migrator.ts`. Building
+  from the models made the models the source of truth for both the code under
+  test and the schema it ran against, so migration drift was structurally
+  invisible — which is how the bug above shipped with every suite green.
+  ([#38], [#39])
+- **Integration tests actually run in CI.** The `check` job starts MySQL and
+  Redis and runs with `REQUIRE_DB=1`, so an unreachable stack fails loudly.
+  Previously the job had no database, every integration test returned early,
+  and CI reported the same "22 passed" whether or not one existed. Local runs
+  without the flag still skip, so `npm test` works with no Docker. ([#40])
+
+### Added
+
+- A static migration-drift guard (`api/tests/unit/migration-schema-drift.test.ts`)
+  that replays the migrations and asserts each table ends up with the columns
+  the global define defaults require. Needs no database. ([#37])
+- `CHANGELOG.md`, and a README note on `@afixt/*` scoped packages and
+  `NPM_TOKEN` (a 404 there is an auth failure, not a missing package).
+  ([#35], [#36])
+
 ## [0.1.0] - 2026-07-22
 
 First tagged release. Everything below had accumulated on `develop`; `master`
@@ -73,7 +116,8 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
   ships with Node 22, and effective on toolchain upgrade.
 - `body-parser` bumped to 2.3.0, clearing OSV `GHSA-v422-hmwv-36x6`.
 
-[Unreleased]: https://github.com/AFixt/livechat/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/AFixt/livechat/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/AFixt/livechat/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/AFixt/livechat/releases/tag/v0.1.0
 [#1]: https://github.com/AFixt/livechat/issues/1
 [#3]: https://github.com/AFixt/livechat/issues/3
@@ -89,3 +133,9 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
 [#31]: https://github.com/AFixt/livechat/pull/31
 [#32]: https://github.com/AFixt/livechat/pull/32
 [#33]: https://github.com/AFixt/livechat/pull/33
+[#35]: https://github.com/AFixt/livechat/pull/35
+[#36]: https://github.com/AFixt/livechat/pull/36
+[#37]: https://github.com/AFixt/livechat/pull/37
+[#38]: https://github.com/AFixt/livechat/pull/38
+[#39]: https://github.com/AFixt/livechat/pull/39
+[#40]: https://github.com/AFixt/livechat/pull/40
