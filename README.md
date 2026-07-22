@@ -55,6 +55,8 @@ From the repo root:
   osv-scanner, trufflehog, lychee) required by pre-push hooks
 - All user-facing changes must include a corresponding `.uc.yaml` update
   (enforced by a CI diff gate)
+- Note user-visible changes under `## [Unreleased]` in `CHANGELOG.md`; the
+  release flow promotes that section to the new version heading
 
 ## License
 
