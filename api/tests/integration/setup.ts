@@ -1,8 +1,10 @@
+import { readdir } from 'node:fs/promises';
 import { createServer, type Server as HttpServer } from 'node:http';
 import { type AddressInfo } from 'node:net';
 
 import Redis, { type Redis as RedisClient } from 'ioredis';
 import { pino, type Logger } from 'pino';
+import { Sequelize as SequelizeLib } from 'sequelize';
 
 import { createApp } from '../../src/app.js';
 import { createSequelize } from '../../src/config/mysql.js';
@@ -17,9 +19,9 @@ import type { Server as IoServer } from 'socket.io';
 
 /**
  * A fresh test env. Defaults to a dedicated `livechat_test` database —
- * integration tests `sync({ force: true })`, so pointing them at the shared
- * dev `livechat_db` would wipe whatever you're working on. Override `DB_NAME`
- * to target another database.
+ * integration tests drop every table and re-run the migrations, so pointing
+ * them at the shared dev `livechat_db` would wipe whatever you're working on.
+ * Override `DB_NAME` to target another database.
  * @returns Env for integration testing.
  */
 export function testEnv(): Env {
@@ -55,6 +57,57 @@ export function testEnv(): Env {
     isTest: true,
     isDevelopment: false,
   } as unknown as Env;
+}
+
+/** The shape every migration file in `src/db/migrations` exports. */
+interface Migration {
+  up: (
+    queryInterface: ReturnType<Sequelize['getQueryInterface']>,
+    sequelize: unknown,
+  ) => Promise<void>;
+}
+
+const MIGRATIONS_DIR = new URL('../../src/db/migrations/', import.meta.url);
+
+/**
+ * Rebuild the schema by running the **real migrations**, not `sync()`.
+ *
+ * This is the point of the integration suite: `sync({ force: true })` builds
+ * tables from the models, so the models can never disagree with the schema
+ * under test and migration drift is invisible. Six tables once shipped without
+ * the `deleted_at` column that the global `paranoid: true` default requires,
+ * and every suite stayed green because none of them ever ran a migration.
+ *
+ * Drops every table first so each run starts from nothing and applies the full
+ * migration history in filename order — the same path a real deployment takes.
+ * @param sequelize - Connection to the (dedicated) test database.
+ */
+export async function resetSchemaFromMigrations(sequelize: Sequelize): Promise<void> {
+  const queryInterface = sequelize.getQueryInterface();
+
+  // Pin one connection for the drops: FOREIGN_KEY_CHECKS is session-scoped, so
+  // toggling it on a pooled connection other than the one running the DROPs
+  // would not take effect.
+  await sequelize.transaction(async (transaction) => {
+    const tables = await queryInterface.showAllTables({ transaction });
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0', { transaction });
+    for (const table of tables) {
+      await sequelize.query(`DROP TABLE IF EXISTS \`${table}\``, { transaction });
+    }
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1', { transaction });
+  });
+
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- module constant, no external input
+  const files = (await readdir(MIGRATIONS_DIR)).filter((f) => f.endsWith('.cjs')).sort();
+  for (const file of files) {
+    const loaded = (await import(new URL(file, MIGRATIONS_DIR).href)) as {
+      default?: Migration;
+    } & Migration;
+    const migration = loaded.default ?? loaded;
+    // Migrations receive the Sequelize class itself (for `Sequelize.DATE` etc.),
+    // exactly as sequelize-cli passes it.
+    await migration.up(queryInterface, SequelizeLib);
+  }
 }
 
 export interface TestHarness {
@@ -99,7 +152,7 @@ export async function probeHarness(): Promise<TestHarness | null> {
   }
 
   initModels(sequelize);
-  await sequelize.sync({ force: true });
+  await resetSchemaFromMigrations(sequelize);
   await redis.flushdb();
 
   const services = createServices({ env, logger, redis });
