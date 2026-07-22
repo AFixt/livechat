@@ -98,14 +98,14 @@ means we adopt the **target** stack without legacy carry-over.
 
 Per issue #1 — the full stack is the mandate, not a suggestion:
 
-- Husky pre-commit (`lint-staged` + `tsc-files --noEmit` +
-  `gitleaks protect --staged`)
+- Husky pre-commit (`lint-staged` + `tsc-files --noEmit` + `trufflehog` secret
+  scan of staged files)
 - Husky commit-msg (`commitlint` / Conventional Commits)
 - Husky pre-push (`npm run check:all`)
 - ESLint flat config (`eslint.config.js`) with `@typescript-eslint`
   `strict-type-checked` and `stylistic-type-checked`, plus `react`,
-  `react-hooks`, `react-refresh`, `jsx-a11y`, `sonarjs`, `security`, `unicorn`,
-  `import-x`, `promise`, `n`, `jsdoc`, `no-secrets`
+  `react-hooks`, `react-refresh`, `sonarjs`, `security`, `unicorn`, `import-x`,
+  `promise`, `n`, `jsdoc`, `no-secrets`
 - Prettier + `prettier-plugin-organize-imports`
 - Stylelint + `stylelint-config-standard` + `@double-great/stylelint-a11y`
 - `markdownlint-cli2`
@@ -114,9 +114,9 @@ Per issue #1 — the full stack is the mandate, not a suggestion:
 - `license-checker-rseidelsohn` (allowlist-only licenses)
 - `size-limit` (build gate)
 - Lighthouse CI (perf/SEO/best-practices; a11y is covered by `a11y-assert`)
-- Security: `npm audit`, `osv-scanner`, `semgrep` (OWASP Top 10), `gitleaks`,
-  `eslint-plugin-no-secrets`, scheduled CodeQL + OWASP Dependency-Check + OWASP
-  ZAP baseline in Actions
+- Security: `npm audit`, `osv-scanner`, `semgrep` (OWASP Top 10), `trufflehog`
+  (secret scanning), `eslint-plugin-no-secrets`, scheduled CodeQL + OWASP ZAP
+  baseline in Actions
 
 **Local gates are preferred over GitHub Actions.** Keep CI as a safety net for
 `--no-verify` / web-UI merges.
@@ -262,3 +262,15 @@ Once scaffolded, root-level scripts mirror the house pattern:
 ## Reviewing PRs
 
 Whenever I ask to review a PR (pull request), use the `pr-review` skill.
+
+## axe-core is banned
+
+**`axe-core` must never be used in this project — directly or transitively.**
+
+- Do not add `axe-core` or any `@axe-core/*` package.
+- Do not add any dependency that pulls in `axe-core` transitively — this
+  includes `eslint-plugin-jsx-a11y`, `lighthouse` / `@lhci/cli`, `pa11y`,
+  `@storybook/addon-a11y`, `jest-axe`, `cypress-axe`, and similar.
+- Before adding any new dependency, verify with `npm ls axe-core` that it does
+  not introduce axe-core into the tree. If it does, do not add it.
+- Use `@afixt/a11y-assert` for accessibility checks instead.

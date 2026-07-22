@@ -1,4 +1,4 @@
-import { cleanEnv, host, port, str, url } from 'envalid';
+import { bool, cleanEnv, host, port, str, url } from 'envalid';
 
 /**
  * Env spec used by {@link loadEnv}.
@@ -17,6 +17,12 @@ const envSpec = {
   DB_NAME: str(),
   DB_USER: str(),
   DB_PASS: str(),
+  // Require TLS on the DB connection. Off by default so local docker-compose
+  // (plaintext) works; set DB_SSL=true in production. DB_SSL_CA carries the
+  // provider's CA certificate as PEM (e.g. DigitalOcean managed MySQL) so the
+  // server certificate can be verified.
+  DB_SSL: bool({ default: false }),
+  DB_SSL_CA: str({ default: '' }),
 
   REDIS_HOST: host(),
   REDIS_PORT: port({ default: 6379 }),

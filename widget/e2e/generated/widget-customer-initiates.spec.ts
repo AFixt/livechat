@@ -9,6 +9,7 @@ test.describe('Visitor opens the widget and starts a chat', () => {
   test('widget-customer-initiates: Visitor opens the widget and starts a chat (positive)', async ({ page }) => {
     // Preconditions:
     //   - The API stack is running with an "acme" tenant.
+    //   - At least one support agent is available (the widget harness seeds this), so the chat lands in the active state rather than the offline no_support state.
 
     // Step 1: Access start location
     await page.goto('http://localhost:5175/');

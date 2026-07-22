@@ -1,7 +1,15 @@
 npx lint-staged
 npx tsc-files --noEmit
-if command -v gitleaks >/dev/null 2>&1; then
-  gitleaks protect --staged --no-banner
+
+# Secret scan. trufflehog has no staged-diff mode, so scan the working-tree
+# content of the staged files here; the authoritative full-history verified
+# scan runs at pre-push and in CI via `npm run security:secrets`.
+if command -v trufflehog >/dev/null 2>&1; then
+  files=$(git diff --cached --name-only --diff-filter=ACM)
+  if [ -n "$files" ]; then
+    printf '%s\n' "$files" | tr '\n' '\0' \
+      | xargs -0 trufflehog filesystem --results=verified --fail --no-update 2>/dev/null
+  fi
 else
-  echo "warn: gitleaks not installed — run scripts/bootstrap.sh" >&2
+  echo "warn: trufflehog not installed — run scripts/bootstrap.sh" >&2
 fi

@@ -59,6 +59,8 @@ export async function initVisitorSession(tenantKey: string): Promise<InitSession
 interface InitiatedChat {
   chat: { id: string; status: string };
   message: { id: string; body: string; deliveredAt: string };
+  /** Whether any support agent was online when the chat was created. */
+  supportAvailable: boolean;
 }
 
 /**
@@ -66,7 +68,7 @@ interface InitiatedChat {
  * @param customerName - Name entered by the visitor.
  * @param firstMessage - Initial message text.
  * @param customerEmail - Optional email for transcript / fallback.
- * @returns The new chat + first message.
+ * @returns The new chat + first message + support availability.
  */
 export async function initiateChat(
   customerName: string,
@@ -83,4 +85,26 @@ export async function initiateChat(
   });
   if (body.data === undefined) throw new Error('No chat returned');
   return body.data;
+}
+
+interface CurrentChatMessage {
+  id: string;
+  body: string;
+  senderKind: 'visitor' | 'user' | 'system';
+  deliveredAt: string;
+}
+
+interface CurrentChat {
+  chat: { id: string; status: string; customerName: string | null } | null;
+  messages: CurrentChatMessage[];
+}
+
+/**
+ * GET /api/v1/visitor/chats/current — the returning visitor's resumable chat.
+ * Used at bootstrap to offer the "welcome back, continue?" (restart) state.
+ * @returns The resumable chat + its messages, or `{ chat: null, messages: [] }`.
+ */
+export async function fetchCurrentChat(): Promise<CurrentChat> {
+  const body = await apiFetch<CurrentChat>('/visitor/chats/current', { method: 'GET' });
+  return body.data ?? { chat: null, messages: [] };
 }

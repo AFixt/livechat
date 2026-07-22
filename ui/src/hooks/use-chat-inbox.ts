@@ -8,6 +8,8 @@ import { useChatsStore } from '../store/chats.js';
 interface ChatInbox {
   /** Accept a chat, focus it, and load its transcript. */
   selectChat: (chatId: string) => void;
+  /** Proactively start a chat with a visitor (§5.1.5). */
+  initiateChatWithVisitor: (visitorSessionId: string) => void;
 }
 
 /**
@@ -15,7 +17,9 @@ interface ChatInbox {
  * {@link ChatInbox.selectChat} that accepts a chat (assigning it and joining
  * its socket room), focuses it, and loads its full transcript — so history,
  * including the first message created at initiation, is shown. Live updates
- * continue to arrive via {@link useStaffSocket}.
+ * continue to arrive via {@link useStaffSocket}. Also returns
+ * {@link ChatInbox.initiateChatWithVisitor} for support-initiated chats; the
+ * resulting chat arrives back over the socket as a `chat:requested` event.
  * @returns The chat inbox controls.
  */
 export function useChatInbox(): ChatInbox {
@@ -47,5 +51,9 @@ export function useChatInbox(): ChatInbox {
     [setActiveChat, upsertChat],
   );
 
-  return { selectChat };
+  const initiateChatWithVisitor = useCallback((visitorSessionId: string): void => {
+    getStaffSocket().emit('chat:initiate', { visitorSessionId });
+  }, []);
+
+  return { selectChat, initiateChatWithVisitor };
 }

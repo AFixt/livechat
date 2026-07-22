@@ -1,0 +1,26 @@
+id: widget-restart
+title: "Returning visitor is offered to resume a prior conversation"
+type: extension
+description: |
+  §5.1.8 — when a returning visitor still has an unfinished chat, the widget
+  offers to resume it ("welcome back, continue?") rather than starting fresh.
+  Activating "Resume chat" returns to the active state with the prior
+  transcript.
+
+  Detection happens at bootstrap from the visitor's prior session (GET
+  /visitor/chats/current), so the full returning-visitor path is exercised in
+  the cross-ends journey suite (ADR-0007). This file is the behavioural source
+  of truth for the restart surface.
+
+start_location: "http://localhost:5175/"
+
+preconditions:
+  - The visitor has a prior, unfinished chat in the same session.
+
+data: {}
+
+steps:
+  - locate: text "Welcome back. Continue your conversation?"
+  - locate: button "Resume chat"
+  - focus: button "Resume chat"
+  - activate: button "Resume chat"

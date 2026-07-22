@@ -10,9 +10,17 @@ import type { Logger } from 'pino';
  * @returns A configured (but not yet connected) Sequelize instance.
  */
 export function createSequelize(
-  env: Pick<Env, 'DB_HOST' | 'DB_PORT' | 'DB_NAME' | 'DB_USER' | 'DB_PASS' | 'NODE_ENV'>,
+  env: Pick<
+    Env,
+    'DB_HOST' | 'DB_PORT' | 'DB_NAME' | 'DB_USER' | 'DB_PASS' | 'DB_SSL' | 'DB_SSL_CA' | 'NODE_ENV'
+  >,
   logger: Logger,
 ): Sequelize {
+  // TLS is opt-in (DB_SSL) so local docker-compose stays plaintext. When on,
+  // verify the server cert against the provider CA if one was supplied.
+  const ssl = env.DB_SSL
+    ? { rejectUnauthorized: true, ...(env.DB_SSL_CA !== '' && { ca: env.DB_SSL_CA }) }
+    : undefined;
   const options: Options = {
     dialect: 'mysql',
     host: env.DB_HOST,
@@ -20,6 +28,7 @@ export function createSequelize(
     database: env.DB_NAME,
     username: env.DB_USER,
     password: env.DB_PASS,
+    dialectOptions: { ssl },
     logging:
       env.NODE_ENV === 'development'
         ? (sql: string) => {

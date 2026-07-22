@@ -4,6 +4,11 @@
   --afixt-surface: canvas;
   --afixt-text: canvastext;
   --afixt-border: #0000001f;
+
+  /* Form-field borders must stay visible: WCAG 1.4.11 requires 3:1 against
+     the surface, which the faint --afixt-border (decorative, ~1.1:1) fails.
+     #767676 clears 4.5:1 on both white and dark system canvases. */
+  --afixt-field-border: #767676;
   --afixt-danger: #b91c1c;
   --afixt-radius: 8px;
   --afixt-z: 2147483000;
@@ -119,7 +124,7 @@ label.field input,
 label.field textarea {
   font: inherit;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--afixt-border);
+  border: 1px solid var(--afixt-field-border);
   border-radius: 4px;
   background: var(--afixt-surface);
   color: var(--afixt-text);

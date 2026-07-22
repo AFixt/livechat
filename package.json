@@ -1,7 +1,8 @@
 {
   "name": "livechat-root",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "Root tooling for the AFixt livechat monorepo (api, ui, widget, shared, usecases).",
   "engines": {
@@ -91,7 +92,7 @@
     "security:audit": "npm audit --workspaces --include-workspace-root --audit-level=high",
     "security:osv": "osv-scanner --lockfile=package-lock.json",
     "security:semgrep": "bash scripts/semgrep.sh",
-    "security:secrets": "gitleaks detect --no-banner",
+    "security:secrets": "trufflehog git file://. --results=verified --fail --no-update",
     "security": "npm-run-all -p security:audit security:osv security:semgrep security:secrets",
     "license:check": "license-checker-rseidelsohn --production --onlyAllow 'MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;Unlicense;Python-2.0;WTFPL;BlueOak-1.0.0' --excludePrivatePackages --summary",
     "license:report": "license-checker-rseidelsohn --production --csv --out reports/licenses.csv",
@@ -113,7 +114,6 @@
     "eslint-import-resolver-typescript": "4.4.4",
     "eslint-plugin-import-x": "4.16.2",
     "eslint-plugin-jsdoc": "62.9.0",
-    "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-n": "17.24.0",
     "eslint-plugin-no-secrets": "2.3.3",
     "eslint-plugin-promise": "7.2.1",

@@ -45,11 +45,18 @@ export type WidgetAction =
     }
   | { type: 'chat_created_no_support'; customerName: string }
   | { type: 'support_initiated'; chatId: string }
+  | { type: 'support_accepted' }
   | { type: 'message_received'; message: WidgetMessage }
   | { type: 'message_sent'; message: WidgetMessage }
   | { type: 'chat_ended_by_support' }
   | { type: 'chat_ended_by_customer' }
-  | { type: 'restart' }
+  | {
+      type: 'restart';
+      chatId: string;
+      customerName: string;
+      messages: WidgetMessage[];
+    }
+  | { type: 'restart_resumed' }
   | { type: 'error'; message: string };
 
 const handlers: {
@@ -74,12 +81,21 @@ const handlers: {
     state: 'no_support',
     customerName: a.customerName,
   }),
-  support_initiated: (m, a) => ({ ...m, state: 'support_initiated', chatId: a.chatId }),
+  support_initiated: (m, a) => ({ ...m, state: 'support_initiated', chatId: a.chatId, open: true }),
+  support_accepted: (m) => ({ ...m, state: 'active' }),
   message_received: (m, a) => ({ ...m, messages: [...m.messages, a.message] }),
   message_sent: (m, a) => ({ ...m, messages: [...m.messages, a.message] }),
   chat_ended_by_support: (m) => ({ ...m, state: 'ended' }),
   chat_ended_by_customer: (m) => ({ ...m, state: 'ended' }),
-  restart: () => ({ ...initialModel(), state: 'restart', open: true }),
+  restart: (_m, a) => ({
+    ...initialModel(),
+    state: 'restart',
+    open: true,
+    chatId: a.chatId,
+    customerName: a.customerName,
+    messages: a.messages,
+  }),
+  restart_resumed: (m) => ({ ...m, state: 'active' }),
   error: (m, a) => ({ ...m, errorMessage: a.message }),
 };
 
