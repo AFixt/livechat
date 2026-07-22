@@ -93,9 +93,23 @@ export async function probeHarness(): Promise<TestHarness | null> {
   try {
     await sequelize.authenticate();
     await redis.connect();
-  } catch {
+  } catch (error) {
     await sequelize.close().catch(() => undefined);
     await redis.quit().catch(() => undefined);
+    if (process.env['REQUIRE_DB'] === '1') {
+      // Every integration test returns early on a null harness, so absent
+      // infrastructure otherwise reads as a pass — a green run that asserted
+      // nothing. CI sets REQUIRE_DB=1 so that can never be mistaken for
+      // coverage; locally the null path still skips so `npm test` works
+      // without docker.
+      throw new Error(
+        'REQUIRE_DB=1 but the integration stack is unreachable — ' +
+          `MySQL ${env.DB_HOST}:${String(env.DB_PORT)}/${env.DB_NAME}, ` +
+          `Redis ${env.REDIS_HOST}:${String(env.REDIS_PORT)}. ` +
+          'Start it with `docker compose up -d mysql redis`. ' +
+          `Cause: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     return null;
   }
 

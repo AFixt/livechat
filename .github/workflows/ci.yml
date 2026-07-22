@@ -47,7 +47,31 @@ jobs:
         with:
           args: --no-progress '**/*.md'
 
+      # The integration tests return early on a null harness, so without a
+      # database they pass while asserting nothing — a green check that means
+      # nothing. Bring the real stack up and set REQUIRE_DB=1 below so an
+      # unreachable stack fails loudly instead of silently skipping.
+      - name: Start integration infrastructure
+        run: |
+          set -euo pipefail
+          docker compose up -d mysql redis
+          # Retry the readiness query itself: on a fresh volume the entrypoint
+          # runs a temporary server that answers before the real one is up.
+          deadline=$(( SECONDS + 120 ))
+          until docker exec livechat-mysql mysql -ulivechat_user -plivechat_pass \
+            -e 'SELECT 1' livechat_test >/dev/null 2>&1; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "MySQL did not become ready within 120s" >&2
+              docker logs --tail 50 livechat-mysql >&2 || true
+              exit 1
+            fi
+            sleep 1
+          done
+          docker exec livechat-redis redis-cli ping
+
       - run: npm run check:all
+        env:
+          REQUIRE_DB: "1"
 
   usecases-diff-gate:
     runs-on: ubuntu-latest
