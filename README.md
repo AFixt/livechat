@@ -21,6 +21,19 @@ GitHub issues.
 - `docs/adr/` — architecture decisions
 - `usecases/` — every user-facing interaction as `.uc.yaml`, per ADR-0002
 
+## Setup
+
+```sh
+nvm use                 # Node 22, per .nvmrc
+bash scripts/bootstrap.sh   # install local tool binaries (semgrep, osv-scanner, trufflehog, lychee)
+npm ci                  # install workspace dependencies
+docker compose up -d    # MySQL + Redis + MailHog + MinIO
+npm run dev             # run api, ui, and widget in parallel
+```
+
+Then `npm run check:all` should pass on a clean clone — it is the same gate
+Husky runs on pre-push.
+
 ## Scripts
 
 From the repo root:
@@ -42,3 +55,8 @@ From the repo root:
   osv-scanner, trufflehog, lychee) required by pre-push hooks
 - All user-facing changes must include a corresponding `.uc.yaml` update
   (enforced by a CI diff gate)
+
+## License
+
+Proprietary. © AFixt. This is a private product (`"private": true`); it is not
+licensed for external use or redistribution.
