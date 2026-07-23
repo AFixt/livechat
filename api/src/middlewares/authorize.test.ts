@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../utils/api-error.js';
 
-import { requireRole, requireStaffOrAdmin, requireTenantAccess } from './authorize.js';
+import {
+  assertTenantAccess,
+  callerTenantScope,
+  requireRole,
+  requireStaffOrAdmin,
+  resolveTenantFilter,
+} from './authorize.js';
 
 import type { User } from '../models/index.js';
 import type { Request, Response } from 'express';
@@ -86,88 +92,90 @@ describe('requireStaffOrAdmin', () => {
   });
 });
 
-describe('requireTenantAccess', () => {
-  it('calls next with 401 when no user is authenticated', () => {
-    const next = vi.fn();
-    const req = fakeReq({});
-    requireTenantAccess()(req, res, next);
-    const err = next.mock.calls[0]?.[0] as ApiError;
-    expect(err).toBeInstanceOf(ApiError);
-    expect(err.status).toBe(401);
+describe('callerTenantScope', () => {
+  it('returns undefined for an untenanted AFixt staff account', () => {
+    expect(callerTenantScope(fakeReq({ user: fakeUser('super_admin', null) }))).toBeUndefined();
   });
 
-  it.each(['super_admin', 'admin', 'staff'] as const)(
-    'lets %s through regardless of tenant mismatch',
-    (role) => {
-      const next = vi.fn();
-      const req = fakeReq({
-        user: fakeUser(role, 'tenant-a'),
-        params: { tenantId: 'tenant-b' },
-      });
-      requireTenantAccess()(req, res, next);
-      expect(next).toHaveBeenCalledExactlyOnceWith();
-    },
-  );
-
-  it('allows a client through when no tenantId is present anywhere on the request', () => {
-    const next = vi.fn();
-    const req = fakeReq({ user: fakeUser('client', 'tenant-a') });
-    requireTenantAccess()(req, res, next);
-    expect(next).toHaveBeenCalledExactlyOnceWith();
+  it('returns undefined when nobody is authenticated', () => {
+    expect(callerTenantScope(fakeReq({}))).toBeUndefined();
   });
 
-  it('allows a client whose params.tenantId matches their own tenant', () => {
-    const next = vi.fn();
-    const req = fakeReq({
-      user: fakeUser('client', 'tenant-a'),
-      params: { tenantId: 'tenant-a' },
-    });
-    requireTenantAccess()(req, res, next);
-    expect(next).toHaveBeenCalledExactlyOnceWith();
+  it('returns the tenant a scoped caller is confined to', () => {
+    expect(callerTenantScope(fakeReq({ user: fakeUser('admin', 'tenant-a') }))).toBe('tenant-a');
+  });
+});
+
+describe('assertTenantAccess', () => {
+  it('permits an untenanted caller to touch any tenant', () => {
+    const req = fakeReq({ user: fakeUser('super_admin', null) });
+    expect(() => {
+      assertTenantAccess(req, 'tenant-b');
+    }).not.toThrow();
   });
 
-  it('allows a client whose body.tenantId matches their own tenant', () => {
-    const next = vi.fn();
-    const req = fakeReq({
-      user: fakeUser('client', 'tenant-a'),
-      body: { tenantId: 'tenant-a' },
-    });
-    requireTenantAccess()(req, res, next);
-    expect(next).toHaveBeenCalledExactlyOnceWith();
+  it('permits a scoped caller to touch their own tenant', () => {
+    const req = fakeReq({ user: fakeUser('staff', 'tenant-a') });
+    expect(() => {
+      assertTenantAccess(req, 'tenant-a');
+    }).not.toThrow();
   });
 
-  it('allows a client whose query.tenantId matches their own tenant', () => {
-    const next = vi.fn();
-    const req = fakeReq({
-      user: fakeUser('client', 'tenant-a'),
-      query: { tenantId: 'tenant-a' },
-    });
-    requireTenantAccess()(req, res, next);
-    expect(next).toHaveBeenCalledExactlyOnceWith();
+  it('rejects a scoped caller touching another tenant', () => {
+    const req = fakeReq({ user: fakeUser('admin', 'tenant-a') });
+    expect(() => {
+      assertTenantAccess(req, 'tenant-b');
+    }).toThrow(ApiError);
   });
 
-  it('prefers params.tenantId over body/query when present', () => {
-    const next = vi.fn();
-    const req = fakeReq({
-      user: fakeUser('client', 'tenant-a'),
-      params: { tenantId: 'tenant-a' },
-      body: { tenantId: 'tenant-b' },
-      query: { tenantId: 'tenant-c' },
-    });
-    requireTenantAccess()(req, res, next);
-    expect(next).toHaveBeenCalledExactlyOnceWith();
+  it('rejects a scoped caller when the resource has no tenant at all', () => {
+    const req = fakeReq({ user: fakeUser('admin', 'tenant-a') });
+    let thrown: unknown;
+    try {
+      assertTenantAccess(req, null);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(ApiError);
+    expect((thrown as ApiError).status).toBe(403);
+  });
+});
+
+describe('resolveTenantFilter', () => {
+  it('lets an untenanted caller ask for any single tenant', () => {
+    const req = fakeReq({ user: fakeUser('super_admin', null) });
+    expect(resolveTenantFilter(req, 'tenant-b')).toBe('tenant-b');
   });
 
-  it('calls next with 403 when the resolved tenantId does not match the user tenant', () => {
-    const next = vi.fn();
-    const req = fakeReq({
-      user: fakeUser('client', 'tenant-a'),
-      params: { tenantId: 'tenant-b' },
-    });
-    requireTenantAccess()(req, res, next);
-    const err = next.mock.calls[0]?.[0] as ApiError;
-    expect(err).toBeInstanceOf(ApiError);
-    expect(err.status).toBe(403);
-    expect(err.message).toBe('Access denied to this tenant');
+  it('lets an untenanted caller ask for every tenant', () => {
+    const req = fakeReq({ user: fakeUser('super_admin', null) });
+    expect(resolveTenantFilter(req, undefined)).toBeUndefined();
+  });
+
+  it('pins a scoped caller to their own tenant when they ask for nothing', () => {
+    const req = fakeReq({ user: fakeUser('admin', 'tenant-a') });
+    expect(resolveTenantFilter(req, undefined)).toBe('tenant-a');
+  });
+
+  it('pins a scoped caller to their own tenant when they ask for it explicitly', () => {
+    const req = fakeReq({ user: fakeUser('admin', 'tenant-a') });
+    expect(resolveTenantFilter(req, 'tenant-a')).toBe('tenant-a');
+  });
+
+  it('ignores a non-string filter and still pins a scoped caller', () => {
+    const req = fakeReq({ user: fakeUser('admin', 'tenant-a') });
+    expect(resolveTenantFilter(req, 42)).toBe('tenant-a');
+  });
+
+  it('rejects a scoped caller explicitly asking for another tenant', () => {
+    const req = fakeReq({ user: fakeUser('admin', 'tenant-a') });
+    let thrown: unknown;
+    try {
+      resolveTenantFilter(req, 'tenant-b');
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(ApiError);
+    expect((thrown as ApiError).status).toBe(403);
   });
 });
