@@ -77,6 +77,8 @@
     "test:api": "npm --workspace api run test",
     "test:ui": "npm --workspace ui run test:unit",
     "test:widget": "npm --workspace widget run test:unit",
+    "test:coverage": "npm --workspace api run test:coverage",
+    "test:ci": "npm-run-all -s test:shared test:coverage test:ui test:widget",
     "test:e2e": "npm-run-all -s usecases:generate test:e2e:journeys test:e2e:ui test:e2e:widget",
     "test:e2e:ui": "npm --workspace ui run test:e2e",
     "test:e2e:widget": "npm --workspace widget run test:e2e",
@@ -97,7 +99,7 @@
     "license:check": "license-checker-rseidelsohn --production --onlyAllow 'MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;Unlicense;Python-2.0;WTFPL;BlueOak-1.0.0' --excludePrivatePackages --summary",
     "license:report": "license-checker-rseidelsohn --production --csv --out reports/licenses.csv",
     "check": "npm-run-all -p lint typecheck stylelint markdownlint usecases:validate",
-    "check:all": "npm-run-all -s check test build size dupes links security license:check",
+    "check:all": "npm-run-all -s check test:ci build size dupes links security license:check",
     "ci": "npm run check:all",
     "test:e2e:journeys": "npm --workspace @livechat/e2e run test"
   },

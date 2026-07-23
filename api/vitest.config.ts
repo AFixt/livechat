@@ -9,7 +9,16 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html'],
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.d.ts', 'src/reset.d.ts', 'src/server.ts', 'src/config/index.ts'],
+      exclude: [
+        'src/**/*.d.ts',
+        'src/reset.d.ts',
+        // Process entrypoints: they wire the app together and run on boot, so
+        // exercising them proves nothing the integration suite does not.
+        'src/server.ts',
+        'src/config/index.ts',
+        // Operator CLI scripts, run by hand against a real database.
+        'src/scripts/**',
+      ],
       thresholds: {
         lines: 80,
         statements: 80,
