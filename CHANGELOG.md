@@ -11,6 +11,54 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 _Nothing yet._
 
+## [0.1.2] - 2026-07-23
+
+A security release. The REST API enforced role but not tenant, so a
+tenant-scoped operator could reach another tenant's data. Also makes the
+coverage gate real rather than decorative.
+
+### Security
+
+- **The REST API now enforces tenant isolation.** A tenant-scoped `admin` or
+  `staff` could read — and in places modify — another tenant's chats, users and
+  tenants over HTTP: list endpoints filtered on a caller-supplied
+  `?tenantId` (omitting it returned every tenant's rows), and by-id routes
+  never compared the record's tenant to the caller's.
+  `requireTenantAccess()` existed but was dead code, and would not have helped
+  if wired up — it returned early for `super_admin`/`admin`/`staff`, so it only
+  ever constrained `client`. Replaced with `callerTenantScope()`,
+  `assertTenantAccess()` and `resolveTenantFilter()`, keyed on the caller's own
+  `tenant_id` rather than their role, and applied across chats, users and
+  tenants. Lists are pinned to the caller's tenant; naming another tenant is a
+  403 rather than a silent rewrite. Untenanted AFixt staff still span every
+  tenant, per the issue #19 decision. ([#43], [#44])
+
+  The Socket.IO layer was already isolated, which is why this went unnoticed —
+  one layer was tested and the adjacent one was not, the same shape as the
+  migration drift fixed in 0.1.1.
+
+### Fixed
+
+- **The e2e stack no longer fails on a fresh MySQL volume.** The entrypoint's
+  temporary init server accepts `CREATE DATABASE`, so the readiness gate could
+  pass against it and the real server would then drop the seed's connection
+  mid-migration (`PROTOCOL_CONNECTION_LOST`). Setup now waits for the init
+  phase to complete before provisioning, and retries the seed. ([#44])
+
+### Changed
+
+- **Coverage thresholds are enforced.** `check:all` ran `test`, not
+  `test:coverage`, so the 80/75/80/80 thresholds in `api/vitest.config.ts` were
+  decorative and the project sat below its own bar. It now runs `test:ci`,
+  which runs the api suite once under coverage; plain `npm test` stays fast for
+  local work. Coverage went from 64.30/39.53/73.99/69.11 to
+  93.24/80.89/98.64/96.65, with the api suite growing from 22 to 191 tests
+  (197 including the isolation tests above). ([#42])
+
+[#42]: https://github.com/AFixt/livechat/pull/42
+[#43]: https://github.com/AFixt/livechat/issues/43
+[#44]: https://github.com/AFixt/livechat/pull/44
+
 ## [0.1.1] - 2026-07-22
 
 A correctness release. v0.1.0 shipped a database schema the ORM could not read
@@ -116,7 +164,8 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
   ships with Node 22, and effective on toolchain upgrade.
 - `body-parser` bumped to 2.3.0, clearing OSV `GHSA-v422-hmwv-36x6`.
 
-[Unreleased]: https://github.com/AFixt/livechat/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/AFixt/livechat/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/AFixt/livechat/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/AFixt/livechat/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/AFixt/livechat/releases/tag/v0.1.0
 [#1]: https://github.com/AFixt/livechat/issues/1

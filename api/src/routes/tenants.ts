@@ -5,7 +5,7 @@ import {
   type UpdateTenantInput,
 } from '@livechat/shared';
 
-import { requireRole } from '../middlewares/authorize.js';
+import { assertTenantAccess, callerTenantScope, requireRole } from '../middlewares/authorize.js';
 import { parsedBody, validate } from '../middlewares/validate.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
@@ -29,9 +29,12 @@ export function buildTenantsRouter(deps: TenantsRouterDeps): Router {
 
   router.get(
     '/',
-    asyncHandler(async (_req, res) => {
+    asyncHandler(async (req, res) => {
       const tenants = await deps.tenant.list();
-      res.json({ success: true, data: tenants });
+      // A tenant-scoped admin sees only their own tenant in the list.
+      const scope = callerTenantScope(req);
+      const visible = scope === undefined ? tenants : tenants.filter((t) => t.id === scope);
+      res.json({ success: true, data: visible });
     }),
   );
 
@@ -52,6 +55,7 @@ export function buildTenantsRouter(deps: TenantsRouterDeps): Router {
       const id = req.params.id;
       if (typeof id !== 'string') return;
       const tenant = await deps.tenant.getById(id);
+      assertTenantAccess(req, tenant.id);
       res.json({ success: true, data: tenant });
     }),
   );

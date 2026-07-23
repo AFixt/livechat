@@ -1,9 +1,10 @@
 import { pino } from 'pino';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createSequelize } from './mysql.js';
 
 import type { Env } from './env.js';
+import type { Logger } from 'pino';
 import type { Sequelize } from 'sequelize';
 
 const logger = pino({ level: 'silent' });
@@ -34,6 +35,39 @@ function sslOf(sequelize: Sequelize): Ssl | undefined {
   };
   return withOptions.options.dialectOptions?.ssl;
 }
+
+/**
+ * Read the resolved `logging` function off a built Sequelize instance, the
+ * same narrow-cast approach as {@link sslOf}.
+ * @param sequelize - The instance built by createSequelize.
+ * @returns The logging option, either `false` or a `(sql: string) => void`.
+ */
+function loggingOf(sequelize: Sequelize): false | ((sql: string) => void) {
+  const withOptions = sequelize as unknown as {
+    options: { logging: false | ((sql: string) => void) };
+  };
+  return withOptions.options.logging;
+}
+
+describe('createSequelize SQL logging', () => {
+  it('disables query logging outside development', () => {
+    const sequelize = createSequelize({ ...baseEnv, DB_SSL: false, DB_SSL_CA: '' }, logger);
+    expect(loggingOf(sequelize)).toBe(false);
+  });
+
+  it('logs each query at debug level in development', () => {
+    const debugSpy = vi.fn();
+    const devLogger = { debug: debugSpy } as unknown as Logger;
+    const sequelize = createSequelize(
+      { ...baseEnv, NODE_ENV: 'development', DB_SSL: false, DB_SSL_CA: '' },
+      devLogger,
+    );
+    const logging = loggingOf(sequelize);
+    expect(typeof logging).toBe('function');
+    if (typeof logging === 'function') logging('SELECT 1');
+    expect(debugSpy).toHaveBeenCalledExactlyOnceWith({ sql: 'SELECT 1' }, 'sql');
+  });
+});
 
 describe('createSequelize DB TLS', () => {
   it('omits ssl when DB_SSL is false (local docker-compose stays plaintext)', () => {

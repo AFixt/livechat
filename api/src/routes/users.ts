@@ -1,5 +1,6 @@
 import { updateUserInputSchema, type UpdateUserInput } from '@livechat/shared';
 
+import { assertTenantAccess, resolveTenantFilter } from '../middlewares/authorize.js';
 import { parsedBody, validate } from '../middlewares/validate.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
@@ -24,8 +25,7 @@ export function buildUsersRouter(deps: UsersRouterDeps): Router {
   router.get(
     '/',
     asyncHandler(async (req, res) => {
-      const tenantId = req.query.tenantId;
-      const users = await deps.user.list(typeof tenantId === 'string' ? tenantId : undefined);
+      const users = await deps.user.list(resolveTenantFilter(req, req.query.tenantId));
       res.json({ success: true, data: users });
     }),
   );
@@ -36,6 +36,7 @@ export function buildUsersRouter(deps: UsersRouterDeps): Router {
       const id = req.params.id;
       if (typeof id !== 'string') return;
       const user = await deps.user.getById(id);
+      assertTenantAccess(req, user.tenantId);
       res.json({ success: true, data: user });
     }),
   );
@@ -46,6 +47,10 @@ export function buildUsersRouter(deps: UsersRouterDeps): Router {
     asyncHandler(async (req, res) => {
       const id = req.params.id;
       if (typeof id !== 'string') return;
+      // Check the existing row's tenant before mutating it, so a scoped caller
+      // cannot edit — or re-tenant — someone else's user.
+      const existing = await deps.user.getById(id);
+      assertTenantAccess(req, existing.tenantId);
       const body = parsedBody(req, updateUserInputSchema) satisfies UpdateUserInput;
       const user = await deps.user.update(id, body);
       res.json({ success: true, data: user });
