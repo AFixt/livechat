@@ -231,13 +231,11 @@ describe('chat routes (integration)', () => {
     expect(res.status).toBe(403);
   });
 
-  // NOTE: `buildChatsRouter` (api/src/routes/chats.ts) only gates access on
-  // role via `requireStaffOrAdmin()` — it never compares a chat's tenantId
-  // against `req.user.tenantId`, unlike the tenant-scoped Socket.IO rooms
-  // exercised in chat-flow.test.ts. This test documents that actual, current
-  // REST-layer behavior; it is not an endorsement of it. Flagged separately
-  // as a cross-tenant data-exposure gap worth a follow-up fix.
-  test("current behavior: a tenant-scoped staff member can read another tenant's chat", async () => {
+  // Issue #43: the REST layer now enforces the same tenant isolation the
+  // Socket.IO rooms already did (see chat-flow.test.ts). A tenant-scoped staff
+  // member is confined to their own tenant across every chat route — reads and
+  // writes alike; only untenanted AFixt staff span tenants.
+  test("a tenant-scoped staff member cannot touch another tenant's chat", async () => {
     if (harness === null) return;
     const { app } = harness;
     const staffA = await seedTenantAndStaff('iso-a');
@@ -245,12 +243,32 @@ describe('chat routes (integration)', () => {
     const visitorB = await seedVisitorSession(staffB.tenantId);
     const chatB = await seedChat(staffB.tenantId, visitorB.id, { status: 'pending' });
     const tokenA = await loginAs(app, staffA.email, staffA.password);
+    const auth = `Bearer ${tokenA}`;
 
-    const res = await request(app)
-      .get(`/api/v1/chats/${chatB.id}`)
-      .set('authorization', `Bearer ${tokenA}`);
-    expect(res.status).toBe(200);
-    expect(res.body.data.id).toBe(chatB.id);
+    const read = await request(app).get(`/api/v1/chats/${chatB.id}`).set('authorization', auth);
+    expect(read.status).toBe(403);
+
+    const transcript = await request(app)
+      .get(`/api/v1/chats/${chatB.id}/messages`)
+      .set('authorization', auth);
+    expect(transcript.status).toBe(403);
+
+    const accept = await request(app)
+      .post(`/api/v1/chats/${chatB.id}/accept`)
+      .set('authorization', auth);
+    expect(accept.status).toBe(403);
+
+    const post = await request(app)
+      .post(`/api/v1/chats/${chatB.id}/messages`)
+      .set('authorization', auth)
+      .send({ body: 'should not land' });
+    expect(post.status).toBe(403);
+
+    const end = await request(app)
+      .post(`/api/v1/chats/${chatB.id}/end`)
+      .set('authorization', auth)
+      .send({ endedBy: 'support' });
+    expect(end.status).toBe(403);
   });
 
   test('lists chats, filterable by tenantId and status', async () => {
@@ -265,14 +283,23 @@ describe('chat routes (integration)', () => {
     const chatB = await seedChat(staffB.tenantId, visitorB.id, { status: 'pending' });
     const token = await loginAs(app, staffA.email, staffA.password);
 
+    // Omitting ?tenantId cannot widen the result set across tenants: a scoped
+    // caller is pinned to their own tenant (issue #43).
     const unfiltered = await request(app)
       .get('/api/v1/chats')
       .set('authorization', `Bearer ${token}`);
     expect(unfiltered.status).toBe(200);
     const unfilteredIds = (unfiltered.body.data as { id: string }[]).map((c) => c.id);
-    expect(unfilteredIds).toEqual(
-      expect.arrayContaining([pendingChatA.id, activeChatA.id, chatB.id]),
-    );
+    expect(unfilteredIds).toEqual(expect.arrayContaining([pendingChatA.id, activeChatA.id]));
+    expect(unfilteredIds).not.toContain(chatB.id);
+
+    // Explicitly asking for someone else's tenant is refused, not silently
+    // rewritten to your own.
+    const crossTenant = await request(app)
+      .get('/api/v1/chats')
+      .query({ tenantId: staffB.tenantId })
+      .set('authorization', `Bearer ${token}`);
+    expect(crossTenant.status).toBe(403);
 
     const byTenant = await request(app)
       .get('/api/v1/chats')

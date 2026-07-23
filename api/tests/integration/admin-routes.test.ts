@@ -267,14 +267,12 @@ describe('admin routes (integration)', () => {
           .send({ origins: ['https://example.com'] });
         expect(origins.status).toBe(403);
 
-        // Read-only tenant routes have no super_admin guard, so admin CAN
-        // read any tenant (including one it is not scoped to) — the admin
-        // console's whole point is cross-tenant visibility for AFixt staff.
+        // A tenant-scoped admin cannot read a tenant it is not scoped to
+        // (issue #43). Only untenanted AFixt staff get cross-tenant visibility.
         const readOther = await request(app)
           .get(`/api/v1/tenants/${otherTenant.id}`)
           .set('authorization', `Bearer ${token}`);
-        expect(readOther.status).toBe(200);
-        expect(readOther.body.data.id).toBe(otherTenant.id);
+        expect(readOther.status).toBe(403);
       },
     );
   });
@@ -679,5 +677,92 @@ describe('admin routes (integration)', () => {
         expect(res.status).toBe(400);
       },
     );
+  });
+
+  // Issue #43: role alone never granted cross-tenant access. A caller carrying
+  // a tenant_id is confined to it; only untenanted AFixt staff span tenants.
+  test.runIf(() => harness !== null)(
+    "a tenant-scoped admin cannot read or modify another tenant's user",
+    async () => {
+      if (harness === null) return;
+      const { app } = harness;
+      const own = await seedTenant({ slug: `iso-own-${Math.random().toString(36).slice(2, 8)}` });
+      const other = await seedTenant({
+        slug: `iso-other-${Math.random().toString(36).slice(2, 8)}`,
+      });
+      const admin = await seedUser('admin', own.id);
+      const victim = await seedUser('staff', other.id);
+      const token = await login(admin.user.email, admin.password);
+      const auth = `Bearer ${token}`;
+
+      const read = await request(app)
+        .get(`/api/v1/users/${victim.user.id}`)
+        .set('authorization', auth);
+      expect(read.status).toBe(403);
+
+      const write = await request(app)
+        .patch(`/api/v1/users/${victim.user.id}`)
+        .set('authorization', auth)
+        .send({ status: 'suspended' });
+      expect(write.status).toBe(403);
+
+      // The victim must be untouched by the refused write.
+      await victim.user.reload();
+      expect(victim.user.status).toBe('active');
+    },
+  );
+
+  test.runIf(() => harness !== null)(
+    'list endpoints are pinned to the caller tenant and refuse a cross-tenant filter',
+    async () => {
+      if (harness === null) return;
+      const { app } = harness;
+      const own = await seedTenant({ slug: `pin-own-${Math.random().toString(36).slice(2, 8)}` });
+      const other = await seedTenant({
+        slug: `pin-other-${Math.random().toString(36).slice(2, 8)}`,
+      });
+      const admin = await seedUser('admin', own.id);
+      const outsider = await seedUser('staff', other.id);
+      const token = await login(admin.user.email, admin.password);
+      const auth = `Bearer ${token}`;
+
+      const users = await request(app).get('/api/v1/users').set('authorization', auth);
+      expect(users.status).toBe(200);
+      const userIds = (users.body.data as { id: string }[]).map((u) => u.id);
+      expect(userIds).toContain(admin.user.id);
+      expect(userIds).not.toContain(outsider.user.id);
+
+      const crossFilter = await request(app)
+        .get('/api/v1/users')
+        .query({ tenantId: other.id })
+        .set('authorization', auth);
+      expect(crossFilter.status).toBe(403);
+
+      const tenants = await request(app).get('/api/v1/tenants').set('authorization', auth);
+      expect(tenants.status).toBe(200);
+      const tenantIds = (tenants.body.data as { id: string }[]).map((t) => t.id);
+      expect(tenantIds).toEqual([own.id]);
+    },
+  );
+
+  test.runIf(() => harness !== null)('untenanted AFixt staff still span every tenant', async () => {
+    if (harness === null) return;
+    const { app } = harness;
+    const a = await seedTenant({ slug: `span-a-${Math.random().toString(36).slice(2, 8)}` });
+    const b = await seedTenant({ slug: `span-b-${Math.random().toString(36).slice(2, 8)}` });
+    const su = await seedUser('super_admin', null);
+    const token = await login(su.user.email, su.password);
+    const auth = `Bearer ${token}`;
+
+    const readA = await request(app).get(`/api/v1/tenants/${a.id}`).set('authorization', auth);
+    expect(readA.status).toBe(200);
+    const readB = await request(app).get(`/api/v1/tenants/${b.id}`).set('authorization', auth);
+    expect(readB.status).toBe(200);
+
+    const filtered = await request(app)
+      .get('/api/v1/users')
+      .query({ tenantId: b.id })
+      .set('authorization', auth);
+    expect(filtered.status).toBe(200);
   });
 });
