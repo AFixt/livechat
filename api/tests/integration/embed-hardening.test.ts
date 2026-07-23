@@ -26,7 +26,7 @@ describe('embed hardening (integration)', () => {
       allowedOrigins: ['https://client.example.com'],
     });
     tenantId = tenant.id;
-  }, 20_000);
+  }, 60_000);
 
   afterAll(async () => {
     if (harness !== null) await harness.cleanup();

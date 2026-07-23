@@ -89,7 +89,7 @@ export function createApp(deps: AppDeps): Express {
   }
 
   app.use(notFoundHandler());
-  app.use(errorHandler(logger));
+  app.use(errorHandler(logger, services.audit));
 
   return app;
 }

@@ -3,15 +3,17 @@ import { updateUserInputSchema, type UpdateUserInput } from '@livechat/shared';
 import { assertTenantAccess, resolveTenantFilter } from '../middlewares/authorize.js';
 import { parsedBody, validate } from '../middlewares/validate.js';
 import { asyncHandler } from '../utils/async-handler.js';
+import { recordAudit } from '../utils/audit.js';
 
 import { buildAdminRouter } from './admin-router.js';
 
 import type { AdminRouterDeps } from './admin-router.js';
-import type { UserService } from '../services/index.js';
+import type { AuditService, UserService } from '../services/index.js';
 import type { Router } from 'express';
 
 interface UsersRouterDeps extends AdminRouterDeps {
   user: UserService;
+  audit: AuditService;
 }
 
 /**
@@ -53,6 +55,13 @@ export function buildUsersRouter(deps: UsersRouterDeps): Router {
       assertTenantAccess(req, existing.tenantId);
       const body = parsedBody(req, updateUserInputSchema) satisfies UpdateUserInput;
       const user = await deps.user.update(id, body);
+      await recordAudit(deps.audit, req, {
+        action: 'user.update',
+        resourceType: 'user',
+        resourceId: user.id,
+        tenantId: user.tenantId,
+        metadata: { fields: Object.keys(body) },
+      });
       res.json({ success: true, data: user });
     }),
   );

@@ -16,15 +16,17 @@ import { authenticate } from '../middlewares/authenticate.js';
 import { createAuthLimiter } from '../middlewares/rate-limit.js';
 import { parsedBody, validate } from '../middlewares/validate.js';
 import { asyncHandler } from '../utils/async-handler.js';
+import { recordAudit } from '../utils/audit.js';
 
 import type { Env } from '../config/env.js';
-import type { AuthService } from '../services/index.js';
+import type { AuditService, AuthService } from '../services/index.js';
 import type { Redis } from 'ioredis';
 
 interface AuthRouterDeps {
   env: Env;
   redis: Redis;
   auth: AuthService;
+  audit: AuditService;
   /** Skip auth-specific rate limiting (for unit tests). */
   skipRateLimit?: boolean;
 }
@@ -51,6 +53,13 @@ export function buildAuthRouter(deps: AuthRouterDeps): Router {
     asyncHandler(async (req, res) => {
       const body = parsedBody(req, registerInputSchema) satisfies RegisterInput;
       const user = await deps.auth.register(body);
+      await recordAudit(deps.audit, req, {
+        action: 'auth.register',
+        resourceType: 'user',
+        resourceId: user.id,
+        userId: user.id,
+        tenantId: user.tenantId,
+      });
       res.status(201).json({ success: true, data: { user } });
     }),
   );
@@ -68,7 +77,27 @@ export function buildAuthRouter(deps: AuthRouterDeps): Router {
       };
       if (req.ip !== undefined) loginArgs.ipAddress = req.ip;
       if (ua !== undefined) loginArgs.userAgent = ua;
-      const result = await deps.auth.login(loginArgs);
+      // Audit the failure too — a run of these is the signal that matters.
+      let result;
+      try {
+        result = await deps.auth.login(loginArgs);
+      } catch (error) {
+        await recordAudit(deps.audit, req, {
+          action: 'auth.login_failed',
+          resourceType: 'user',
+          userId: null,
+          tenantId: null,
+          metadata: { email: body.email },
+        });
+        throw error;
+      }
+      await recordAudit(deps.audit, req, {
+        action: 'auth.login',
+        resourceType: 'user',
+        resourceId: result.user.id,
+        userId: result.user.id,
+        tenantId: result.user.tenantId,
+      });
       res.json({ success: true, data: result });
     }),
   );
@@ -79,6 +108,7 @@ export function buildAuthRouter(deps: AuthRouterDeps): Router {
     asyncHandler(async (req, res) => {
       if (req.user === undefined || req.tokenJti === undefined) return;
       await deps.auth.logout(req.user.id, req.tokenJti);
+      await recordAudit(deps.audit, req, { action: 'auth.logout', resourceType: 'user' });
       res.json({ success: true });
     }),
   );
@@ -103,6 +133,13 @@ export function buildAuthRouter(deps: AuthRouterDeps): Router {
     asyncHandler(async (req, res) => {
       const body = parsedBody(req, forgotPasswordInputSchema) satisfies ForgotPasswordInput;
       await deps.auth.forgotPassword(body.email);
+      await recordAudit(deps.audit, req, {
+        action: 'auth.password_reset_requested',
+        resourceType: 'user',
+        userId: null,
+        tenantId: null,
+        metadata: { email: body.email },
+      });
       res.json({
         success: true,
         message: 'If the email exists, a reset link has been sent',
@@ -116,6 +153,12 @@ export function buildAuthRouter(deps: AuthRouterDeps): Router {
     asyncHandler(async (req, res) => {
       const body = parsedBody(req, resetPasswordInputSchema) satisfies ResetPasswordInput;
       await deps.auth.resetPassword(body.token, body.password);
+      await recordAudit(deps.audit, req, {
+        action: 'auth.password_reset',
+        resourceType: 'user',
+        userId: null,
+        tenantId: null,
+      });
       res.json({ success: true, message: 'Password reset successfully' });
     }),
   );
@@ -129,6 +172,12 @@ export function buildAuthRouter(deps: AuthRouterDeps): Router {
         return;
       }
       await deps.auth.verifyEmail(token);
+      await recordAudit(deps.audit, req, {
+        action: 'auth.email_verified',
+        resourceType: 'user',
+        userId: null,
+        tenantId: null,
+      });
       res.json({ success: true, message: 'Email verified successfully' });
     }),
   );
@@ -141,6 +190,11 @@ export function buildAuthRouter(deps: AuthRouterDeps): Router {
       const body = parsedBody(req, changePasswordInputSchema) satisfies ChangePasswordInput;
       if (req.user === undefined) return;
       await deps.auth.changePassword(req.user.id, body.currentPassword, body.newPassword);
+      await recordAudit(deps.audit, req, {
+        action: 'auth.password_changed',
+        resourceType: 'user',
+        resourceId: req.user.id,
+      });
       res.json({ success: true, message: 'Password changed successfully' });
     }),
   );

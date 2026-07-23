@@ -6,11 +6,13 @@ interface AuditEntry {
   userId?: string | null;
   tenantId?: string | null;
   action: string;
-  resourceType?: string;
-  resourceId?: string;
+  // Explicitly `| undefined` so callers can pass an absent field straight
+  // through under `exactOptionalPropertyTypes` without conditional spreads.
+  resourceType?: string | undefined;
+  resourceId?: string | undefined;
   ipAddress?: string | null;
   userAgent?: string | null;
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown> | undefined;
 }
 
 /**

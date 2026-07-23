@@ -11,6 +11,45 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 _Nothing yet._
 
+## [0.2.0] - 2026-07-23
+
+Audit logging works. It was built but never called, so `audit_logs` stayed
+empty in a running system.
+
+### Added
+
+- **Audit logging is wired up.** `createAuditService()` was constructed and
+  exposed as `services.audit`, but `record()` had no call sites anywhere — the
+  table, model and service all worked and none of them were ever reached.
+  CLAUDE.md asks for "every auth + admin action"; none of it happened. ([#46],
+  [#47])
+
+  Now recorded:
+  - **Auth** — `register`, `login`, `login_failed`, `logout`,
+    `password_reset_requested`, `password_reset`, `password_changed`,
+    `email_verified`. Failed logins are audited too, since a run of them is the
+    signal worth having.
+  - **Admin mutations** — tenant `create`/`update`/`delete`/
+    `rotate_embed_secret` and `user.update`, against the affected resource
+    rather than the actor's own tenant.
+  - **Authorization denials** — captured centrally in the error handler, which
+    already sees every `ApiError`: 401 becomes `auth.denied`, 403 becomes
+    `access.denied`. This closes the loop on the tenant isolation added in
+    0.1.2 — a cross-tenant probe now leaves a trail naming the actor.
+
+  Entries carry the actor, tenant, resource, IP and user-agent. Deliberately
+  never recorded: the attempted password on a failed login, or a rotated embed
+  secret. Both are asserted in tests.
+
+### Fixed
+
+- Integration `beforeAll` timeout raised from 20s to 60s. That hook drops every
+  table and replays the migrations per file, which intermittently exceeded 20s
+  under load and failed `check:all`. ([#47])
+
+[#46]: https://github.com/AFixt/livechat/issues/46
+[#47]: https://github.com/AFixt/livechat/pull/47
+
 ## [0.1.2] - 2026-07-23
 
 A security release. The REST API enforced role but not tenant, so a
@@ -164,7 +203,8 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
   ships with Node 22, and effective on toolchain upgrade.
 - `body-parser` bumped to 2.3.0, clearing OSV `GHSA-v422-hmwv-36x6`.
 
-[Unreleased]: https://github.com/AFixt/livechat/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/AFixt/livechat/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/AFixt/livechat/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/AFixt/livechat/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/AFixt/livechat/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/AFixt/livechat/releases/tag/v0.1.0
