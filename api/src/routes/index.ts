@@ -37,16 +37,27 @@ export function buildRouter(deps: RouterDeps): Router {
       env: deps.env,
       redis: deps.redis,
       auth: deps.services.auth,
+      audit: deps.services.audit,
       ...(deps.skipRateLimit === true && { skipRateLimit: true }),
     }),
   );
   router.use(
     '/tenants',
-    buildTenantsRouter({ env: deps.env, redis: deps.redis, tenant: deps.services.tenant }),
+    buildTenantsRouter({
+      env: deps.env,
+      redis: deps.redis,
+      tenant: deps.services.tenant,
+      audit: deps.services.audit,
+    }),
   );
   router.use(
     '/users',
-    buildUsersRouter({ env: deps.env, redis: deps.redis, user: deps.services.user }),
+    buildUsersRouter({
+      env: deps.env,
+      redis: deps.redis,
+      user: deps.services.user,
+      audit: deps.services.audit,
+    }),
   );
   router.use(
     '/invitations',

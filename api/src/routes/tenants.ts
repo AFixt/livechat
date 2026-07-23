@@ -8,15 +8,17 @@ import {
 import { assertTenantAccess, callerTenantScope, requireRole } from '../middlewares/authorize.js';
 import { parsedBody, validate } from '../middlewares/validate.js';
 import { asyncHandler } from '../utils/async-handler.js';
+import { recordAudit } from '../utils/audit.js';
 
 import { buildAdminRouter } from './admin-router.js';
 
 import type { AdminRouterDeps } from './admin-router.js';
-import type { TenantService } from '../services/index.js';
+import type { AuditService, TenantService } from '../services/index.js';
 import type { Router } from 'express';
 
 interface TenantsRouterDeps extends AdminRouterDeps {
   tenant: TenantService;
+  audit: AuditService;
 }
 
 /**
@@ -45,6 +47,12 @@ export function buildTenantsRouter(deps: TenantsRouterDeps): Router {
     asyncHandler(async (req, res) => {
       const body = parsedBody(req, createTenantInputSchema) satisfies CreateTenantInput;
       const tenant = await deps.tenant.create(body);
+      await recordAudit(deps.audit, req, {
+        action: 'tenant.create',
+        resourceType: 'tenant',
+        resourceId: tenant.id,
+        metadata: { slug: tenant.slug },
+      });
       res.status(201).json({ success: true, data: tenant });
     }),
   );
@@ -69,6 +77,12 @@ export function buildTenantsRouter(deps: TenantsRouterDeps): Router {
       if (typeof id !== 'string') return;
       const body = parsedBody(req, updateTenantInputSchema) satisfies UpdateTenantInput;
       const tenant = await deps.tenant.update(id, body);
+      await recordAudit(deps.audit, req, {
+        action: 'tenant.update',
+        resourceType: 'tenant',
+        resourceId: tenant.id,
+        metadata: { fields: Object.keys(body) },
+      });
       res.json({ success: true, data: tenant });
     }),
   );
@@ -80,6 +94,11 @@ export function buildTenantsRouter(deps: TenantsRouterDeps): Router {
       const id = req.params.id;
       if (typeof id !== 'string') return;
       await deps.tenant.remove(id);
+      await recordAudit(deps.audit, req, {
+        action: 'tenant.delete',
+        resourceType: 'tenant',
+        resourceId: id,
+      });
       res.json({ success: true });
     }),
   );
@@ -91,6 +110,12 @@ export function buildTenantsRouter(deps: TenantsRouterDeps): Router {
       const id = req.params.id;
       if (typeof id !== 'string') return;
       const secret = await deps.tenant.rotateEmbedSecret(id);
+      // Never record the secret itself.
+      await recordAudit(deps.audit, req, {
+        action: 'tenant.rotate_embed_secret',
+        resourceType: 'tenant',
+        resourceId: id,
+      });
       res.json({ success: true, data: { embedSecret: secret } });
     }),
   );

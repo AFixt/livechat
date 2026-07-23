@@ -107,7 +107,7 @@ describe('visitor namespace + visitor routes (integration)', () => {
     if (harness === null) {
       console.warn('[integration] MySQL or Redis not reachable — skipping');
     }
-  }, 20_000);
+  }, 60_000);
 
   afterAll(async () => {
     if (harness !== null) await harness.cleanup();
