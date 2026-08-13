@@ -1,0 +1,23 @@
+id: admin-revoke-invitation
+title: "Admin revokes a pending invitation"
+type: extension
+description: |
+  A pending invitation's row exposes a Revoke action. Revoking flips the
+  invitation's status to revoked, after which its token can no longer be
+  used to register and the Revoke control disables.
+
+start_location: "http://localhost:5174/admin/invitations"
+
+preconditions:
+  - An admin or super_admin user is authenticated.
+  - At least one invitation with status "pending" is listed (see
+    admin-invite-user.uc.yaml).
+
+data: {}
+
+steps:
+  - locate: table "Invitations"
+  - locate: button "Revoke"
+  - focus: button "Revoke"
+  - activate: button "Revoke"
+  - verify: text "revoked"

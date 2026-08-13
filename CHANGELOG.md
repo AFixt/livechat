@@ -9,7 +9,24 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **Use-case coverage for eleven previously undocumented interactions**
+  ([#66]): widget invitation state (§5.1.2, open + dismiss), widget
+  chat-ended / email-transcript state (§5.1.7, send + decline), operator
+  end-chat, operator alert-sound mute, admin tenant settings surface
+  (embed snippet, allowed origins, rotate embed secret), admin edit user,
+  admin invitations list + revoke. Generated Playwright specs committed;
+  `admin-view-invitations` and `support-toggle-alert-sound` join the
+  runnable e2e projects.
+
+### Fixed
+
+- The admin "Allowed origins" textarea had no accessible name — the section
+  heading above it is not a label. It now carries an explicit one, targeted
+  by the new `admin-edit-tenant-settings` use case. ([#66])
+
+[#66]: https://github.com/AFixt/livechat/issues/66
 
 ## [0.2.0] - 2026-07-23
 

@@ -1,0 +1,33 @@
+id: widget-chat-ended
+title: "Visitor is offered an email transcript when support ends the chat"
+type: extension
+description: |
+  §5.1.7 — when the support agent ends the session, the chat surface is
+  replaced with an offer to email the visitor a copy of the conversation.
+  Supplying an email address and submitting sends the transcript and
+  returns the widget to its initial closed state.
+
+  The transition is driven by a chat:end socket event from the console, so
+  the full round trip is exercised in the cross-ends journey suite
+  (ADR-0007). This file is the behavioural source of truth for the
+  chat-ended surface. Note: the transcript email delivery itself is not yet
+  implemented server-side (the submit currently no-ops); this use case
+  documents the required behavior.
+
+start_location: "http://localhost:5175/"
+
+preconditions:
+  - The visitor was in an active chat that a support agent has just ended.
+
+data:
+  transcript_email: "visitor@example.com"
+
+steps:
+  - locate: text "Chat ended. Would you like an email copy of this conversation?"
+  - locate: field "Email address (optional)"
+  - focus: field "Email address (optional)"
+  - enter: field "Email address (optional)" value "{{ transcript_email }}"
+  - locate: button "Send me the transcript"
+  - focus: button "Send me the transcript"
+  - activate: button "Send me the transcript"
+  - locate: button "Chat with support"

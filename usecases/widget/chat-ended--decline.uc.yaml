@@ -1,0 +1,25 @@
+id: widget-chat-ended--decline
+title: "Visitor declines the email transcript after support ends the chat"
+type: extension
+description: |
+  §5.1.7 — declining the transcript offer ("No thanks") must return the
+  widget to its initial closed state without collecting an email address.
+
+  The transition is driven by a chat:end socket event from the console, so
+  the full round trip is exercised in the cross-ends journey suite
+  (ADR-0007). This file is the behavioural source of truth for the decline
+  path.
+
+start_location: "http://localhost:5175/"
+
+preconditions:
+  - The visitor was in an active chat that a support agent has just ended.
+
+data: {}
+
+steps:
+  - locate: text "Chat ended. Would you like an email copy of this conversation?"
+  - locate: button "No thanks"
+  - focus: button "No thanks"
+  - activate: button "No thanks"
+  - locate: button "Chat with support"

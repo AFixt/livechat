@@ -1,0 +1,34 @@
+id: widget-invitation
+title: "Visitor sees the proactive invitation while support is online"
+type: extension
+description: |
+  §5.1.2 — when a support agent is available, the closed widget swaps its
+  plain trigger for the invitation flourish: "Our support team is online
+  right now." with a primary "Start a chat" action and a dismiss action.
+  Activating "Start a chat" opens the panel on the name + first-message
+  form; dismissing returns to the plain trigger for the rest of the visit.
+
+  Availability must arrive over the visitor socket (support_available), so
+  the transition into this state belongs to the cross-ends journey suite
+  (ADR-0007). Note: no server event currently sets support_available to
+  true — the surface is implemented but unreachable; this use case
+  documents the required behavior. This file is the behavioural source of
+  truth for the invitation surface itself.
+
+start_location: "http://localhost:5175/"
+
+preconditions:
+  - At least one support agent is online and available for the tenant.
+  - The widget is closed (no open panel) and no chat is in progress.
+
+data: {}
+
+steps:
+  - locate: region "Chat invitation"
+  - locate: text "Our support team is online right now."
+  - locate: button "Start a chat"
+  - locate: button "Dismiss chat invitation"
+  - focus: button "Start a chat"
+  - activate: button "Start a chat"
+  - locate: heading "Chat with support"
+  - locate: field "Your name"
