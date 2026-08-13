@@ -6,6 +6,7 @@ import { createLogger } from './config/logger.js';
 import { createSequelize } from './config/mysql.js';
 import { createRedis } from './config/redis.js';
 import { attachIo } from './io/index.js';
+import { createShutdownHandler } from './lifecycle/graceful-shutdown.js';
 import { initModels } from './models/index.js';
 import { createServices } from './services/index.js';
 
@@ -28,9 +29,7 @@ const app = createApp({
   ...(env.NODE_ENV === 'test' && { skipRateLimit: true }),
 });
 const server = createServer(app);
-attachIo(server, { env, logger, services });
-
-const SHUTDOWN_TIMEOUT_MS = 10_000;
+const io = attachIo(server, { env, logger, services });
 
 /**
  * Bring up database + redis + HTTP server. Sets `process.exitCode` on failure
@@ -58,32 +57,13 @@ async function start(): Promise<void> {
   }
 }
 
-/**
- * Gracefully close the HTTP server, database, and redis, then exit.
- * Forces exit after {@link SHUTDOWN_TIMEOUT_MS}.
- * @param signal - The signal that triggered shutdown.
- */
-function shutdown(signal: NodeJS.Signals): void {
-  logger.info({ signal }, 'shutting down');
-
-  const forceTimer = setTimeout(() => {
-    logger.error('forced shutdown after timeout');
-    process.exitCode = 1;
-  }, SHUTDOWN_TIMEOUT_MS);
-  forceTimer.unref();
-
-  server.close(() => {
-    Promise.allSettled([sequelize.close(), redis.quit()])
-      .then(() => {
-        clearTimeout(forceTimer);
-        logger.info('shutdown complete');
-      })
-      .catch((err: unknown) => {
-        logger.error({ err }, 'error during shutdown');
-        process.exitCode = 1;
-      });
-  });
-}
+const shutdown = createShutdownHandler({
+  io,
+  httpServer: server,
+  sequelize,
+  redis,
+  logger,
+});
 
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
