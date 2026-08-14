@@ -25,8 +25,19 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 - The admin "Allowed origins" textarea had no accessible name — the section
   heading above it is not a label. It now carries an explicit one, targeted
   by the new `admin-edit-tenant-settings` use case. ([#66])
+- **The API now actually shuts down.** `SIGTERM` left the process alive
+  indefinitely whenever any Socket.IO client was connected: `http.Server#close()`
+  never closes established connections, so the close callback never fired and
+  MySQL/Redis were never released. The orphaned process kept serving every
+  connected widget and console session, so a restarted API received no traffic
+  from existing clients and deploys silently did not take effect for them.
+  Socket.IO clients are now disconnected (with a transport close, so they
+  reconnect to the replacement instance), idle connections are dropped, and the
+  force-exit fallback calls `process.exit()` instead of assigning
+  `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
 [#66]: https://github.com/AFixt/livechat/issues/66
+[#68]: https://github.com/AFixt/livechat/issues/68
 
 ## [0.2.0] - 2026-07-23
 
