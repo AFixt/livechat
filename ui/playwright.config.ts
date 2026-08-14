@@ -49,8 +49,14 @@ export default defineConfig({
       // is excluded: the DSL emits selectOption() for its role dropdown, which
       // only drives a native <select>; MUI renders a listbox combobox. Upstream
       // in @afixt/usecase-runner, tracked in #6.
+      // `admin-edit-tenant-settings`, `admin-edit-user`, `admin-rotate-embed-
+      // secret` and `admin-revoke-invitation` are excluded: their per-row
+      // "Edit"/"Revoke" targets are ambiguous against a multi-row list (or
+      // need a pending invitation / an expanded row a standalone spec can't
+      // establish) — the journey suite covers those transitions.
       name: 'admin',
-      testMatch: /generated\/admin-(create-tenant|view-tenants|view-users)\.spec\.ts/,
+      testMatch:
+        /generated\/admin-(create-tenant|view-tenants|view-users|view-invitations)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/admin.json' },
       dependencies: ['setup'],
     },
@@ -66,6 +72,14 @@ export default defineConfig({
       name: 'support-logout',
       testMatch: /generated\/support-logout\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/staff-logout.json' },
+      dependencies: ['setup'],
+    },
+    {
+      // Only toggles the client-side alert-sound preference, so it can share
+      // the dashboard session without affecting other specs.
+      name: 'support-preferences',
+      testMatch: /generated\/support-toggle-alert-sound\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/staff.json' },
       dependencies: ['setup'],
     },
     {

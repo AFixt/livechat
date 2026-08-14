@@ -1,0 +1,28 @@
+id: support-end-chat
+title: "Operator ends an active chat"
+type: extension
+description: |
+  §5.1.7 (operator side) — with an active chat selected, the operator ends
+  the session via the "End chat" control (emitting chat:end). The composer
+  and End chat control disable once the chat status becomes ended, and the
+  visitor's widget transitions to its chat-ended state.
+
+  The active-chat precondition and the socket round trip are established in
+  the cross-ends journey suite (ADR-0007). This file is the behavioural
+  source of truth for the operator's end-chat affordance.
+
+start_location: "http://localhost:5174/"
+
+preconditions:
+  - A staff user is authenticated (see support-login.uc.yaml).
+  - The operator has an active chat selected (established over sockets — see
+    the e2e journey suite).
+
+data: {}
+
+steps:
+  - locate: region "Chat transcript"
+  - locate: button "End chat"
+  - focus: button "End chat"
+  - activate: button "End chat"
+  - note: "After chat:end is acknowledged the chat status becomes ended_by_agent and the Message field, Send and End chat controls disable; the visitor-side consequence (§5.1.7) is covered by widget-chat-ended.uc.yaml and the journey suite."

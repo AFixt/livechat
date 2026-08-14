@@ -1,0 +1,20 @@
+id: admin-view-invitations
+title: "Admin views the invitations list"
+type: positive
+description: |
+  The invitations page lists every issued invitation with email, role,
+  tenant, status, and expiry, plus the entry point for inviting a new user.
+  Documents the accessible structure of the list surface.
+
+start_location: "http://localhost:5174/admin/invitations"
+
+preconditions:
+  - An admin or super_admin user is authenticated.
+
+data: {}
+
+steps:
+  - locate: heading "Invitations"
+  - locate: button "Invite user"
+  - locate: table "Invitations"
+  - note: "Column headers Email, Role, Tenant, Status, Expires at, and Actions must be real columnheader cells; tighten to explicit columnheader locates once usecase-runner ships that role token (in its spec.md, absent from 1.3.2)."
