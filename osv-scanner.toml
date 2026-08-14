@@ -1,0 +1,15 @@
+# osv-scanner ignore list — every entry MUST be justified and time-limited.
+# Reviewed when its `ignoreUntil` lapses; the scan goes red again on that date,
+# which is the point (no silent, permanent suppression).
+
+[[IgnoredVulns]]
+id = "GHSA-jmr9-qjv8-65gv"
+ignoreUntil = 2026-11-13
+# extract-zip 2.0.1 (CVSS 8.6). No fixed version exists — 2.0.1 is the latest
+# published release, and osv reports the advisory as `last_affected: 2.0.1` with
+# no `fixed` event. Dev-only: pulled transitively via @puppeteer/browsers, used
+# by the Lighthouse/estimo performance tooling (estimo, find-chrome-bin) — never
+# in the production api/ui/widget runtime. Nothing to update to; tracked in #51.
+# Revisit at ignoreUntil: adopt a fixed extract-zip the moment one ships, or drop
+# the perf tooling that drags it in.
+reason = "No fixed version published (2.0.1 is latest); dev-only via @puppeteer/browsers perf tooling, not in production runtime. Tracked in #51."
