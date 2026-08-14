@@ -11,6 +11,17 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Added
 
+- **Socket.IO now works across multiple API instances.** The real-time layer is
+  wired to a Redis adapter (`@socket.io/redis-adapter`, `api/src/io/adapter.ts`)
+  so rooms and broadcasts span every process. Previously `.do/app.yaml` deployed
+  `instance_count: 2` with no adapter, so rooms were per-process and roughly half
+  of all messages between a visitor and an agent on different instances were
+  silently lost. The adapter uses dedicated pub/sub Redis connections (a
+  subscriber connection can't serve other commands), its readiness is surfaced
+  by `GET /api/v1/health` as `data.socketAdapter`, and its connections are closed
+  on graceful shutdown. `docs/deploy.md` documents that horizontal scaling
+  depends on it. ([#73])
+
 - **Use-case coverage for eleven previously undocumented interactions**
   ([#66]): widget invitation state (§5.1.2, open + dismiss), widget
   chat-ended / email-transcript state (§5.1.7, send + decline), operator
@@ -55,6 +66,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
 [#72]: https://github.com/AFixt/livechat/issues/72
+[#73]: https://github.com/AFixt/livechat/issues/73
 
 ## [0.2.0] - 2026-07-23
 

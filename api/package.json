@@ -27,6 +27,7 @@
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "8.5.0",
     "@livechat/shared": "*",
+    "@socket.io/redis-adapter": "8.3.0",
     "bcryptjs": "3.0.3",
     "compression": "1.8.1",
     "cookie-parser": "1.4.7",
@@ -46,8 +47,8 @@
     "sequelize": "6.37.8",
     "sequelize-cli": "6.6.5",
     "socket.io": "4.8.3",
-    "tsx": "4.21.0",
     "swagger-ui-express": "5.0.1",
+    "tsx": "4.21.0",
     "uuid": "14.0.0",
     "zod": "4.3.6"
   },

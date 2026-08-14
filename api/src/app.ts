@@ -14,6 +14,7 @@ import { createGlobalLimiter } from './middlewares/rate-limit.js';
 import { buildRouter } from './routes/index.js';
 
 import type { Env } from './config/env.js';
+import type { AdapterHealth } from './io/adapter.js';
 import type { Services } from './services/index.js';
 import type { Redis } from 'ioredis';
 import type { Logger } from 'pino';
@@ -23,6 +24,8 @@ interface AppDeps {
   logger: Logger;
   redis: Redis;
   services: Services;
+  /** Socket.IO Redis adapter health, surfaced by `/health` (#73). */
+  socketAdapterHealth?: AdapterHealth;
   /**
    * Skip global rate limiting. Set to `true` in unit tests where the Redis
    * stub can't satisfy the rate-limit-redis Lua protocol.
@@ -78,6 +81,7 @@ export function createApp(deps: AppDeps): Express {
     env,
     redis,
     services,
+    ...(deps.socketAdapterHealth && { socketAdapterHealth: deps.socketAdapterHealth }),
     ...(deps.skipRateLimit === true && { skipRateLimit: true }),
   });
   if (deps.skipRateLimit === true) {

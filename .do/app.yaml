@@ -24,6 +24,8 @@ services:
     dockerfile_path: api/Dockerfile
     source_dir: /
     http_port: 3000
+    # Safe to scale >1: the Socket.IO Redis adapter (api/src/io/adapter.ts)
+    # makes rooms and presence span instances. See docs/deploy.md#horizontal-scaling.
     instance_count: 2
     instance_size_slug: basic-xxs
     health_check:
