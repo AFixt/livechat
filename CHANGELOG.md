@@ -20,6 +20,22 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   `admin-view-invitations` and `support-toggle-alert-sound` join the
   runnable e2e projects.
 
+### Security
+
+- **Socket.IO chat handlers now enforce tenant/visitor ownership.** Every
+  `/staff` and `/visitor` event trusted a client-supplied `chatId` and acted on
+  it with no tenant check, so any authenticated staff user could read, reply to,
+  take over, or end **any** tenant's chat by id, and any visitor could do the
+  same to another visitor's chat. Ownership is now enforced inside
+  `chat-service` (a `ChatCaller` scope on `getById`/`sendMessage`/`endChat`/
+  `assign`), so the HTTP and socket paths share one control and cannot diverge.
+  The `/staff` handshake now runs the full HTTP auth path (JTI blacklist, active
+  status, tenant expiry) and rejects non-staff roles, so a revoked or
+  deactivated token no longer keeps a live socket. Rejections are returned to
+  the caller as a `chat:error` event instead of being silently swallowed, and a
+  custom Semgrep rule (`.semgrep/rules.yml`) keeps chat lookups behind the
+  scoped service. ([#72])
+
 ### Fixed
 
 - The admin "Allowed origins" textarea had no accessible name — the section
@@ -38,6 +54,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#72]: https://github.com/AFixt/livechat/issues/72
 
 ## [0.2.0] - 2026-07-23
 

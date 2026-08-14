@@ -1,13 +1,18 @@
-import jwt from 'jsonwebtoken';
+import { authenticateAccessToken } from '../middlewares/authenticate.js';
 
-import { detach } from './detach.js';
+import { detach, guard, type SocketErrorPayload } from './detach.js';
 import { GLOBAL_STAFF_ROOM } from './rooms.js';
 
 import type { ServerToClientEvents, StaffSocketData, StaffToServerEvents } from './types.js';
 import type { Env } from '../config/env.js';
+import type { ChatCaller } from '../services/chat-service.js';
 import type { Services } from '../services/index.js';
+import type { Redis } from 'ioredis';
 import type { Logger } from 'pino';
 import type { Namespace, Server, Socket } from 'socket.io';
+
+/** Roles that may open a `/staff` socket and act on chats. */
+const STAFF_ROLES = ['super_admin', 'admin', 'staff'];
 
 /**
  *
@@ -18,17 +23,11 @@ type StaffNamespace = Namespace<StaffToServerEvents, ServerToClientEvents, objec
  */
 type StaffSocket = Socket<StaffToServerEvents, ServerToClientEvents, object, StaffSocketData>;
 
-interface JwtPayload {
-  sub: string;
-  role: string;
-  tenantId: string | null;
-  jti: string;
-}
-
 interface StaffDeps {
   io: Server;
   logger: Logger;
   env: Pick<Env, 'JWT_ACCESS_SECRET'>;
+  redis: Redis;
   services: Pick<Services, 'chat' | 'presence'>;
 }
 
@@ -42,46 +41,64 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
   const nsp = deps.io.of('/staff') as StaffNamespace;
 
   nsp.use((socket, next) => {
-    const token = socket.handshake.auth.token as string | undefined;
-    if (token === undefined) {
-      next(new Error('Authentication required'));
-      return;
-    }
-    try {
-      const decoded = jwt.verify(token, deps.env.JWT_ACCESS_SECRET) as JwtPayload;
-      socket.data.userId = decoded.sub;
-      socket.data.role = decoded.role;
-      socket.data.tenantId = decoded.tenantId;
+    (async () => {
+      const token = socket.handshake.auth.token as string | undefined;
+      if (token === undefined) {
+        next(new Error('Authentication required'));
+        return;
+      }
+      // Reuse the full HTTP auth path (JTI blacklist, active status, tenant
+      // expiry) so a logged-out or deactivated token cannot keep a live socket
+      // for the rest of its ~15-minute lifetime (issue #72).
+      let userId: string;
+      let role: string;
+      let tenantId: string | null;
+      try {
+        const { user } = await authenticateAccessToken({ env: deps.env, redis: deps.redis }, token);
+        ({ id: userId, role, tenantId } = user);
+      } catch {
+        next(new Error('Invalid token'));
+        return;
+      }
+      if (!STAFF_ROLES.includes(role)) {
+        next(new Error('Insufficient permissions'));
+        return;
+      }
+      socket.data.userId = userId;
+      socket.data.role = role;
+      socket.data.tenantId = tenantId;
       next();
-    } catch {
-      next(new Error('Invalid token'));
-    }
+    })().catch(next);
   });
 
   nsp.on('connection', (socket: StaffSocket) => {
-    const { userId, role, tenantId } = socket.data;
+    const { userId, tenantId } = socket.data;
+    // The handshake already rejected any non-staff role, so every connected
+    // socket is a staff operator. `tenantId === null` is an untenanted AFixt
+    // operator who serves every tenant (issue #72).
+    const caller: ChatCaller = { kind: 'staff', tenantId };
+    const emitError = (payload: SocketErrorPayload): void => {
+      socket.emit('chat:error', payload);
+    };
+
     detach(deps.logger, 'staff room join failed', async () => {
       await socket.join(`user:${userId}`);
-      if (['super_admin', 'admin', 'staff'].includes(role)) {
-        await socket.join('staff');
-        // AFixt staff with no tenant of their own serve every tenant, so they
-        // join the global room that visitor/chat events are mirrored to. Note
-        // the `staff` room is NOT used for that — it holds tenant-scoped staff
-        // too, and broadcasting there would break tenant isolation.
-        if (tenantId === null) await socket.join(GLOBAL_STAFF_ROOM);
-      }
-      if (tenantId !== null) await socket.join(`tenant:${tenantId}`);
+      await socket.join('staff');
+      // AFixt staff with no tenant of their own serve every tenant, so they
+      // join the global room that visitor/chat events are mirrored to. Note
+      // the `staff` room is NOT used for that — it holds tenant-scoped staff
+      // too, and broadcasting there would break tenant isolation.
+      if (tenantId === null) await socket.join(GLOBAL_STAFF_ROOM);
+      else await socket.join(`tenant:${tenantId}`);
     });
-    if (['super_admin', 'admin', 'staff'].includes(role)) {
-      detach(deps.logger, 'marking staff available failed', async () =>
-        deps.services.presence.setStaffAvailable(userId),
-      );
-      nsp.emit('support:availability_changed', { available: true });
-    }
+    detach(deps.logger, 'marking staff available failed', async () =>
+      deps.services.presence.setStaffAvailable(userId),
+    );
+    nsp.emit('support:availability_changed', { available: true });
 
     socket.on('chat:accept', (payload) => {
-      detach(deps.logger, 'staff chat:accept failed', async () => {
-        const chat = await deps.services.chat.assign(payload.chatId, userId);
+      guard(deps.logger, emitError, 'chat:accept', async () => {
+        const chat = await deps.services.chat.assign(payload.chatId, userId, caller);
         await socket.join(`chat:${chat.id}`);
         const assigned = { chatId: chat.id, assignedTo: userId };
         nsp.to(`chat:${chat.id}`).emit('chat:assigned', assigned);
@@ -90,13 +107,16 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
     });
 
     socket.on('chat:message', (payload) => {
-      detach(deps.logger, 'staff chat:message failed', async () => {
-        const msg = await deps.services.chat.sendMessage({
-          chatId: payload.chatId,
-          senderKind: 'user',
-          senderUserId: userId,
-          body: payload.body,
-        });
+      guard(deps.logger, emitError, 'chat:message', async () => {
+        const msg = await deps.services.chat.sendMessage(
+          {
+            chatId: payload.chatId,
+            senderKind: 'user',
+            senderUserId: userId,
+            body: payload.body,
+          },
+          caller,
+        );
         const event = {
           chatId: payload.chatId,
           messageId: msg.id,
@@ -111,6 +131,9 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
     });
 
     socket.on('chat:typing', (payload) => {
+      // Only relay typing for a chat this socket has actually joined, so a
+      // typing packet cannot be spoofed into an arbitrary chat room (#72).
+      if (!socket.rooms.has(`chat:${payload.chatId}`)) return;
       const typingEvent = {
         chatId: payload.chatId,
         actor: 'user' as const,
@@ -121,11 +144,11 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
     });
 
     socket.on('chat:end', (payload) => {
-      detach(deps.logger, 'staff chat:end failed', async () => {
-        const chat = await deps.services.chat.endChat({
-          chatId: payload.chatId,
-          endedBy: 'support',
-        });
+      guard(deps.logger, emitError, 'chat:end', async () => {
+        const chat = await deps.services.chat.endChat(
+          { chatId: payload.chatId, endedBy: 'support' },
+          caller,
+        );
         const endEvent = { chatId: chat.id, endedBy: 'support' as const };
         nsp.to(`chat:${chat.id}`).emit('chat:ended', endEvent);
         deps.io.of('/visitor').to(`chat:${chat.id}`).emit('chat:ended', endEvent);
@@ -133,7 +156,7 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
     });
 
     socket.on('chat:initiate', (payload) => {
-      detach(deps.logger, 'staff chat:initiate failed', async () => {
+      guard(deps.logger, emitError, 'chat:initiate', async () => {
         if (tenantId === null) return;
         const chat = await deps.services.chat.initiateBySupport({
           tenantId,
@@ -157,15 +180,13 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
     });
 
     socket.on('disconnect', () => {
-      if (['super_admin', 'admin', 'staff'].includes(role)) {
-        detach(deps.logger, 'staff disconnect cleanup failed', async () => {
-          await deps.services.presence.setStaffUnavailable(userId);
-          const anyLeft = await deps.services.presence.anyStaffAvailable();
-          if (!anyLeft) {
-            nsp.emit('support:availability_changed', { available: false });
-          }
-        });
-      }
+      detach(deps.logger, 'staff disconnect cleanup failed', async () => {
+        await deps.services.presence.setStaffUnavailable(userId);
+        const anyLeft = await deps.services.presence.anyStaffAvailable();
+        if (!anyLeft) {
+          nsp.emit('support:availability_changed', { available: false });
+        }
+      });
     });
   });
 

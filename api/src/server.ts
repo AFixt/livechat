@@ -29,7 +29,7 @@ const app = createApp({
   ...(env.NODE_ENV === 'test' && { skipRateLimit: true }),
 });
 const server = createServer(app);
-const io = attachIo(server, { env, logger, services });
+const io = attachIo(server, { env, logger, redis, services });
 
 /**
  * Bring up database + redis + HTTP server. Sets `process.exitCode` on failure

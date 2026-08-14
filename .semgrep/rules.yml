@@ -1,0 +1,28 @@
+# Project-specific Semgrep rules.
+#
+# Registry packs (p/owasp-top-ten, p/nodejsscan, …) missed the Socket.IO
+# tenant-authorization hole (#72) because the vulnerable pattern is
+# domain-specific: a handler that resolves a chat by id and acts on it without
+# scoping the lookup to the caller's tenant/visitor. These rules encode that
+# invariant so it cannot silently regress.
+rules:
+  - id: chat-lookup-must-go-through-scoped-service
+    languages: [typescript]
+    severity: ERROR
+    message: >
+      Resolve chats only through chatService (getById/sendMessage/endChat/
+      assign), which enforces tenant/visitor scoping via ChatCaller (#72).
+      A direct Chat.findByPk/findOne/findAll bypasses that authorization and
+      re-opens the cross-tenant chat-hijack hole. If a new raw lookup is truly
+      needed, add it inside chat-service.ts behind an explicit access check.
+    patterns:
+      - pattern-either:
+          - pattern: Chat.findByPk(...)
+          - pattern: Chat.findOne(...)
+          - pattern: Chat.findAll(...)
+    paths:
+      # The service is the single authorized place to resolve chats.
+      exclude:
+        - "**/api/src/services/chat-service.ts"
+        - "**/*.test.ts"
+        - "**/api/tests"

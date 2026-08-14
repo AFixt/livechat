@@ -75,6 +75,43 @@ async function assertTenantActive(user: User): Promise<void> {
   }
 }
 
+/** The authenticated principal resolved from an access token. */
+export interface AuthenticatedAccess {
+  /** The loaded, active User. */
+  user: User;
+  /** JTI of the presented access token. */
+  jti: string;
+}
+
+/**
+ * Verify an access token the whole way: signature, Redis JTI blacklist,
+ * user existence + `active` status, and tenant expiry. Shared by the HTTP
+ * {@link authenticate} middleware and the Socket.IO handshake so the two can
+ * never diverge (issue #72) — a blacklisted, deactivated, or expired-tenant
+ * token is refused on both paths.
+ * @param deps - Env + Redis dependencies.
+ * @param token - The raw access token (no `Bearer ` prefix).
+ * @returns The authenticated user and the token's JTI.
+ * @throws {ApiError} 401/403 on any verification failure.
+ */
+export async function authenticateAccessToken(
+  deps: AuthDeps,
+  token: string,
+): Promise<AuthenticatedAccess> {
+  const decoded = verifyAccess(token, deps.env.JWT_ACCESS_SECRET);
+
+  const blacklisted = await deps.redis.get(`bl:${decoded.jti}`);
+  if (blacklisted !== null) throw ApiError.unauthorized('Token has been revoked');
+
+  const user = await User.findByPk(decoded.sub);
+  if (user === null) throw ApiError.unauthorized('User not found');
+  if (user.status !== 'active') throw ApiError.forbidden('Account is not active');
+
+  await assertTenantActive(user);
+
+  return { user, jti: decoded.jti };
+}
+
 /**
  * Authenticate the bearer JWT, reject blacklisted or expired tokens, load
  * the User, and enforce tenant expiration for non-super-admin accounts.
@@ -85,19 +122,9 @@ export function authenticate(deps: AuthDeps): RequestHandler {
   return (req, _res, next) => {
     (async () => {
       const token = parseBearer(req);
-      const decoded = verifyAccess(token, deps.env.JWT_ACCESS_SECRET);
-
-      const blacklisted = await deps.redis.get(`bl:${decoded.jti}`);
-      if (blacklisted !== null) throw ApiError.unauthorized('Token has been revoked');
-
-      const user = await User.findByPk(decoded.sub);
-      if (user === null) throw ApiError.unauthorized('User not found');
-      if (user.status !== 'active') throw ApiError.forbidden('Account is not active');
-
-      await assertTenantActive(user);
-
+      const { user, jti } = await authenticateAccessToken(deps, token);
       req.user = user;
-      req.tokenJti = decoded.jti;
+      req.tokenJti = jti;
       next();
     })().catch(next);
   };
