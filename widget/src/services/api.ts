@@ -32,15 +32,30 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   return body;
 }
 
+interface TrackingState {
+  functional: 'granted' | 'denied';
+  presence: 'granted' | 'denied';
+  analytics: 'granted' | 'denied';
+}
+
 interface InitSessionResponse {
-  sessionId: string;
+  /**
+   * The tracked-session id, or `null` when the consent gate suppressed ambient
+   * presence tracking. `null` means: render and allow chat (functional), but do
+   * not open the presence socket.
+   */
+  sessionId: string | null;
   tenantId: string;
+  jurisdiction: string;
+  gpc: boolean;
+  tracking: TrackingState;
 }
 
 /**
- * POST /api/v1/visitor/session — boot a visitor session.
+ * POST /api/v1/visitor/session — run the consent gate and (when permitted)
+ * boot a tracked visitor session.
  * @param tenantKey - Tenant slug from `data-tenant-key`.
- * @returns The visitor session summary.
+ * @returns The gate decision + session summary.
  */
 export async function initVisitorSession(tenantKey: string): Promise<InitSessionResponse> {
   const body = await apiFetch<InitSessionResponse>('/visitor/session', {

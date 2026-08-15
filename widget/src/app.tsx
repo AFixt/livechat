@@ -48,42 +48,50 @@ export function App(props: AppProps): preact.JSX.Element {
 
   useEffect(() => {
     // Object property (not a local) so its value survives the async closure
-    // for the cleanup to flip without tripping no-unnecessary-condition.
+    // for the cleanup to flip. Read via `isLive()` so control-flow narrowing
+    // doesn't make a later re-check look statically unreachable.
     const live = { current: true };
+    const isLive = (): boolean => live.current;
     const onSupportInitiated = (p: { chatId: string }): void => {
       dispatch({ type: 'support_initiated', chatId: p.chatId });
       announceLiveMessage('A support agent wants to chat');
       playAlert();
     };
     void (async () => {
-      // Reuse an existing session when the visitor already has one — a page
-      // reload must not mint a fresh session, which would orphan a prior chat
-      // and break the returning-visitor (restart) flow. Probing the resumable
-      // chat doubles as the "do I have a session?" check.
-      let resume: Awaited<ReturnType<typeof fetchCurrentChat>> | null = null;
+      // Run the consent gate first. This resolves the visitor's jurisdiction,
+      // applies the rules, and only creates a tracked session (and returns its
+      // id) when ambient presence tracking is permitted. It is idempotent: a
+      // returning tracked visitor gets their existing session id back.
+      let result: Awaited<ReturnType<typeof initVisitorSession>>;
       try {
-        resume = await fetchCurrentChat();
+        result = await initVisitorSession(props.tenantKey);
       } catch {
-        // No existing session (401) or unreachable — start a fresh session.
-        try {
-          await initVisitorSession(props.tenantKey);
-        } catch {
-          if (live.current) dispatch({ type: 'error', message: 'Unable to start a session.' });
-          return;
-        }
+        if (isLive()) dispatch({ type: 'error', message: 'Unable to start a session.' });
+        return;
       }
-      if (!live.current) return;
-      // A session now exists — connect the socket so this visitor shows up in
-      // the console's presence list and can receive proactive support events.
+      if (!isLive()) return;
+      // No tracked session means the consent gate suppressed ambient tracking
+      // (e.g. opt-in / unknown jurisdiction pre-consent). The widget still
+      // renders and can start a chat as a first-party interaction, but the
+      // presence socket stays closed and no resumable chat is probed.
+      if (result.sessionId === null) return;
+      // A tracked session exists — connect the socket so this visitor shows up
+      // in the console's presence list and can receive proactive support events.
       getVisitorSocket().on('support:initiated', onSupportInitiated);
       // Returning visitor with an unfinished chat? Offer to resume it.
-      if (resume !== null && resume.chat !== null) {
-        dispatch({
-          type: 'restart',
-          chatId: resume.chat.id,
-          customerName: resume.chat.customerName ?? '',
-          messages: resume.messages,
-        });
+      try {
+        const resume = await fetchCurrentChat();
+        if (!isLive()) return;
+        if (resume.chat !== null) {
+          dispatch({
+            type: 'restart',
+            chatId: resume.chat.id,
+            customerName: resume.chat.customerName ?? '',
+            messages: resume.messages,
+          });
+        }
+      } catch {
+        // No resumable chat / transient error — nothing to restore.
       }
     })();
     return () => {

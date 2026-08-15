@@ -63,7 +63,10 @@ async function loginAs(baseUrl: string, email: string, password: string): Promis
 }
 
 /**
- * Init a visitor session over HTTP and return the raw cookie value + session id.
+ * Init a *tracked* visitor session over HTTP and return the raw cookie value +
+ * session id. Sends `country: 'US'` so the consent gate (opt-out jurisdiction,
+ * no GPC) permits presence tracking and a `visitor_sessions` row is created —
+ * the precondition for the presence/typing/page-change events under test.
  * @param baseUrl - Live harness base URL.
  * @param tenantSlug - Tenant to attach the session to.
  * @returns The raw `livechat_visitor` cookie value plus the session id.
@@ -74,7 +77,7 @@ async function initVisitor(
 ): Promise<{ cookie: string; sessionId: string }> {
   const res = await request(baseUrl)
     .post('/api/v1/visitor/session')
-    .send({ tenantKey: tenantSlug });
+    .send({ tenantKey: tenantSlug, country: 'US' });
   expect(res.status).toBe(201);
   const setCookie = res.headers['set-cookie'] as string | string[] | undefined;
   const cookies: string[] = Array.isArray(setCookie)
@@ -339,6 +342,7 @@ describe('visitor namespace + visitor routes (integration)', () => {
     await seedTenantAndStaff('optfields', 'staff@optfields.example');
     const res = await request(baseUrl).post('/api/v1/visitor/session').send({
       tenantKey: 'optfields',
+      country: 'US',
       language: 'en-US',
       currentUrl: 'https://example.com/landing',
       referrer: 'https://google.com/search',

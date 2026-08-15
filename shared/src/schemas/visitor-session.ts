@@ -35,6 +35,11 @@ export type VisitorSessionSafe = z.infer<typeof visitorSessionSafeSchema>;
 
 /**
  * Input schema for `POST /visitor/session` — widget init call.
+ *
+ * `country`/`region` are optional geo hints and `gpc` is the widget's
+ * `navigator.globalPrivacyControl` reading; all three feed the consent gate,
+ * which decides whether a tracked session (with the ambient fields below) is
+ * created at all.
  */
 export const initVisitorSessionInputSchema = z.object({
   tenantKey: z.string().min(1).max(255),
@@ -42,11 +47,39 @@ export const initVisitorSessionInputSchema = z.object({
   currentUrl: z.string().max(2048).optional(),
   referrer: z.string().max(2048).optional(),
   language: z.string().max(16).optional(),
+  country: z
+    .string()
+    .length(2)
+    .regex(/^[A-Za-z]{2}$/)
+    .optional(),
+  region: z.string().max(8).optional(),
+  gpc: z.boolean().optional(),
 });
 /**
  * Input for initializing a visitor session from the widget.
  */
 export type InitVisitorSessionInput = z.infer<typeof initVisitorSessionInputSchema>;
+
+/**
+ * Response shape for `POST /visitor/session`. `sessionId` is `null` when the
+ * consent gate suppressed tracking (no `visitor_sessions` row was created); the
+ * widget uses `tracking.presence` to decide whether to open the presence socket.
+ */
+export const initVisitorSessionResultSchema = z.object({
+  sessionId: z.uuid().nullable(),
+  tenantId: z.uuid(),
+  jurisdiction: z.string(),
+  gpc: z.boolean(),
+  tracking: z.object({
+    functional: z.enum(['granted', 'denied']),
+    presence: z.enum(['granted', 'denied']),
+    analytics: z.enum(['granted', 'denied']),
+  }),
+});
+/**
+ * Result of initializing a visitor session.
+ */
+export type InitVisitorSessionResult = z.infer<typeof initVisitorSessionResultSchema>;
 
 /**
  * Input schema for `POST /visitor/heartbeat` — updates `current_url`, keeps

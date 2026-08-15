@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-import { Tenant, VisitorSession } from '../models/index.js';
+import { VisitorSession } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
 
 import { hashSessionId, mintVisitorCookie, verifyVisitorCookie } from './visitor-cookie.js';
@@ -11,42 +11,40 @@ interface VisitorSessionDeps {
   env: Pick<Env, 'COOKIE_SECRET'>;
 }
 
-interface InitParams {
-  tenantSlug: string;
-  userAgent?: string;
-  ipAddress?: string;
-  language?: string;
-  currentUrl?: string;
-  referrer?: string;
-  /**
-   * Raw HS256 JWT minted by the client's backend with the tenant's
-   * `embed_secret`. When present and valid, the decoded `sub` claim is
-   * stored on the visitor session so staff can correlate the chat with
-   * the client's own user record.
-   */
-  identityToken?: string;
-}
-
 interface IdentityTokenPayload {
   sub: string;
   email?: string;
   name?: string;
 }
 
-interface InitResult {
-  session: VisitorSession;
-  cookieValue: string;
+interface CreateTrackedParams {
+  tenantId: string;
+  /**
+   * The durable subject key — HMAC of the visitor cookie's session id. Stored
+   * as `session_cookie_hash` so the socket handshake and consent records line
+   * up with this row. Obtain via {@link VisitorSessionService.mintHandle} or
+   * {@link VisitorSessionService.subjectKeyFromCookie}.
+   */
+  subjectKey: string;
+  /** Verified `sub` claim from the client identity token, if any. */
+  identityTokenSub?: string | null;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+  language?: string | null;
+  currentUrl?: string | null;
+  referrer?: string | null;
+  country?: string | null;
+  city?: string | null;
 }
 
 /**
  * Verify the optional identity-token JWT against a tenant's embed secret.
- * Extracted so the reducer in `init()` stays under the complexity cap.
  * @param token - Raw JWT (or undefined, in which case returns null).
  * @param secret - Tenant `embed_secret` (HS256).
  * @returns The `sub` claim, or null when no token was provided.
  * @throws 400 ApiError on any verification failure.
  */
-function verifyIdentityToken(token: string | undefined, secret: string): string | null {
+export function verifyIdentityToken(token: string | undefined, secret: string): string | null {
   if (token === undefined) return null;
   try {
     const decoded = jwt.verify(token, secret, {
@@ -96,29 +94,22 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
     },
 
     /**
-     * Create a brand-new visitor session and return the signed cookie.
-     * @param params - Init params from the widget.
-     * @returns The new session + its signed cookie value.
+     * Create a tracked visitor-session row for a subject that has cleared the
+     * consent gate (presence granted, or an actively-started chat). Captures
+     * the behavioral/PII fields the console shows.
+     * @param params - Tenant, subject key, and captured fields.
+     * @returns The created session.
      */
-    async init(params: InitParams): Promise<InitResult> {
-      const tenant = await Tenant.findOne({
-        where: { slug: params.tenantSlug, status: 'active' },
-      });
-      if (tenant === null) throw ApiError.badRequest('Unknown tenant');
-
-      const identityTokenSub = verifyIdentityToken(params.identityToken, tenant.embedSecret);
-
-      const { sessionId, cookieValue } = mintVisitorCookie(deps.env.COOKIE_SECRET);
-      const hash = hashSessionId(sessionId, deps.env.COOKIE_SECRET);
+    async createTracked(params: CreateTrackedParams): Promise<VisitorSession> {
       const now = new Date();
-      const session = await VisitorSession.create({
-        tenantId: tenant.id,
-        sessionCookieHash: hash,
-        identityTokenSub,
+      return VisitorSession.create({
+        tenantId: params.tenantId,
+        sessionCookieHash: params.subjectKey,
+        identityTokenSub: params.identityTokenSub ?? null,
         userAgent: params.userAgent ?? null,
         ipAddress: params.ipAddress ?? null,
-        country: null,
-        city: null,
+        country: params.country ?? null,
+        city: params.city ?? null,
         language: params.language ?? null,
         currentUrl: params.currentUrl ?? null,
         referrer: params.referrer ?? null,
@@ -126,7 +117,15 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
         firstSeenAt: now,
         lastSeenAt: now,
       });
-      return { session, cookieValue };
+    },
+
+    /**
+     * Look up a tracked session by its durable subject key.
+     * @param subjectKey - The subject key (from cookie or handle).
+     * @returns The session, or null if none has been created (gated visitor).
+     */
+    async findBySubjectKey(subjectKey: string): Promise<VisitorSession | null> {
+      return VisitorSession.findOne({ where: { sessionCookieHash: subjectKey } });
     },
 
     /**
@@ -136,11 +135,8 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
      * @throws 401 if the cookie is missing/invalid or the session has been removed.
      */
     async findByCookie(cookieValue: string): Promise<VisitorSession> {
-      const sessionId = verifyVisitorCookie(cookieValue, deps.env.COOKIE_SECRET);
-      const hash = hashSessionId(sessionId, deps.env.COOKIE_SECRET);
-      const session = await VisitorSession.findOne({
-        where: { sessionCookieHash: hash },
-      });
+      const subjectKey = this.subjectKeyFromCookie(cookieValue);
+      const session = await this.findBySubjectKey(subjectKey);
       if (session === null) throw ApiError.unauthorized('Visitor session not found');
       return session;
     },

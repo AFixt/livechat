@@ -9,6 +9,24 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Security
+
+- **Visitor presence tracking is now gated behind a consent decision.**
+  Previously the widget created a `visitor_sessions` row — capturing IP, user
+  agent, current URL, and referrer — for every visitor on page load, in every
+  jurisdiction, with no consent gate (behavioral tracking of visitors who never
+  engaged). Page load now runs the consent gate first: ([#53])
+  - In opt-in (EU/EEA/UK) and Unknown-location modes, **no tracked session is
+    created and no IP/geo/URL is captured** until the visitor consents or
+    actively starts a chat. `POST /visitor/session` returns `sessionId: null`
+    and the widget keeps the presence socket closed.
+  - In US opt-out modes, presence tracking proceeds by default unless the
+    visitor has opted out (or GPC is present — see #55).
+  - **Functional use is never blocked.** The widget still renders and a visitor
+    can always start a chat; opening a chat is strictly necessary and lazily
+    creates the session at that point. New widget use case
+    `functional-without-consent.uc.yaml` covers this.
+
 ### Added
 
 - **Consent foundation for the geo-privacy program.** A real, extensible consent
@@ -61,6 +79,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
+[#53]: https://github.com/AFixt/livechat/issues/53
 [#56]: https://github.com/AFixt/livechat/issues/56
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68

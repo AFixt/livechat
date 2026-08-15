@@ -84,6 +84,7 @@ export function buildRouter(deps: RouterDeps): Router {
     buildVisitorRouter({
       env: deps.env,
       visitorSession: deps.services.visitorSession,
+      consent: deps.services.consent,
       chat: deps.services.chat,
       presence: deps.services.presence,
     }),
