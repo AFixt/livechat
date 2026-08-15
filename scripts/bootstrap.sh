@@ -42,6 +42,28 @@ if ! command -v lychee >/dev/null 2>&1; then
   }
 fi
 
+# Container / Dockerfile / IaC scanners (ADR-0011, issue #60). Optional locally:
+# scripts/{hadolint,trivy,checkov}.sh skip cleanly when these are absent, and CI
+# installs them. Best-effort here — a failed install only warns, never aborts
+# bootstrap, unlike the required tools above.
+if ! command -v hadolint >/dev/null 2>&1; then
+  echo "Installing hadolint (optional)..."
+  brew install hadolint 2>/dev/null \
+    || echo "warn: install hadolint from https://github.com/hadolint/hadolint/releases"
+fi
+
+if ! command -v trivy >/dev/null 2>&1; then
+  echo "Installing trivy (optional)..."
+  brew install trivy 2>/dev/null \
+    || echo "warn: install trivy from https://github.com/aquasecurity/trivy/releases"
+fi
+
+if ! command -v checkov >/dev/null 2>&1; then
+  echo "Installing checkov (optional)..."
+  pipx install checkov 2>/dev/null || pip install --user checkov 2>/dev/null \
+    || echo "warn: install checkov via 'pipx install checkov'"
+fi
+
 echo ""
 echo "Installing npm dependencies..."
 npm ci

@@ -36,6 +36,17 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
+### Security
+
+- Container, Dockerfile, and IaC scanning added (Hadolint, Trivy, Checkov) —
+  `scripts/{hadolint,trivy,checkov}.sh` wrappers with `security:hadolint` /
+  `security:trivy` / `security:checkov` npm scripts, folded into the aggregate
+  `security` script, and a PR-time `.github/workflows/container-iac-scan.yml`
+  safety net. Accepted findings are documented in `.hadolint.yaml`,
+  `.trivyignore`, and `.checkov.yaml`; a `HEALTHCHECK` was added to all three
+  Dockerfiles. (ADR-0011, [#60])
+
+[#60]: https://github.com/AFixt/livechat/issues/60
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
 

@@ -1,0 +1,15 @@
+# Trivy accepted-findings allow-list.
+# Run: bash scripts/trivy.sh  (npm run security:trivy)
+#
+# Every entry is a Trivy check ID (AVD-*) followed by a justification, mirroring
+# how scripts/semgrep.sh annotates each --exclude-rule and scripts/npm-audit.sh
+# annotates each accepted advisory. Keep this in lockstep with .hadolint.yaml
+# and .checkov.yaml so all three scanners agree on what is deferred.
+
+# AVD-DS-0002 — "Image user should not be 'root'."
+# Applies to ui/Dockerfile and widget/Dockerfile, both nginx images that must
+# bind port 80 (privileged) to serve static assets. Running unprivileged needs
+# the nginxinc/nginx-unprivileged base (listens on 8080) plus nginx.conf changes
+# owned by a separate workstream. api/Dockerfile already sets `USER node`.
+# Same deferral as Hadolint DL3002 and Checkov CKV_DOCKER_3.
+AVD-DS-0002

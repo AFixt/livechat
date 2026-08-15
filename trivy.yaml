@@ -1,0 +1,30 @@
+# Trivy config — container / filesystem / IaC misconfiguration scanning.
+# Run: bash scripts/trivy.sh  (npm run security:trivy)
+#
+# Accepted findings are listed, with justification, in .trivyignore (Trivy reads
+# it from the repo root automatically). This file only tunes what/how we scan.
+
+# Fail the gate on HIGH and CRITICAL only. MEDIUM/LOW are reported by CI in the
+# SARIF upload for visibility but do not block, matching the HIGH/CRITICAL
+# threshold used by scripts/npm-audit.sh and security:audit.
+severity:
+  - HIGH
+  - CRITICAL
+
+# `trivy config` uses the misconfiguration scanner. In CI we additionally run
+# vuln + secret scanners against the built images; those scanners honour this
+# same config file.
+scan:
+  scanners:
+    - misconfig
+    - vuln
+    - secret
+
+misconfiguration:
+  # Only surface actual misconfigurations, not the (large) list of passed
+  # checks — keeps local output readable.
+  include-non-failures: false
+
+# Non-zero exit when anything at/above the severity threshold remains after
+# .trivyignore is applied, so the npm script and CI job fail loudly.
+exit-code: 1

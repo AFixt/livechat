@@ -1,0 +1,53 @@
+# Checkov config — IaC scanning of the Dockerfiles, docker-compose*.yml, and
+# .do/app.yaml. Run: bash scripts/checkov.sh  (npm run security:checkov)
+#
+# Every skipped check carries its justification below, mirroring how
+# scripts/semgrep.sh annotates each --exclude-rule. Keep skip-check in lockstep
+# with .hadolint.yaml and .trivyignore so all three scanners agree.
+
+# Scan exactly the container/IaC artifacts, by path, so the gate never drifts
+# onto unrelated YAML (GitHub workflows, usecases/*.uc.yaml, etc.). Checkov
+# infers the framework per file: the Dockerfiles use the `dockerfile` framework;
+# the compose files and .do/app.yaml use the `yaml` framework; `secrets` sweeps
+# all of them for committed credentials. (DigitalOcean App Platform has no
+# dedicated Checkov parser — its structural misconfig is covered by Trivy's
+# `config` scan in scripts/trivy.sh; here app.yaml is guarded against secrets
+# and generic YAML policy.)
+file:
+  - api/Dockerfile
+  - ui/Dockerfile
+  - widget/Dockerfile
+  - docker-compose.yml
+  - docker-compose.prod.yml
+  - .do/app.yaml
+
+framework:
+  - dockerfile
+  - yaml
+  - secrets
+
+# Fail the run on any violation not skipped below.
+soft-fail: false
+compact: true
+quiet: true
+
+skip-check:
+  # CKV_DOCKER_3 — "Ensure that a user for the container has been created."
+  # ui/Dockerfile and widget/Dockerfile are nginx images that must bind the
+  # privileged port 80; running as a non-root user needs the
+  # nginxinc/nginx-unprivileged base + nginx.conf changes owned by a separate
+  # workstream. api/Dockerfile already sets `USER node`. Same deferral as
+  # Hadolint DL3002 and Trivy AVD-DS-0002.
+  - CKV_DOCKER_3
+
+  # CKV_SECRET_6 — "Base64 High Entropy String."
+  # The only hits are the dev-only placeholder secrets in docker-compose.yml
+  # (JWT_ACCESS_SECRET/JWT_REFRESH_SECRET/COOKIE_SECRET = `dev-*-change-me`),
+  # which run the *local* stack and are explicitly labelled as throwaway. Real
+  # secrets are injected at runtime — docker-compose.prod.yml and .do/app.yaml
+  # use `${VAR}` refs / empty `type: SECRET` values, never literals. This
+  # Checkov run is scoped to six IaC files (see `file:` above), so the skip is
+  # narrow; authoritative secret detection across the whole tree is trufflehog's
+  # job (ADR-0008, and the two-tier scan in issue #82), backed by semgrep
+  # `p/secrets` and eslint-plugin-no-secrets — defense in depth.
+  - CKV_SECRET_6
