@@ -9,6 +9,19 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Use cases now carry `expected_result`, use `extends` for variants, and cover
+  more error paths** ([#85]). Every non-`extends` use case gained an
+  `expected_result` stating the observable outcome; the `support/login` and
+  `widget/chat-ended` variant pairs were converted from duplicated files to
+  `extends` + `steps_override`; three `type: negative` cases were added
+  (invalid allowed-origin, already-revoked invitation, invalid user role); and
+  `usecases/README.md` now documents the positive/negative/extension
+  distinction. (The `widget/invitation` pair is handled with #76, which makes
+  that state reachable.) `usecases:validate` passes (31 cases) and specs were
+  regenerated.
+
 ### Added
 
 - **Use-case coverage for eleven previously undocumented interactions**
@@ -38,6 +51,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#85]: https://github.com/AFixt/livechat/issues/85
 
 ## [0.2.0] - 2026-07-23
 

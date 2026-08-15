@@ -9,6 +9,10 @@ description: |
 
 start_location: "http://localhost:5174/settings/availability"
 
+expected_result: >-
+  The audible new-message alert is muted and the toggle reflects the muted
+  state accessibly.
+
 preconditions:
   - A staff user is authenticated (see support-login.uc.yaml).
 

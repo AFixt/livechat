@@ -13,6 +13,10 @@ description: |
 
 start_location: "http://localhost:5175/"
 
+expected_result: >-
+  The visitor sees a proactive invitation prompted by support, announced
+  accessibly, with accept and dismiss controls.
+
 preconditions:
   - A support agent has initiated a chat with this visitor (chat:initiate,
     established over sockets — see the e2e journey suite).
