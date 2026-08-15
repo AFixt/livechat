@@ -39,6 +39,7 @@ export function useStaffSocket(): void {
   const removeVisitor = useChatsStore((s) => s.removeVisitor);
   const upsertChat = useChatsStore((s) => s.upsertChat);
   const appendMessage = useChatsStore((s) => s.appendMessage);
+  const setTyping = useChatsStore((s) => s.setTyping);
   const markEnded = useChatsStore((s) => s.markEnded);
 
   useEffect(() => {
@@ -77,6 +78,17 @@ export function useStaffSocket(): void {
     };
     const onEnded = (p: { chatId: string; endedBy: 'customer' | 'support' }): void => {
       markEnded(p.chatId, p.endedBy);
+      setTyping(p.chatId, false);
+    };
+    const onTyping = (p: {
+      chatId: string;
+      actor: 'visitor' | 'user';
+      isTyping: boolean;
+    }): void => {
+      // Only the visitor's typing is shown in the console; the operator's own
+      // echo is ignored (#80).
+      if (p.actor !== 'visitor') return;
+      setTyping(p.chatId, p.isTyping);
     };
 
     socket.on('visitor:joined', onVisitorJoined);
@@ -84,6 +96,7 @@ export function useStaffSocket(): void {
     socket.on('chat:requested', onChatRequested);
     socket.on('chat:message', onMessage);
     socket.on('chat:ended', onEnded);
+    socket.on('chat:typing', onTyping);
 
     return () => {
       socket.off('visitor:joined', onVisitorJoined);
@@ -91,6 +104,7 @@ export function useStaffSocket(): void {
       socket.off('chat:requested', onChatRequested);
       socket.off('chat:message', onMessage);
       socket.off('chat:ended', onEnded);
+      socket.off('chat:typing', onTyping);
     };
-  }, [appendMessage, markEnded, removeVisitor, t, upsertChat, upsertVisitor]);
+  }, [appendMessage, markEnded, removeVisitor, setTyping, t, upsertChat, upsertVisitor]);
 }

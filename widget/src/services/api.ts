@@ -108,3 +108,16 @@ export async function fetchCurrentChat(): Promise<CurrentChat> {
   const body = await apiFetch<CurrentChat>('/visitor/chats/current', { method: 'GET' });
   return body.data ?? { chat: null, messages: [] };
 }
+
+/**
+ * POST /api/v1/visitor/chats/:id/transcript — email the visitor a copy of the
+ * conversation (§5.1.7, #80).
+ * @param chatId - The chat to transcribe.
+ * @param email - Address to send the transcript to.
+ */
+export async function emailTranscript(chatId: string, email: string): Promise<void> {
+  await apiFetch(`/visitor/chats/${chatId}/transcript`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}

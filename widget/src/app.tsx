@@ -1,8 +1,13 @@
-import { useEffect, useReducer, useRef } from 'preact/hooks';
+import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 
 import { LiveRegion } from './components/live-region.js';
 import { useFocusReturn } from './hooks/use-focus-return.js';
-import { fetchCurrentChat, initiateChat, initVisitorSession } from './services/api.js';
+import {
+  emailTranscript,
+  fetchCurrentChat,
+  initiateChat,
+  initVisitorSession,
+} from './services/api.js';
 import { playAlert } from './services/audio.js';
 import { announceLiveMessage } from './services/live-region.js';
 import { disconnectVisitorSocket, getVisitorSocket } from './services/socket.js';
@@ -38,6 +43,9 @@ interface SocketMessageEvent {
  */
 export function App(props: AppProps): preact.JSX.Element {
   const [model, dispatch] = useReducer(reduce, initialModel());
+  // Peer (support) typing indicator — transient UI state, kept out of the state
+  // machine so it never interacts with the documented widget states (#80).
+  const [peerTyping, setPeerTyping] = useState(false);
   useFocusReturn(model.open);
   const panelHeaderRef = useRef<HTMLHeadingElement>(null);
 
@@ -114,11 +122,22 @@ export function App(props: AppProps): preact.JSX.Element {
         type: p.endedBy === 'support' ? 'chat_ended_by_support' : 'chat_ended_by_customer',
       });
     };
+    const onTyping = (p: {
+      chatId: string;
+      actor: 'visitor' | 'user';
+      isTyping: boolean;
+    }): void => {
+      if (p.chatId !== model.chatId || p.actor !== 'user') return;
+      setPeerTyping(p.isTyping);
+    };
     socket.on('chat:message', onMessage);
     socket.on('chat:ended', onEnded);
+    socket.on('chat:typing', onTyping);
     return () => {
       socket.off('chat:message', onMessage);
       socket.off('chat:ended', onEnded);
+      socket.off('chat:typing', onTyping);
+      setPeerTyping(false);
     };
   }, [model.chatId]);
 
@@ -177,6 +196,11 @@ export function App(props: AppProps): preact.JSX.Element {
     dispatch({ type: 'chat_ended_by_customer' });
   };
 
+  const handleTyping = (isTyping: boolean): void => {
+    if (model.chatId === null) return;
+    getVisitorSocket().emit('chat:typing', { chatId: model.chatId, isTyping });
+  };
+
   return (
     <>
       <LiveRegion />
@@ -226,11 +250,19 @@ export function App(props: AppProps): preact.JSX.Element {
               />
             )}
             {model.state === 'active' && (
-              <ActiveState messages={model.messages} onSend={handleSend} onEnd={handleEnd} />
+              <ActiveState
+                messages={model.messages}
+                onSend={handleSend}
+                onEnd={handleEnd}
+                onTyping={handleTyping}
+                peerTyping={peerTyping}
+              />
             )}
             {model.state === 'ended' && (
               <EndedState
-                onEmailTranscript={() => Promise.resolve()}
+                onEmailTranscript={(email) =>
+                  model.chatId === null ? Promise.resolve() : emailTranscript(model.chatId, email)
+                }
                 onDone={() => {
                   dispatch({ type: 'close' });
                 }}

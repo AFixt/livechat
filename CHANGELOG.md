@@ -11,6 +11,17 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Added
 
+- **Typing indicators are live end-to-end** (part of [#80]). The server already
+  relayed `chat:typing`, but neither client sent or showed it. The widget and
+  console now emit a debounced typing signal while composing (stopping on idle,
+  blur, or send) and render the other party's typing in an `aria-live` status
+  region — "Support is typing…" in the widget, "{name} is typing…" in the
+  console — so the cue is programmatic, visible, and announced (§3).
+- **The "email me the transcript" affordance now works** (part of [#80]). It was
+  a no-op (`onEmailTranscript={() => Promise.resolve()}`). New endpoint
+  `POST /api/v1/visitor/chats/:id/transcript` mails the conversation to a
+  visitor-supplied address via the existing email service, scoped so a visitor
+  can only transcribe their own chat.
 - **Use-case coverage for eleven previously undocumented interactions**
   ([#66]): widget invitation state (§5.1.2, open + dismiss), widget
   chat-ended / email-transcript state (§5.1.7, send + decline), operator
@@ -38,6 +49,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#80]: https://github.com/AFixt/livechat/issues/80
 
 ## [0.2.0] - 2026-07-23
 

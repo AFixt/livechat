@@ -8,7 +8,7 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useChatInbox } from '../hooks/use-chat-inbox.js';
@@ -116,6 +116,9 @@ interface ChatPaneProps {
   } | null;
 }
 
+/** How long after the last keystroke the operator is considered to have stopped. */
+const TYPING_IDLE_MS = 1500;
+
 /**
  * Right-hand panel showing the active chat's transcript + compose box.
  * @param props - ChatPane props.
@@ -125,9 +128,39 @@ function ChatPane(props: ChatPaneProps): React.JSX.Element {
   const { t } = useTranslation();
   const [draft, setDraft] = useState('');
   const chat = props.chat;
+  const visitorTyping = useChatsStore((s) => (chat === null ? false : s.typingByChat[chat.id]));
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const signalling = useRef(false);
+
+  const stopTyping = (): void => {
+    if (idleTimer.current !== null) {
+      clearTimeout(idleTimer.current);
+      idleTimer.current = null;
+    }
+    if (signalling.current && chat !== null) {
+      signalling.current = false;
+      getStaffSocket().emit('chat:typing', { chatId: chat.id, isTyping: false });
+    }
+  };
+
+  const onDraftChange = (value: string): void => {
+    setDraft(value);
+    if (chat === null) return;
+    if (value.trim() === '') {
+      stopTyping();
+      return;
+    }
+    if (!signalling.current) {
+      signalling.current = true;
+      getStaffSocket().emit('chat:typing', { chatId: chat.id, isTyping: true });
+    }
+    if (idleTimer.current !== null) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(stopTyping, TYPING_IDLE_MS);
+  };
 
   const send = (): void => {
     if (chat === null || draft.trim() === '') return;
+    stopTyping();
     getStaffSocket().emit('chat:message', { chatId: chat.id, body: draft });
     setDraft('');
   };
@@ -199,6 +232,18 @@ function ChatPane(props: ChatPaneProps): React.JSX.Element {
           </Box>
         ))}
       </Box>
+      <Typography
+        component="p"
+        variant="body2"
+        color="text.secondary"
+        role="status"
+        aria-live="polite"
+        sx={{ minHeight: 20 }}
+      >
+        {visitorTyping === true
+          ? t('dashboard.chats.typing', { name: chat.customerName ?? chat.id.slice(0, 8) })
+          : ''}
+      </Typography>
       <Box
         component="form"
         onSubmit={(e) => {
@@ -211,8 +256,9 @@ function ChatPane(props: ChatPaneProps): React.JSX.Element {
           label={t('dashboard.chats.messageLabel')}
           value={draft}
           onChange={(e) => {
-            setDraft(e.target.value);
+            onDraftChange(e.target.value);
           }}
+          onBlur={stopTyping}
           disabled={chatEnded}
           fullWidth
         />

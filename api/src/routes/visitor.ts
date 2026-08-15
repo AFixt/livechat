@@ -7,15 +7,27 @@ import {
   type VisitorInitiateChatInput,
 } from '@livechat/shared';
 import { Router } from 'express';
+import { z } from 'zod';
 
 import { parsedBody, validate } from '../middlewares/validate.js';
 import { ApiError } from '../utils/api-error.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
 import type { Env } from '../config/env.js';
-import type { ChatService, PresenceService, VisitorSessionService } from '../services/index.js';
+import type {
+  ChatService,
+  EmailService,
+  PresenceService,
+  VisitorSessionService,
+} from '../services/index.js';
 
 const VISITOR_COOKIE_NAME = 'livechat_visitor';
+
+/** Reused across every cookie-authenticated visitor route. */
+const ERR_VISITOR_SESSION = 'Visitor session required';
+
+/** Body schema for the email-transcript endpoint (#80). */
+const emailTranscriptSchema = z.object({ email: z.email() });
 const VISITOR_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 interface VisitorRouterDeps {
@@ -23,6 +35,7 @@ interface VisitorRouterDeps {
   visitorSession: VisitorSessionService;
   chat: ChatService;
   presence: PresenceService;
+  email: EmailService;
 }
 
 /**
@@ -72,7 +85,7 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
       const body = parsedBody(req, visitorHeartbeatInputSchema) satisfies VisitorHeartbeatInput;
       const rawCookie: unknown = req.cookies[VISITOR_COOKIE_NAME];
       const cookie = typeof rawCookie === 'string' ? rawCookie : undefined;
-      if (cookie === undefined) throw ApiError.unauthorized('Visitor session required');
+      if (cookie === undefined) throw ApiError.unauthorized(ERR_VISITOR_SESSION);
       const session = await deps.visitorSession.findByCookie(cookie);
       await deps.visitorSession.heartbeat(session, body.currentUrl);
       res.json({ success: true });
@@ -89,7 +102,7 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
       ) satisfies VisitorInitiateChatInput;
       const rawCookie: unknown = req.cookies[VISITOR_COOKIE_NAME];
       const cookie = typeof rawCookie === 'string' ? rawCookie : undefined;
-      if (cookie === undefined) throw ApiError.unauthorized('Visitor session required');
+      if (cookie === undefined) throw ApiError.unauthorized(ERR_VISITOR_SESSION);
       const visitor = await deps.visitorSession.findByCookie(cookie);
 
       const initArgs: Parameters<ChatService['initiateByVisitor']>[0] = {
@@ -111,7 +124,7 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
     asyncHandler(async (req, res) => {
       const rawCookie: unknown = req.cookies[VISITOR_COOKIE_NAME];
       const cookie = typeof rawCookie === 'string' ? rawCookie : undefined;
-      if (cookie === undefined) throw ApiError.unauthorized('Visitor session required');
+      if (cookie === undefined) throw ApiError.unauthorized(ERR_VISITOR_SESSION);
       const visitor = await deps.visitorSession.findByCookie(cookie);
       const chat = await deps.chat.findResumableByVisitorSession(visitor.id);
       if (chat === null) {
@@ -120,6 +133,36 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
       }
       const messages = await deps.chat.listMessages(chat.id);
       res.json({ success: true, data: { chat, messages } });
+    }),
+  );
+
+  router.post(
+    '/chats/:id/transcript',
+    validate({ body: emailTranscriptSchema }),
+    asyncHandler(async (req, res) => {
+      const id = req.params.id;
+      if (typeof id !== 'string') return;
+      const rawCookie: unknown = req.cookies[VISITOR_COOKIE_NAME];
+      const cookie = typeof rawCookie === 'string' ? rawCookie : undefined;
+      if (cookie === undefined) throw ApiError.unauthorized(ERR_VISITOR_SESSION);
+      const visitor = await deps.visitorSession.findByCookie(cookie);
+      const { email } = parsedBody(req, emailTranscriptSchema);
+      // Scope the chat to this visitor so one visitor cannot email another's
+      // transcript (#80). (When #72 lands, this becomes the scoped getById.)
+      const chat = await deps.chat.getById(id);
+      if (chat.visitorSessionId !== visitor.id) {
+        throw ApiError.forbidden('Access denied to this chat');
+      }
+      const messages = await deps.chat.listMessages(chat.id);
+      await deps.email.sendTranscriptEmail(
+        email,
+        messages.map((m) => ({
+          senderKind: m.senderKind,
+          body: m.body,
+          deliveredAt: m.deliveredAt,
+        })),
+      );
+      res.json({ success: true });
     }),
   );
 
