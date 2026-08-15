@@ -33,8 +33,9 @@
 #   reason   why it is accepted (short; the full rationale stays inline in
 #            `source`).
 #   added    ISO date the exception was first accepted / catalogued.
-#   expires  ISO date it must be re-justified or removed. The gate goes red on
-#            this date — that is the point.
+#   expires  ISO date it must be re-justified or removed. The gate warns while
+#            this date is within EXCEPTION_WARN_DAYS and goes red once it has
+#            passed — that is the point.
 #   status   active | pending | none. Only `active` entries are gated.
 #   issue    related GitHub issue, if any.
 

@@ -61,8 +61,9 @@ updated as those land.
 
 ## Consequences
 
-- A "temporary" suppression now becomes a red build on its review date — the
-  forcing function that keeps the exception set honest.
+- A "temporary" suppression is warned on as its review date approaches and
+  becomes a red build once that date has passed — the forcing function that
+  keeps the exception set honest.
 - Anyone can read the enforced policy in one file and the full suppression
   inventory in another; onboarding and audits get a single entry point.
 - Small ongoing cost: adding a suppression now requires a second edit (the
