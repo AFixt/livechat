@@ -67,7 +67,7 @@ export function buildRouter(deps: RouterDeps): Router {
       invitation: deps.services.invitation,
     }),
   );
-  router.use('/widget', originAllowed(), buildWidgetRouter());
+  router.use('/widget', originAllowed(), buildWidgetRouter({ presence: deps.services.presence }));
   router.use(
     '/visitor',
     originAllowed(),

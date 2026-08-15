@@ -1,5 +1,8 @@
 import jwt from 'jsonwebtoken';
 
+import { GLOBAL_STAFF_TENANT } from '../services/presence-service.js';
+
+import { broadcastTenantAvailability } from './availability.js';
 import { detach } from './detach.js';
 import { GLOBAL_STAFF_ROOM } from './rooms.js';
 
@@ -72,11 +75,24 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
       }
       if (tenantId !== null) await socket.join(`tenant:${tenantId}`);
     });
-    if (['super_admin', 'admin', 'staff'].includes(role)) {
-      detach(deps.logger, 'marking staff available failed', async () =>
-        deps.services.presence.setStaffAvailable(userId),
-      );
-      nsp.emit('support:availability_changed', { available: true });
+    const isStaff = ['super_admin', 'admin', 'staff'].includes(role);
+    // Untenanted AFixt staff serve every tenant (issue #19); bucket their
+    // availability globally rather than under a single tenant.
+    const availabilityTenant = tenantId ?? GLOBAL_STAFF_TENANT;
+    if (isStaff) {
+      detach(deps.logger, 'restoring staff availability failed', async () => {
+        // Do NOT auto-mark available on connect: keep the user's persisted,
+        // explicit status so availability survives reconnects/reloads.
+        const status = await deps.services.presence.restoreOnConnect(userId, availabilityTenant);
+        nsp.to(`user:${userId}`).emit('availability:self', { status });
+        if (tenantId !== null) {
+          await broadcastTenantAvailability({
+            io: deps.io,
+            presence: deps.services.presence,
+            tenantId,
+          });
+        }
+      });
     }
 
     socket.on('chat:accept', (payload) => {
@@ -156,17 +172,34 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
       });
     });
 
-    socket.on('disconnect', () => {
-      if (['super_admin', 'admin', 'staff'].includes(role)) {
-        detach(deps.logger, 'staff disconnect cleanup failed', async () => {
-          await deps.services.presence.setStaffUnavailable(userId);
-          const anyLeft = await deps.services.presence.anyStaffAvailable();
-          if (!anyLeft) {
-            nsp.emit('support:availability_changed', { available: false });
-          }
-        });
-      }
+    socket.on('availability:set', (payload) => {
+      if (!isStaff) return;
+      detach(deps.logger, 'staff availability:set failed', async () => {
+        await deps.services.presence.setAvailability(userId, availabilityTenant, payload.status);
+        // Echo to every tab of this user so the console reflects the change
+        // and multi-tab stays in sync (availability is per-user, not per-tab).
+        nsp.to(`user:${userId}`).emit('availability:self', { status: payload.status });
+        if (tenantId !== null) {
+          await broadcastTenantAvailability({
+            io: deps.io,
+            presence: deps.services.presence,
+            tenantId,
+          });
+        }
+      });
     });
+
+    socket.on('availability:heartbeat', () => {
+      if (!isStaff) return;
+      detach(deps.logger, 'staff availability:heartbeat failed', async () =>
+        deps.services.presence.heartbeat(userId),
+      );
+    });
+
+    // No availability change on disconnect: status is explicit and persists.
+    // A full disconnect (all tabs closed, heartbeats stop) stops the agent
+    // counting only once the connection grace window lapses — a dropped
+    // socket never flips them away immediately.
   });
 
   return nsp;

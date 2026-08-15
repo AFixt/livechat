@@ -72,9 +72,13 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
 
   nsp.on('connection', (socket: VisitorSocket) => {
     const { visitorSessionId, tenantId } = socket.data;
-    detach(deps.logger, 'visitor room join failed', async () =>
-      socket.join(`visitor:${visitorSessionId}`),
-    );
+    detach(deps.logger, 'visitor room join failed', async () => {
+      await socket.join(`visitor:${visitorSessionId}`);
+      // Join the tenant-wide room so this visitor receives
+      // `support:availability_changed` broadcasts and can flip between the
+      // invitation (§5.1.2) and no-support (§5.1.4) states in real time.
+      await socket.join(`tenant:${tenantId}`);
+    });
 
     detach(deps.logger, 'marking visitor present failed', async () =>
       deps.services.presence.markVisitorPresent(tenantId, visitorSessionId, {

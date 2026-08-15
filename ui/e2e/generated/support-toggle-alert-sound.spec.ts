@@ -11,10 +11,10 @@ test.describe('Operator mutes the audible new-message alert', () => {
     //   - A staff user is authenticated (see support-login.uc.yaml).
 
     // Step 1: Access start location
-    await page.goto('http://localhost:5174/settings/availability');
+    await page.goto('http://localhost:5174/settings/preferences');
 
-    // Step 2: Locate heading "Availability" (toggle-alert-sound.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Availability' })).toBeVisible();
+    // Step 2: Locate heading "Preferences" (toggle-alert-sound.uc.yaml:1)
+    await expect(page.getByRole('heading', { name: 'Preferences' })).toBeVisible();
 
     // Step 3: Locate checkbox "Alert sound muted" (toggle-alert-sound.uc.yaml:2)
     await expect(page.getByRole('checkbox', { name: 'Alert sound muted' })).toBeVisible();

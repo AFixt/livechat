@@ -8,12 +8,11 @@ description: |
   Activating "Start a chat" opens the panel on the name + first-message
   form; dismissing returns to the plain trigger for the rest of the visit.
 
-  Availability must arrive over the visitor socket (support_available), so
-  the transition into this state belongs to the cross-ends journey suite
-  (ADR-0007). Note: no server event currently sets support_available to
-  true — the surface is implemented but unreachable; this use case
-  documents the required behavior. This file is the behavioural source of
-  truth for the invitation surface itself.
+  Availability arrives over the visitor socket: the /visitor namespace emits
+  `support:availability_changed`, which the widget maps to the
+  `support_available` action (issue #76). The transition into this state
+  belongs to the cross-ends journey suite (ADR-0007); this file is the
+  behavioural source of truth for the invitation surface itself.
 
 start_location: "http://localhost:5175/"
 

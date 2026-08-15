@@ -83,6 +83,14 @@ export default defineConfig({
       dependencies: ['setup'],
     },
     {
+      // Sets the operator's own explicit availability. `check()` is idempotent
+      // so it is safe to share the dashboard session regardless of prior state.
+      name: 'support-availability',
+      testMatch: /generated\/support-set-availability\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/staff.json' },
+      dependencies: ['setup'],
+    },
+    {
       name: 'support-anon',
       testMatch: /generated\/support-login.*\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },

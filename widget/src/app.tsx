@@ -1,8 +1,13 @@
-import { useEffect, useReducer, useRef } from 'preact/hooks';
+import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 
 import { LiveRegion } from './components/live-region.js';
 import { useFocusReturn } from './hooks/use-focus-return.js';
-import { fetchCurrentChat, initiateChat, initVisitorSession } from './services/api.js';
+import {
+  fetchCurrentChat,
+  fetchWidgetConfig,
+  initiateChat,
+  initVisitorSession,
+} from './services/api.js';
 import { playAlert } from './services/audio.js';
 import { announceLiveMessage } from './services/live-region.js';
 import { disconnectVisitorSocket, getVisitorSocket } from './services/socket.js';
@@ -31,6 +36,16 @@ interface SocketMessageEvent {
 }
 
 /**
+ * Optional support-hours props for the no-support state. Returns an empty
+ * object when unset so it is safe to spread under `exactOptionalPropertyTypes`.
+ * @param text - Configured support-hours display text, or undefined.
+ * @returns Props to spread onto `<NoSupportState>`.
+ */
+function noSupportProps(text: string | undefined): { supportHoursText?: string } {
+  return text === undefined ? {} : { supportHoursText: text };
+}
+
+/**
  * Root widget component — owns the state machine and wires REST + socket
  * events into dispatched actions.
  * @param props - Widget configuration from the custom element attributes.
@@ -38,6 +53,7 @@ interface SocketMessageEvent {
  */
 export function App(props: AppProps): preact.JSX.Element {
   const [model, dispatch] = useReducer(reduce, initialModel());
+  const [supportHoursText, setSupportHoursText] = useState<string | undefined>(undefined);
   useFocusReturn(model.open);
   const panelHeaderRef = useRef<HTMLHeadingElement>(null);
 
@@ -55,7 +71,29 @@ export function App(props: AppProps): preact.JSX.Element {
       announceLiveMessage('A support agent wants to chat');
       playAlert();
     };
+    // The /visitor namespace bridges staff availability to the widget, making
+    // the proactive invitation (§5.1.2) and no-support (§5.1.4) states
+    // reachable. Both true and false are dispatched.
+    const onAvailabilityChanged = (p: { available: boolean }): void => {
+      dispatch({ type: 'support_available', available: p.available });
+      if (p.available) announceLiveMessage('Support is now online');
+    };
+    // Public tenant config — support-hours text plus the current availability
+    // flag, so the invitation/no-support states are correct on first paint
+    // before any live socket event arrives. Best-effort: the widget still
+    // works if this fails.
+    const loadInitialConfig = async (): Promise<void> => {
+      try {
+        const config = await fetchWidgetConfig(props.tenantKey);
+        if (!live.current) return;
+        setSupportHoursText(config.supportHoursText ?? undefined);
+        dispatch({ type: 'support_available', available: config.supportAvailable });
+      } catch {
+        // ignore — config is optional
+      }
+    };
     void (async () => {
+      await loadInitialConfig();
       // Reuse an existing session when the visitor already has one — a page
       // reload must not mint a fresh session, which would orphan a prior chat
       // and break the returning-visitor (restart) flow. Probing the resumable
@@ -76,6 +114,7 @@ export function App(props: AppProps): preact.JSX.Element {
       // A session now exists — connect the socket so this visitor shows up in
       // the console's presence list and can receive proactive support events.
       getVisitorSocket().on('support:initiated', onSupportInitiated);
+      getVisitorSocket().on('support:availability_changed', onAvailabilityChanged);
       // Returning visitor with an unfinished chat? Offer to resume it.
       if (resume !== null && resume.chat !== null) {
         dispatch({
@@ -89,6 +128,7 @@ export function App(props: AppProps): preact.JSX.Element {
     return () => {
       live.current = false;
       getVisitorSocket().off('support:initiated', onSupportInitiated);
+      getVisitorSocket().off('support:availability_changed', onAvailabilityChanged);
     };
   }, [props.tenantKey]);
 
@@ -212,7 +252,7 @@ export function App(props: AppProps): preact.JSX.Element {
             {model.state === 'no_support' && (
               <NoSupportState
                 onSubmit={() => Promise.resolve()}
-                supportHoursText="Mon–Fri, 9am–5pm"
+                {...noSupportProps(supportHoursText)}
               />
             )}
             {model.state === 'support_initiated' && (

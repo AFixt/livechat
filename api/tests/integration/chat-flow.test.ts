@@ -229,7 +229,8 @@ describe('chat flow (integration)', () => {
     expect(currentRes.body.data.chat.id).toBe(priorChatId);
     expect((currentRes.body.data.messages as unknown[]).length).toBeGreaterThanOrEqual(1);
 
-    // A connected staff socket flips availability to true.
+    // Availability is now explicit, not a side effect of connecting: the
+    // agent must opt in to `available` before support counts as online.
     const staffSocket: Socket = ioClient(`${baseUrl}/staff`, {
       path: '/api/socket.io',
       auth: { token: accessToken },
@@ -237,6 +238,7 @@ describe('chat flow (integration)', () => {
       forceNew: true,
     });
     await waitFor(staffSocket, 'connect');
+    staffSocket.emit('availability:set', { status: 'available' });
     await new Promise((resolve) => setTimeout(resolve, 200));
     const onlineRes = await request(baseUrl)
       .post('/api/v1/visitor/chats')
