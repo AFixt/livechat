@@ -22,6 +22,13 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Fixed
 
+- **Integration tests no longer flake under load.** The suite's 10s
+  `testTimeout` had no headroom: tests doing several bcrypt-cost-12 hashes plus
+  real MySQL round-trips landed near 10s on a busy machine, so unrelated tests
+  timed out intermittently and adding any new integration test destabilised
+  existing ones. Test-environment bcrypt cost is now 4 (production/dev stay at
+  12, asserted by `bcrypt-cost.test.ts`), and the integration `testTimeout` is
+  raised to 30s. ([#71])
 - The admin "Allowed origins" textarea had no accessible name — the section
   heading above it is not a label. It now carries an explicit one, targeted
   by the new `admin-edit-tenant-settings` use case. ([#66])
@@ -38,6 +45,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#71]: https://github.com/AFixt/livechat/issues/71
 
 ## [0.2.0] - 2026-07-23
 
