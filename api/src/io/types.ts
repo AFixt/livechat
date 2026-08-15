@@ -62,6 +62,13 @@ export interface ServerToClientEvents {
 export interface StaffToServerEvents {
   /** Staff accepts a pending chat. */
   'chat:accept': (payload: { chatId: string }) => void;
+  /**
+   * Staff (re-)joins a chat room without changing its assignment. Emitted on
+   * every socket `connect` so an operator re-enters the `chat:{id}` rooms they
+   * had open after any reconnect — unlike `chat:accept`, it never mutates
+   * `assignedTo` (issue #69).
+   */
+  'chat:join': (payload: { chatId: string }) => void;
   /** Staff sends a message. */
   'chat:message': (payload: { chatId: string; body: string }) => void;
   /** Staff typing indicator. */

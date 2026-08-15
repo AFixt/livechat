@@ -9,6 +9,22 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Chat is no longer silently dead after a socket reconnect** ([#69]). Two
+  compounding faults: (1) `getStaffSocket()`/`getVisitorSocket()` called
+  `.disconnect()` on a socket whose `.connected` was false — which permanently
+  kills socket.io's own reconnect loop and orphans every listener — so the
+  clients returned a dead socket instead of the reconnecting one; and (2) even
+  once reconnected, `chat:{id}` room membership does not survive a new socket,
+  so messages stopped arriving. Now: the getters return the existing instance
+  (letting socket.io reconnect), both clients re-emit `chat:join` on every
+  (re)connect (a new `/staff` `chat:join` handler re-enters the room without
+  changing assignment), the widget backfills the transcript via
+  `messages_synced` (de-duplicating optimistic sends), and a reconnect is
+  surfaced programmatically, visibly, and audibly (widget banner + live-region
+  announcement; console live-region announcement). ([#69])
+
 ### Added
 
 - **Socket.IO now works across multiple API instances.** The real-time layer is
@@ -65,6 +81,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#69]: https://github.com/AFixt/livechat/issues/69
 [#72]: https://github.com/AFixt/livechat/issues/72
 [#73]: https://github.com/AFixt/livechat/issues/73
 

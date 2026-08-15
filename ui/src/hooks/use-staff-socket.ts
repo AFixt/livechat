@@ -78,12 +78,28 @@ export function useStaffSocket(): void {
     const onEnded = (p: { chatId: string; endedBy: 'customer' | 'support' }): void => {
       markEnded(p.chatId, p.endedBy);
     };
+    // A reconnected socket is a fresh connection in no chat rooms, so messages
+    // stop arriving until we re-enter them. On every (re)connect, re-join every
+    // live chat the operator has open; `chat:join` re-enters without changing
+    // assignment (issue #69). Announced only on an actual reconnect (§3).
+    let connectedBefore = false;
+    const onConnect = (): void => {
+      const { chats } = useChatsStore.getState();
+      for (const c of Object.values(chats)) {
+        if (!c.status.startsWith('ended_')) socket.emit('chat:join', { chatId: c.id });
+      }
+      if (connectedBefore) {
+        announceLiveMessage(t('dashboard.reconnected', 'Reconnected to live updates.'));
+      }
+      connectedBefore = true;
+    };
 
     socket.on('visitor:joined', onVisitorJoined);
     socket.on('visitor:left', onVisitorLeft);
     socket.on('chat:requested', onChatRequested);
     socket.on('chat:message', onMessage);
     socket.on('chat:ended', onEnded);
+    socket.on('connect', onConnect);
 
     return () => {
       socket.off('visitor:joined', onVisitorJoined);
@@ -91,6 +107,7 @@ export function useStaffSocket(): void {
       socket.off('chat:requested', onChatRequested);
       socket.off('chat:message', onMessage);
       socket.off('chat:ended', onEnded);
+      socket.off('connect', onConnect);
     };
   }, [appendMessage, markEnded, removeVisitor, t, upsertChat, upsertVisitor]);
 }

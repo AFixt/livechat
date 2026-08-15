@@ -1,6 +1,8 @@
-import { useEffect, useReducer, useRef } from 'preact/hooks';
+import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 
 import { LiveRegion } from './components/live-region.js';
+import { ReconnectBanner } from './components/reconnect-banner.js';
+import { useChatConnection } from './hooks/use-chat-connection.js';
 import { useFocusReturn } from './hooks/use-focus-return.js';
 import { fetchCurrentChat, initiateChat, initVisitorSession } from './services/api.js';
 import { playAlert } from './services/audio.js';
@@ -16,18 +18,8 @@ import { NoSupportState } from './states/no-support.js';
 import { RestartState } from './states/restart.js';
 import { SupportInitiatedState } from './states/support-initiated.js';
 
-import type { WidgetMessage } from './types.js';
-
 interface AppProps {
   tenantKey: string;
-}
-
-interface SocketMessageEvent {
-  chatId: string;
-  messageId: string;
-  senderKind: 'visitor' | 'user' | 'system';
-  body: string;
-  deliveredAt: string;
 }
 
 /**
@@ -38,6 +30,10 @@ interface SocketMessageEvent {
  */
 export function App(props: AppProps): preact.JSX.Element {
   const [model, dispatch] = useReducer(reduce, initialModel());
+  // Transient connection state — surfaced as an aria-live banner while the
+  // socket is reconnecting (issue #69). Kept out of the state machine so it
+  // never perturbs the documented widget states.
+  const [reconnecting, setReconnecting] = useState(false);
   useFocusReturn(model.open);
   const panelHeaderRef = useRef<HTMLHeadingElement>(null);
 
@@ -92,35 +88,10 @@ export function App(props: AppProps): preact.JSX.Element {
     };
   }, [props.tenantKey]);
 
-  useEffect(() => {
-    if (model.chatId === null) return;
-    const socket = getVisitorSocket();
-    socket.emit('chat:join', { chatId: model.chatId });
-    const onMessage = (msg: SocketMessageEvent): void => {
-      if (msg.chatId !== model.chatId || msg.senderKind === 'visitor') return;
-      const message: WidgetMessage = {
-        id: msg.messageId,
-        body: msg.body,
-        senderKind: msg.senderKind,
-        deliveredAt: msg.deliveredAt,
-      };
-      dispatch({ type: 'message_received', message });
-      announceLiveMessage('New message from support');
-      playAlert();
-    };
-    const onEnded = (p: { chatId: string; endedBy: 'customer' | 'support' }): void => {
-      if (p.chatId !== model.chatId) return;
-      dispatch({
-        type: p.endedBy === 'support' ? 'chat_ended_by_support' : 'chat_ended_by_customer',
-      });
-    };
-    socket.on('chat:message', onMessage);
-    socket.on('chat:ended', onEnded);
-    return () => {
-      socket.off('chat:message', onMessage);
-      socket.off('chat:ended', onEnded);
-    };
-  }, [model.chatId]);
+  // Owns the active chat's socket subscription, including reconnect re-join +
+  // transcript backfill (issue #69). Extracted so its branching stays out of
+  // this component's complexity budget.
+  useChatConnection(model.chatId, dispatch, setReconnecting);
 
   useEffect(
     () => () => {
@@ -196,6 +167,7 @@ export function App(props: AppProps): preact.JSX.Element {
               ×
             </button>
           </header>
+          <ReconnectBanner active={reconnecting} />
           <div class="panel-body">
             {model.state === 'initial' && (
               <CustomerInitiatedState

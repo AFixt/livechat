@@ -48,6 +48,7 @@ export type WidgetAction =
   | { type: 'support_accepted' }
   | { type: 'message_received'; message: WidgetMessage }
   | { type: 'message_sent'; message: WidgetMessage }
+  | { type: 'messages_synced'; messages: WidgetMessage[] }
   | { type: 'chat_ended_by_support' }
   | { type: 'chat_ended_by_customer' }
   | {
@@ -58,6 +59,47 @@ export type WidgetAction =
     }
   | { type: 'restart_resumed' }
   | { type: 'error'; message: string };
+
+/**
+ * Append a message unless one with the same id is already present, so a
+ * duplicate delivery (e.g. a socket re-emit after reconnect) never doubles a
+ * bubble (issue #69).
+ * @param messages - Current messages.
+ * @param message - Incoming message.
+ * @returns The next message list.
+ */
+function appendUnique(messages: WidgetMessage[], message: WidgetMessage): WidgetMessage[] {
+  if (messages.some((m) => m.id === message.id)) return messages;
+  return [...messages, message];
+}
+
+/**
+ * Reconcile the server's authoritative transcript with what the widget holds
+ * after a reconnect (issue #69). The server list wins; any local optimistic
+ * send (`local-` id) that the server has not yet persisted is preserved so an
+ * in-flight message posted during the outage is not lost. Optimistic visitor
+ * sends the server already recorded are dropped by body match to avoid a
+ * duplicate bubble.
+ * @param existing - Messages currently in the model.
+ * @param incoming - The server transcript (real ids), oldest first.
+ * @returns The reconciled, de-duplicated message list.
+ */
+function reconcileMessages(
+  existing: WidgetMessage[],
+  incoming: WidgetMessage[],
+): WidgetMessage[] {
+  const incomingIds = new Set(incoming.map((m) => m.id));
+  const persistedVisitorBodies = new Set(
+    incoming.filter((m) => m.senderKind === 'visitor').map((m) => m.body),
+  );
+  const pending = existing.filter(
+    (m) =>
+      m.id.startsWith('local-') &&
+      !incomingIds.has(m.id) &&
+      !(m.senderKind === 'visitor' && persistedVisitorBodies.has(m.body)),
+  );
+  return [...incoming, ...pending];
+}
 
 const handlers: {
   [K in WidgetAction['type']]: (
@@ -83,8 +125,9 @@ const handlers: {
   }),
   support_initiated: (m, a) => ({ ...m, state: 'support_initiated', chatId: a.chatId, open: true }),
   support_accepted: (m) => ({ ...m, state: 'active' }),
-  message_received: (m, a) => ({ ...m, messages: [...m.messages, a.message] }),
-  message_sent: (m, a) => ({ ...m, messages: [...m.messages, a.message] }),
+  message_received: (m, a) => ({ ...m, messages: appendUnique(m.messages, a.message) }),
+  message_sent: (m, a) => ({ ...m, messages: appendUnique(m.messages, a.message) }),
+  messages_synced: (m, a) => ({ ...m, messages: reconcileMessages(m.messages, a.messages) }),
   chat_ended_by_support: (m) => ({ ...m, state: 'ended' }),
   chat_ended_by_customer: (m) => ({ ...m, state: 'ended' }),
   restart: (_m, a) => ({
