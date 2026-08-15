@@ -9,6 +9,19 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Security
+
+- **Visitor sessions now expire and can be revoked.** The session cookie was a
+  30-day, non-revocable credential: `findByCookie` matched on the hash alone,
+  with no absolute/idle expiry and no server-side bound beyond the client cookie
+  `maxAge`. Absolute (default 30d) and idle (default 3d) expiry are now enforced
+  server-side in `findByCookie` — which the `/visitor` socket handshake also
+  goes through, so both the HTTP routes and the socket reject expired sessions.
+  A visitor "forget me" endpoint (`POST /visitor/session/forget`) hard-deletes
+  the session (also serving geo-privacy deletion) and clears the cookie. Windows
+  are configurable via `VISITOR_SESSION_ABSOLUTE_TTL_HOURS` /
+  `VISITOR_SESSION_IDLE_TTL_HOURS`. ([#79])
+
 ### Added
 
 - **Use-case coverage for eleven previously undocumented interactions**
@@ -38,6 +51,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#79]: https://github.com/AFixt/livechat/issues/79
 
 ## [0.2.0] - 2026-07-23
 

@@ -1,4 +1,4 @@
-import { bool, cleanEnv, host, port, str, url } from 'envalid';
+import { bool, cleanEnv, host, num, port, str, url } from 'envalid';
 
 /**
  * Env spec used by {@link loadEnv}.
@@ -33,6 +33,13 @@ const envSpec = {
   JWT_REFRESH_EXPIRES_IN: str({ default: '7d' }),
 
   COOKIE_SECRET: str(),
+
+  // Visitor session lifetime, enforced server-side in `findByCookie` (#79) —
+  // the cookie `maxAge` is only a client-side hint. Absolute: hard cap from
+  // first contact. Idle: max gap since the last request/heartbeat. Defaults:
+  // 30 days absolute, 3 days idle.
+  VISITOR_SESSION_ABSOLUTE_TTL_HOURS: num({ default: 720 }),
+  VISITOR_SESSION_IDLE_TTL_HOURS: num({ default: 72 }),
 
   APP_URL: url(),
   API_URL: url(),
