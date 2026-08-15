@@ -11,6 +11,31 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Added
 
+- **Consent foundation for the geo-privacy program.** A real, extensible consent
+  framework with documented defaults and an audit trail — the base the presence
+  gate and GPC handling build on. ([#56])
+  - New `consent_records` table + Sequelize model: one durable row per
+    tracking decision/consent change, keyed by an anonymous `subject_key` (HMAC
+    of the visitor cookie, so it lines up with a tracked session without
+    requiring one). IP is minimized to an HMAC (`ip_hash`); the raw address is
+    never stored.
+  - A **jurisdiction rules engine** (`consent-policy.ts`): a small, versioned,
+    data-driven table (`RULE_VERSION`). EU/EEA/UK → opt-in; US/US-CA → opt-out
+    (honoring explicit opt-out and GPC); unknown location → strict opt-in (never
+    US-max). `functional` is strictly necessary and always granted;
+    `presence`/`analytics` are the gated non-essential purposes.
+  - **Privacy APIs** under `/api/v1/privacy`: `GET /consent` (side-effect-free
+    effective-state read for the widget to gate on), `POST /consent`,
+    `POST /consent/withdraw`, and `POST /data-request` (an audited, queued stub).
+  - **Tracking-decision audit trail**: every decision emits the §19 event
+    vocabulary to `audit_logs` (`privacy.location_resolved` /
+    `privacy.location_unknown` / `privacy.geolocation_default_applied`,
+    `privacy.rule_applied`, `privacy.gpc_detected` / `privacy.gpc_applied`,
+    `privacy.consent_recorded` / `privacy.consent_withdrawn` /
+    `privacy.data_request`).
+  - Decisions covered by unit tests (EU/US/GPC/unknown) and the APIs by
+    integration tests against real MySQL. See
+    [ADR-0011](docs/adr/0011-consent-model-and-jurisdiction-policy.md).
 - **Use-case coverage for eleven previously undocumented interactions**
   ([#66]): widget invitation state (§5.1.2, open + dismiss), widget
   chat-ended / email-transcript state (§5.1.7, send + decline), operator
@@ -36,6 +61,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
+[#56]: https://github.com/AFixt/livechat/issues/56
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
 

@@ -3,6 +3,7 @@ import { ChatAttachment, initChatAttachmentModel } from './chat-attachment.js';
 import { ChatEvent, initChatEventModel } from './chat-event.js';
 import { ChatMessage, initChatMessageModel } from './chat-message.js';
 import { Chat, initChatModel } from './chat.js';
+import { ConsentRecord, initConsentRecordModel } from './consent-record.js';
 import { Invitation, initInvitationModel } from './invitation.js';
 import { JwtBlacklist, initJwtBlacklistModel } from './jwt-blacklist.js';
 import { StaffTenant, initStaffTenantModel } from './staff-tenant.js';
@@ -31,6 +32,7 @@ export function initModels(sequelize: Sequelize): void {
   initChatMessageModel(sequelize);
   initChatEventModel(sequelize);
   initChatAttachmentModel(sequelize);
+  initConsentRecordModel(sequelize);
 
   Tenant.hasMany(User, { foreignKey: 'tenant_id', as: 'users' });
   Tenant.hasMany(Invitation, { foreignKey: 'tenant_id', as: 'invitations' });
@@ -66,6 +68,16 @@ export function initModels(sequelize: Sequelize): void {
 
   VisitorSession.belongsTo(Tenant, { foreignKey: 'tenant_id', as: 'tenant' });
   VisitorSession.hasMany(Chat, { foreignKey: 'visitor_session_id', as: 'chats' });
+  VisitorSession.hasMany(ConsentRecord, {
+    foreignKey: 'visitor_session_id',
+    as: 'consentRecords',
+  });
+
+  ConsentRecord.belongsTo(Tenant, { foreignKey: 'tenant_id', as: 'tenant' });
+  ConsentRecord.belongsTo(VisitorSession, {
+    foreignKey: 'visitor_session_id',
+    as: 'visitorSession',
+  });
 
   Chat.belongsTo(Tenant, { foreignKey: 'tenant_id', as: 'tenant' });
   Chat.belongsTo(VisitorSession, { foreignKey: 'visitor_session_id', as: 'visitor' });
@@ -95,6 +107,7 @@ export {
   ChatAttachment,
   ChatEvent,
   ChatMessage,
+  ConsentRecord,
   Invitation,
   JwtBlacklist,
   StaffTenant,

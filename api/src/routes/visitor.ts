@@ -12,11 +12,10 @@ import { parsedBody, validate } from '../middlewares/validate.js';
 import { ApiError } from '../utils/api-error.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
+import { VISITOR_COOKIE_NAME, visitorCookieOptions } from './visitor-cookie-options.js';
+
 import type { Env } from '../config/env.js';
 import type { ChatService, PresenceService, VisitorSessionService } from '../services/index.js';
-
-const VISITOR_COOKIE_NAME = 'livechat_visitor';
-const VISITOR_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 interface VisitorRouterDeps {
   env: Env;
@@ -51,13 +50,7 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
       if (body.identityToken !== undefined) initArgs.identityToken = body.identityToken;
 
       const { session, cookieValue } = await deps.visitorSession.init(initArgs);
-      res.cookie(VISITOR_COOKIE_NAME, cookieValue, {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: deps.env.NODE_ENV === 'production',
-        maxAge: VISITOR_COOKIE_MAX_AGE_MS,
-        path: '/',
-      });
+      res.cookie(VISITOR_COOKIE_NAME, cookieValue, visitorCookieOptions(deps.env));
       res.status(201).json({
         success: true,
         data: { sessionId: session.id, tenantId: session.tenantId },

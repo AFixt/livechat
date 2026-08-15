@@ -70,6 +70,32 @@ function verifyIdentityToken(token: string | undefined, secret: string): string 
 export function createVisitorSessionService(deps: VisitorSessionDeps) {
   return {
     /**
+     * Mint a signed visitor cookie **without** creating any `visitor_sessions`
+     * row. Used for the consent gate: a visitor in an opt-in jurisdiction gets
+     * a durable subject handle (so consent can be recorded and the widget can
+     * function) while no PII/behavioral row exists until they consent or engage.
+     * @returns The cookie value to set and the derived durable subject key.
+     */
+    mintHandle(): { cookieValue: string; subjectKey: string } {
+      const { sessionId, cookieValue } = mintVisitorCookie(deps.env.COOKIE_SECRET);
+      const subjectKey = hashSessionId(sessionId, deps.env.COOKIE_SECRET);
+      return { cookieValue, subjectKey };
+    },
+
+    /**
+     * Derive the durable subject key from a signed visitor cookie. Equals the
+     * `session_cookie_hash` of any tracked session minted from the same cookie,
+     * so consent records and session rows line up.
+     * @param cookieValue - Raw cookie value from the widget.
+     * @returns The subject key (hex HMAC of the session id).
+     * @throws 401 if the cookie is missing/invalid.
+     */
+    subjectKeyFromCookie(cookieValue: string): string {
+      const sessionId = verifyVisitorCookie(cookieValue, deps.env.COOKIE_SECRET);
+      return hashSessionId(sessionId, deps.env.COOKIE_SECRET);
+    },
+
+    /**
      * Create a brand-new visitor session and return the signed cookie.
      * @param params - Init params from the widget.
      * @returns The new session + its signed cookie value.
