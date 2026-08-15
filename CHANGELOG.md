@@ -9,6 +9,17 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Added
+
+- **Use-case coverage for eleven previously undocumented interactions**
+  ([#66]): widget invitation state (§5.1.2, open + dismiss), widget
+  chat-ended / email-transcript state (§5.1.7, send + decline), operator
+  end-chat, operator alert-sound mute, admin tenant settings surface
+  (embed snippet, allowed origins, rotate embed secret), admin edit user,
+  admin invitations list + revoke. Generated Playwright specs committed;
+  `admin-view-invitations` and `support-toggle-alert-sound` join the
+  runnable e2e projects.
+
 ### Changed
 
 - **Use cases now carry `expected_result`, use `extends` for variants, and cover
@@ -21,17 +32,6 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   distinction. (The `widget/invitation` pair is handled with #76, which makes
   that state reachable.) `usecases:validate` passes (31 cases) and specs were
   regenerated.
-
-### Added
-
-- **Use-case coverage for eleven previously undocumented interactions**
-  ([#66]): widget invitation state (§5.1.2, open + dismiss), widget
-  chat-ended / email-transcript state (§5.1.7, send + decline), operator
-  end-chat, operator alert-sound mute, admin tenant settings surface
-  (embed snippet, allowed origins, rotate embed secret), admin edit user,
-  admin invitations list + revoke. Generated Playwright specs committed;
-  `admin-view-invitations` and `support-toggle-alert-sound` join the
-  runnable e2e projects.
 
 ### Fixed
 
