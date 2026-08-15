@@ -28,8 +28,27 @@ nvm use                 # Node 22, per .nvmrc
 bash scripts/bootstrap.sh   # install local tool binaries (semgrep, osv-scanner, trufflehog, lychee)
 npm ci                  # install workspace dependencies
 docker compose up -d    # MySQL + Redis + MailHog + MinIO
+
+cp api/.env.example api/.env   # local config; defaults match the compose ports
+npm run migrate -w api  # apply the database schema
+npm run seed -w api     # create the dev tenant + login accounts (see below)
+
 npm run dev             # run api, ui, and widget in parallel
 ```
+
+`api/.env` is loaded automatically in development (dotenv). Its committed
+example carries working defaults for the compose stack's host ports — no editing
+needed to run locally.
+
+**Dev login accounts** (created by `npm run seed -w api`):
+
+| Role          | Email                | Password          |
+| ------------- | -------------------- | ----------------- |
+| `super_admin` | `admin@example.com`  | `Admin!Password1` |
+| `staff`       | `staff@acme.example` | `Staff!Password1` |
+
+The seed also creates the `acme` dev tenant. Open the console at
+<http://localhost:25174> and the widget preview at <http://localhost:25175>.
 
 Then `npm run check:all` should pass on a clean clone — it is the same gate
 Husky runs on pre-push.

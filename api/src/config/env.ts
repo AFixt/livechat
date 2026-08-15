@@ -1,3 +1,4 @@
+import { config as loadDotenv } from 'dotenv';
 import { bool, cleanEnv, host, port, str, url } from 'envalid';
 
 /**
@@ -70,5 +71,10 @@ export type Env = Readonly<ReturnType<typeof loadEnv>>;
  *   helpful error and exits the process.
  */
 export function loadEnv(): ReturnType<typeof cleanEnv<typeof envSpec>> {
+  // Load a local `.env` outside production so a clean clone runs after
+  // `npm ci && docker compose up -d` (#81). dotenv never overrides variables
+  // already set in the environment, so CI/production values always win, and
+  // production must not read a file at all.
+  if (process.env.NODE_ENV !== 'production') loadDotenv();
   return cleanEnv(process.env, envSpec);
 }

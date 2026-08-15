@@ -22,6 +22,15 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Fixed
 
+- **A clean clone runs by following the README.** The API read `process.env`
+  with no `.env` loading and no example file, so `npm run dev` exited with an
+  envalid wall of ~15 missing variables. Added `api/.env.example` with working
+  defaults matching the compose ports, `dotenv` loading in development (app,
+  migrate, and seed), wired `npm run seed` to the real dev seeder (it was
+  `sequelize-cli db:seed:all` against a non-existent seeders dir), documented
+  the real steps + dev login accounts in the README, and gave `server.ts` an
+  `error` handler so a port clash prints an actionable message instead of an
+  `EADDRINUSE` stack trace. ([#81])
 - The admin "Allowed origins" textarea had no accessible name — the section
   heading above it is not a label. It now carries an explicit one, targeted
   by the new `admin-edit-tenant-settings` use case. ([#66])
@@ -38,6 +47,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#81]: https://github.com/AFixt/livechat/issues/81
 
 ## [0.2.0] - 2026-07-23
 

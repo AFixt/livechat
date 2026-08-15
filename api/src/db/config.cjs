@@ -3,6 +3,17 @@
 // out-of-band (migrations) and may legitimately run with a subset of the
 // full app env.
 
+// Load api/.env for local `npm run migrate`/`seed` so a clean clone works
+// (#81). dotenv never overrides already-set variables, so CI/production (which
+// supply env directly) are unaffected; production never reads the file.
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    require('dotenv').config();
+  } catch {
+    // dotenv is a dependency; this guard only protects an unusual install.
+  }
+}
+
 // TLS is opt-in via DB_SSL so migrations against local docker-compose stay
 // plaintext; in production it verifies the server cert against DB_SSL_CA (the
 // provider's CA PEM) when supplied. Mirrors api/src/config/mysql.ts.
