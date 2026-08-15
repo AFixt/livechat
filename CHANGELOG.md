@@ -20,8 +20,24 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   `admin-view-invitations` and `support-toggle-alert-sound` join the
   runnable e2e projects.
 
+- **Security regression test suite** ([#64], part of the security-baseline
+  program): asserts the error envelope never leaks a stack trace, internal
+  message, SQL, or filesystem path; that malformed/oversized/wrong-typed and
+  injection-ish request bodies are rejected as 4xx (not 500) on the auth and
+  visitor routes; that the visitor session cookie carries `HttpOnly` +
+  `SameSite=Lax` (and `Secure` in production) and that a forged/tampered signed
+  cookie is refused; and that `/staff` (missing/malformed/expired/wrong-secret
+  token) and `/visitor` (forged cookie) Socket.IO handshakes are refused.
+
 ### Fixed
 
+- **Malformed and oversized request bodies now return a client 4xx, not 500**
+  ([#64]). Body-parser failures (invalid JSON, a payload beyond the 1 MB JSON
+  limit, unsupported charset) previously fell through to the generic
+  `500 Internal server error` branch. The error handler now maps them to
+  `400 Malformed request body` / `413 Request payload too large` /
+  `415 Unsupported media type` with a fixed, non-leaking message (the offending
+  payload slice body-parser puts in `err.message` is never echoed).
 - The admin "Allowed origins" textarea had no accessible name — the section
   heading above it is not a label. It now carries an explicit one, targeted
   by the new `admin-edit-tenant-settings` use case. ([#66])
@@ -36,6 +52,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
+[#64]: https://github.com/AFixt/livechat/issues/64
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
 
