@@ -11,6 +11,18 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Added
 
+- **Custom Semgrep rules** ([#83]) in `.semgrep/rules.yml`, wired into the gate
+  by `scripts/semgrep.sh` alongside the registry packs. Seven project-specific
+  rules the public packs miss: chat lookups must go through the tenant-scoped
+  service, tenant-owned model lookups in handlers need a scoping predicate,
+  permissive CORS origin (`origin: true` / `'*'`), CORS reflecting the request
+  Origin header, `jwt.verify` without an `algorithms` pin, `jwt.decode` where
+  verification is required, and cookies set without `httpOnly` + `secure`. Rule
+  fixtures under `.semgrep/tests/` are validated by `semgrep --test`. The
+  `jwt-verify-without-algorithm-pin` rule immediately caught three unpinned
+  verifiers (see Fixed). `scripts/semgrep.sh` now skips gracefully when semgrep
+  is not on PATH and excludes the fixtures dir from the scan.
+
 - **Use-case coverage for eleven previously undocumented interactions**
   ([#66]): widget invitation state (§5.1.2, open + dismiss), widget
   chat-ended / email-transcript state (§5.1.7, send + decline), operator
@@ -35,9 +47,17 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   reconnect to the replacement instance), idle connections are dropped, and the
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
+- **JWT verification now pins `algorithms: ['HS256']`** at all three verify
+  call sites — `middlewares/authenticate.ts`, `io/staff-namespace.ts`, and
+  `services/auth-service.ts` — surfaced by the new
+  `jwt-verify-without-algorithm-pin` Semgrep rule. Without a pin, `jwt.verify`
+  accepts whatever algorithm the token header claims (algorithm-confusion /
+  `alg: none` footgun). All tokens are signed HS256, so the pin is a pure
+  hardening with no behavior change. ([#83])
 
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#83]: https://github.com/AFixt/livechat/issues/83
 
 ## [0.2.0] - 2026-07-23
 

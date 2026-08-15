@@ -1,0 +1,265 @@
+# Project-specific Semgrep rules for AFixt livechat.
+#
+# These encode defects that the public registry packs (`p/javascript`,
+# `p/owasp-top-ten`, `p/nodejsscan`, …) do NOT catch: the Socket.IO / route
+# authorization boundary, the tenant-scoping boundary, our CORS posture, and a
+# handful of JWT / cookie footguns specific to this codebase's conventions.
+#
+# Wired into the gate by `scripts/semgrep.sh` via `--config=.semgrep/rules.yml`
+# alongside the registry packs.
+#
+# Validate:   semgrep --validate --config .semgrep/rules.yml
+# Unit-test:  semgrep --test --config .semgrep/rules.yml .semgrep/tests/
+# Scan repo:  bash scripts/semgrep.sh   (runs these + the registry packs)
+#
+# MERGE NOTE: the first rule below (`chat-lookup-must-go-through-scoped-service`)
+# is ALSO introduced by PR #87 (issue #72), which creates this same
+# `.semgrep/rules.yml` with that single rule. When #87 and this branch both
+# land, the two definitions of that rule id must be de-duplicated into one —
+# keep a single copy and preserve the additional rules from this file.
+
+rules:
+  # ---------------------------------------------------------------------------
+  # 1. Chat lookups must go through the tenant-scoped chat service.
+  #    (Re-stated from PR #87 / issue #72 — see MERGE NOTE above.)
+  #
+  #    Reading Chat / ChatMessage rows directly in a socket or route handler
+  #    bypasses the ownership checks that `services/chat-service.ts` performs
+  #    (visitor-session / tenant scoping). All chat reads must flow through the
+  #    service so the tenant boundary is enforced in exactly one place.
+  # ---------------------------------------------------------------------------
+  - id: chat-lookup-must-go-through-scoped-service
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      Direct Chat/ChatMessage model lookup in a socket/route handler. Chat reads
+      must go through services/chat-service.ts, which enforces visitor-session
+      and tenant ownership. Call the scoped service instead of the model.
+    metadata:
+      category: security
+      cwe:
+        - 'CWE-639: Authorization Bypass Through User-Controlled Key'
+      owasp:
+        - 'A01:2021 - Broken Access Control'
+      references:
+        - https://github.com/AFixt/livechat/issues/72
+    patterns:
+      - pattern-either:
+          - pattern: 'Chat.findByPk(...)'
+          - pattern: 'Chat.findOne(...)'
+          - pattern: 'Chat.findAll(...)'
+          - pattern: 'ChatMessage.findByPk(...)'
+          - pattern: 'ChatMessage.findOne(...)'
+          - pattern: 'ChatMessage.findAll(...)'
+    paths:
+      include:
+        - api/src/io/
+        - api/src/routes/
+
+  # ---------------------------------------------------------------------------
+  # 2. Tenant-owned model lookups in handlers need a scoping predicate.
+  #
+  #    `findByPk` on a tenant/visitor-owned model is, by construction, an
+  #    unscoped lookup by primary key: it returns the row regardless of which
+  #    tenant or visitor owns it. `findOne` is flagged only when its `where`
+  #    carries no ownership predicate (tenantId / visitor_session_id / chatId).
+  #    Scoped to handlers (io + routes); services and tests are where the
+  #    scoped queries legitimately live, so they are excluded.
+  #
+  #    Chat / ChatMessage are covered by rule 1 above and deliberately left out
+  #    of the model list here to avoid double-flagging the same line.
+  # ---------------------------------------------------------------------------
+  - id: tenant-owned-lookup-needs-scope
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      Unscoped lookup on tenant-owned model `$MODEL` in a handler. `findByPk`
+      ignores tenant/visitor ownership, and this `findOne` has no ownership
+      predicate. Constrain the query by tenant_id / visitor_session_id (or route
+      it through a scoped service) so one tenant cannot read another's rows.
+    metadata:
+      category: security
+      cwe:
+        - 'CWE-639: Authorization Bypass Through User-Controlled Key'
+      owasp:
+        - 'A01:2021 - Broken Access Control'
+    patterns:
+      - pattern-either:
+          - pattern: '$MODEL.findByPk(...)'
+          - patterns:
+              - pattern: '$MODEL.findOne(...)'
+              - pattern-not: '$MODEL.findOne({ where: { ..., tenantId: $T, ... }, ... })'
+              - pattern-not: '$MODEL.findOne({ where: { ..., tenant_id: $T, ... }, ... })'
+              - pattern-not: '$MODEL.findOne({ where: { ..., visitorSessionId: $V, ... }, ... })'
+              - pattern-not: '$MODEL.findOne({ where: { ..., visitor_session_id: $V, ... }, ... })'
+              - pattern-not: '$MODEL.findOne({ where: { ..., chatId: $C, ... }, ... })'
+      - metavariable-regex:
+          metavariable: $MODEL
+          regex: ^(VisitorSession|ChatEvent|ChatAttachment|Invitation)$
+    paths:
+      include:
+        - api/src/io/
+        - api/src/routes/
+
+  # ---------------------------------------------------------------------------
+  # 3. Permissive CORS origin.
+  #
+  #    `origin: true` reflects ANY requesting origin, and `origin: '*'` allows
+  #    all — both defeat the point of an allowlist, and combined with
+  #    `credentials: true` they leak authenticated responses cross-origin. The
+  #    real defect this guards against was unbounded origin reflection.
+  #
+  #    The project's legitimate per-tenant origin check lives in
+  #    `api/src/middlewares/origin-allowed.ts`; it is Express middleware that
+  #    calls `next()` after an allowlist `includes()` check, NOT a `cors()`
+  #    option callback, so it does not (and must not) match these patterns.
+  # ---------------------------------------------------------------------------
+  - id: cors-permissive-origin
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Permissive CORS origin. `origin: true` reflects any requesting origin and
+      `origin: '*'` allows all; with `credentials: true` this exposes
+      authenticated responses cross-origin. Use an explicit allowlist
+      (env-configured or the per-tenant allowed_origins list).
+    metadata:
+      category: security
+      cwe:
+        - 'CWE-942: Permissive Cross-domain Policy with Untrusted Domains'
+      owasp:
+        - 'A05:2021 - Security Misconfiguration'
+    patterns:
+      - pattern-either:
+          # Express cors() middleware.
+          - pattern: 'cors({ ..., origin: true, ... })'
+          - pattern: "cors({ ..., origin: '*', ... })"
+          # Socket.IO server config: { cors: { origin: ... } }.
+          - pattern: 'new Server(..., { ..., cors: { ..., origin: true, ... }, ... })'
+          - pattern: "new Server(..., { ..., cors: { ..., origin: '*', ... }, ... })"
+
+  # ---------------------------------------------------------------------------
+  # 4. CORS origin that reflects the request Origin header.
+  #
+  #    Echoing `req.headers.origin` straight back — either as the `origin`
+  #    value or from inside a `cors()` delegate callback — is unbounded
+  #    reflection: every caller is trusted. Validate against an allowlist and
+  #    pass a boolean/string to the callback, never the raw origin.
+  # ---------------------------------------------------------------------------
+  - id: cors-reflects-request-origin
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      CORS reflects the request Origin header without an allowlist check. This
+      trusts every caller. Compare the origin against an allowlist and return a
+      boolean/allowed value to the cors callback instead of echoing it back.
+    metadata:
+      category: security
+      cwe:
+        - 'CWE-942: Permissive Cross-domain Policy with Untrusted Domains'
+      owasp:
+        - 'A05:2021 - Security Misconfiguration'
+    patterns:
+      - pattern-either:
+          # origin set directly to the reflected header.
+          - pattern: 'cors({ ..., origin: $REQ.headers.origin, ... })'
+          - pattern: 'new Server(..., { ..., cors: { ..., origin: $REQ.headers.origin, ... }, ... })'
+          # cors() delegate that reflects the origin arg or unconditionally allows.
+          - patterns:
+              - pattern-inside: 'cors({ ..., origin: ($ORIGIN, $CB) => { ... }, ... })'
+              - pattern-either:
+                  - pattern: '$CB(null, $ORIGIN)'
+                  - pattern: '$CB(null, true)'
+
+  # ---------------------------------------------------------------------------
+  # 5. JWT verified without pinning the algorithm.
+  #
+  #    `jwt.verify(token, secret)` accepts whatever `alg` the token header
+  #    claims. Pin `algorithms` so a token cannot select an unexpected
+  #    algorithm (the classic RS256->HS256 confusion, or `alg: none` on older
+  #    libraries). All tokens in this codebase are HS256.
+  # ---------------------------------------------------------------------------
+  - id: jwt-verify-without-algorithm-pin
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      jwt.verify() without an `algorithms` allowlist. The verifier will accept
+      whatever algorithm the token header claims. Pass
+      `{ algorithms: ['HS256'] }` so the algorithm cannot be attacker-selected.
+    metadata:
+      category: security
+      cwe:
+        - 'CWE-347: Improper Verification of Cryptographic Signature'
+      owasp:
+        - 'A02:2021 - Cryptographic Failures'
+    patterns:
+      - pattern-either:
+          # Two-arg form: no options object at all.
+          - pattern: 'jwt.verify($TOKEN, $SECRET)'
+          # Options object present but with no `algorithms` key.
+          - patterns:
+              - pattern: 'jwt.verify($TOKEN, $SECRET, { ... })'
+              - pattern-not: 'jwt.verify($TOKEN, $SECRET, { ..., algorithms: $ALGS, ... })'
+
+  # ---------------------------------------------------------------------------
+  # 6. jwt.decode() where verification is required.
+  #
+  #    `jwt.decode` does NOT verify the signature — it just base64-decodes the
+  #    payload. Trusting its output for auth/identity is a signature-bypass.
+  #    Use `jwt.verify`. (Guardrail: no current call sites, prevents regressions.)
+  # ---------------------------------------------------------------------------
+  - id: jwt-decode-instead-of-verify
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      jwt.decode() does not verify the signature. If this token is used for
+      authentication or identity, an attacker can forge it. Use jwt.verify()
+      with a secret and an `algorithms` allowlist.
+    metadata:
+      category: security
+      cwe:
+        - 'CWE-347: Improper Verification of Cryptographic Signature'
+      owasp:
+        - 'A02:2021 - Cryptographic Failures'
+    patterns:
+      - pattern: 'jwt.decode(...)'
+
+  # ---------------------------------------------------------------------------
+  # 7. Cookies set without httpOnly + secure.
+  #
+  #    Session/auth cookies (the signed visitor session id, refresh cookies)
+  #    must be `httpOnly` (no JS access -> XSS can't exfiltrate them) and
+  #    `secure` (HTTPS-only). Flags a `res.cookie()` with no options, or one
+  #    whose options omit either flag. Scoped to server-side handlers.
+  # ---------------------------------------------------------------------------
+  - id: cookie-missing-httponly-secure
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Cookie set without `httpOnly` and/or `secure`. Session/auth cookies must
+      be `httpOnly: true` (blocks JS/XSS access) and `secure` (HTTPS-only; gate
+      on NODE_ENV for local dev). Add both flags to the res.cookie() options.
+    metadata:
+      category: security
+      cwe:
+        - 'CWE-1004: Sensitive Cookie Without HttpOnly Flag'
+        - 'CWE-614: Sensitive Cookie Without Secure Flag'
+      owasp:
+        - 'A05:2021 - Security Misconfiguration'
+    patterns:
+      - pattern-either:
+          # No options object at all.
+          - pattern: '$RES.cookie($NAME, $VALUE)'
+          # Options object missing httpOnly.
+          - patterns:
+              - pattern: '$RES.cookie($NAME, $VALUE, { ... })'
+              - pattern-not: '$RES.cookie($NAME, $VALUE, { ..., httpOnly: $H, ... })'
+          # Options object missing secure.
+          - patterns:
+              - pattern: '$RES.cookie($NAME, $VALUE, { ... })'
+              - pattern-not: '$RES.cookie($NAME, $VALUE, { ..., secure: $S, ... })'
+    paths:
+      include:
+        - api/src/io/
+        - api/src/routes/
+        - api/src/middlewares/
+        - api/src/controllers/
