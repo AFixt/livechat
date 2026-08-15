@@ -36,8 +36,22 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
+### Security
+
+- Two-tier secret scanning. The verified/blocking trufflehog gate is unchanged;
+  a new suspected (unverified/unknown) tier reports without blocking, via
+  `scripts/secret-scan.sh` + `security:secrets:suspected`. A
+  `.secrets.baseline` (detect-secrets) records known false positives so the
+  suspected tier is actionable, checked by `scripts/detect-secrets.sh` +
+  `security:secrets:baseline`; `.trufflehog-exclude.txt` is the trufflehog-native
+  path allow-list. A `.pre-commit-config.yaml` wires the detect-secrets baseline
+  hook (husky stays the enforced gate); the husky pre-commit now runs both tiers
+  on staged files. PR-time `.github/workflows/secret-scan.yml` surfaces the
+  suspected tier without blocking. (ADR-0012, [#82])
+
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#82]: https://github.com/AFixt/livechat/issues/82
 
 ## [0.2.0] - 2026-07-23
 
