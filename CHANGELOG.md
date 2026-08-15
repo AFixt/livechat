@@ -36,8 +36,22 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
+### Security
+
+- **`POST /widget/csp-report` is no longer an unvalidated public log sink.** The
+  unauthenticated endpoint previously logged whatever was posted — a
+  log-injection and unbounded-log DoS vector. It now validates the body against
+  a Zod schema (both the classic `application/csp-report` object form and the
+  Reporting-API `report-to` array), rejects anything that doesn't match with a
+  400, caps the body at 8 KB with its own parser (413 over that, overriding the
+  global 1 MB limit), rate-limits per IP (60/min), and logs only a bounded,
+  whitelisted set of fields — never the raw body, the original policy, or the
+  violation sample. Also adds an owned, commented OWASP ZAP baseline rule set
+  (`.github/zap/rules.tsv`) and `docs/security/zap.md`. ([#84])
+
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#84]: https://github.com/AFixt/livechat/issues/84
 
 ## [0.2.0] - 2026-07-23
 
