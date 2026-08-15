@@ -2,11 +2,11 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { ApiError } from '../utils/api-error.js';
 
+import { readVisitorSessionValue } from './visitor-request.js';
+
 import type { Env } from '../config/env.js';
 import type { RequestHandler } from 'express';
 
-/** The visitor session cookie name (mirrors `routes/visitor.ts`). */
-const VISITOR_COOKIE_NAME = 'livechat_visitor';
 /** Header the widget echoes the CSRF token in (already in the CORS allowlist). */
 const CSRF_HEADER = 'x-xsrf-token';
 
@@ -50,9 +50,7 @@ function safeEqual(a: string, b: string): boolean {
  */
 export function csrfProtection(env: Pick<Env, 'COOKIE_SECRET'>): RequestHandler {
   return (req, _res, next) => {
-    const cookies = req.cookies as Record<string, unknown>;
-    const rawCookie = cookies[VISITOR_COOKIE_NAME];
-    const cookie = typeof rawCookie === 'string' ? rawCookie : undefined;
+    const cookie = readVisitorSessionValue(req);
     // No ambient cookie credential means nothing to forge — let the route's own
     // auth check produce the 401.
     if (cookie === undefined) {

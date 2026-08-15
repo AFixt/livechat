@@ -21,6 +21,51 @@ export function setCsrfToken(token: string): void {
   csrfToken = token;
 }
 
+/** First-party storage key for the visitor session token (#75). */
+const SESSION_STORAGE_KEY = 'afixt.livechat.session';
+
+/**
+ * Visitor session token for the third-party-cookie fallback (#75). When the
+ * browser blocks the cross-site cookie (Safari ITP, Firefox TCP), the widget
+ * resends this value — first-party storage of the visitor's own session — as
+ * `X-Visitor-Session`. See ADR-0012.
+ */
+let sessionToken: string | null = readStoredSession();
+
+/**
+ * Read the persisted session token from first-party storage, tolerating
+ * environments where storage is unavailable.
+ * @returns The stored token, or null.
+ */
+function readStoredSession(): string | null {
+  try {
+    return window.localStorage.getItem(SESSION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Record the visitor session token, persisting it for later page loads.
+ * @param token - The signed session value from a bootstrap response.
+ */
+export function setSessionToken(token: string): void {
+  sessionToken = token;
+  try {
+    window.localStorage.setItem(SESSION_STORAGE_KEY, token);
+  } catch {
+    // Storage blocked/full — the in-memory copy still serves this page load.
+  }
+}
+
+/**
+ * The current visitor session token, for the socket handshake `auth` payload.
+ * @returns The token, or null if no session yet.
+ */
+export function getSessionToken(): string | null {
+  return sessionToken;
+}
+
 /**
  * Minimal fetch wrapper — cookie-authed, credentials: 'include' so the
  * signed visitor cookie is sent on every request. No axios dependency
@@ -40,6 +85,11 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   if (csrfToken !== null && !headers.has('X-XSRF-TOKEN')) {
     headers.set('X-XSRF-TOKEN', csrfToken);
   }
+  // Send the session token when the browser blocks the third-party cookie
+  // (#75). Ignored by the server when the cookie is present.
+  if (sessionToken !== null && !headers.has('X-Visitor-Session')) {
+    headers.set('X-Visitor-Session', sessionToken);
+  }
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     credentials: 'include',
@@ -56,6 +106,7 @@ interface InitSessionResponse {
   sessionId: string;
   tenantId: string;
   csrfToken: string;
+  sessionToken: string;
 }
 
 /**
@@ -75,6 +126,7 @@ export async function initVisitorSession(tenantKey: string): Promise<InitSession
   });
   if (body.data === undefined) throw new Error('No session returned');
   setCsrfToken(body.data.csrfToken);
+  setSessionToken(body.data.sessionToken);
   return body.data;
 }
 
@@ -121,6 +173,8 @@ interface CurrentChat {
   messages: CurrentChatMessage[];
   /** Present for a returning visitor who never re-calls /session (#77). */
   csrfToken?: string;
+  /** Echoed session token so it can be persisted for the header fallback (#75). */
+  sessionToken?: string;
 }
 
 /**
@@ -131,5 +185,6 @@ interface CurrentChat {
 export async function fetchCurrentChat(): Promise<CurrentChat> {
   const body = await apiFetch<CurrentChat>('/visitor/chats/current', { method: 'GET' });
   if (body.data?.csrfToken !== undefined) setCsrfToken(body.data.csrfToken);
+  if (body.data?.sessionToken !== undefined) setSessionToken(body.data.sessionToken);
   return body.data ?? { chat: null, messages: [] };
 }

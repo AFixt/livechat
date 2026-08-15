@@ -9,6 +9,20 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The widget's visitor session survives cross-site embedding.** The session
+  cookie was `SameSite=Lax`, so browsers never sent it from an embedded widget —
+  the visitor was unauthenticated on every call after the first and the socket
+  handshake had no cookie. The cookie is now `SameSite=None; Secure; Partitioned`
+  in production (`Lax` in local HTTP dev, so no insecure `None` is ever emitted).
+  Because Safari/Firefox block third-party cookies outright, the widget also
+  persists the session token in first-party storage and resends it as
+  `X-Visitor-Session` (and `auth.cookie` on the socket handshake); the API
+  resolves the session from that header first, then the cookie — see
+  [ADR-0012](docs/adr/0012-visitor-session-third-party-cookie-fallback.md).
+  Requires #74 (CORS) and #77 (CSRF), both landed. ([#75])
+
 ### Security
 
 - **CSRF protection on cookie-authenticated visitor routes.** The API had no CSRF
@@ -50,6 +64,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#75]: https://github.com/AFixt/livechat/issues/75
 [#77]: https://github.com/AFixt/livechat/issues/77
 
 ## [0.2.0] - 2026-07-23
