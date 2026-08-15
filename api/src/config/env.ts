@@ -1,4 +1,4 @@
-import { bool, cleanEnv, host, port, str, url } from 'envalid';
+import { bool, cleanEnv, host, num, port, str, url } from 'envalid';
 
 /**
  * Env spec used by {@link loadEnv}.
@@ -33,6 +33,17 @@ const envSpec = {
   JWT_REFRESH_EXPIRES_IN: str({ default: '7d' }),
 
   COOKIE_SECRET: str(),
+
+  // Visitor data retention. `VISITOR_DATA_RETENTION_DAYS` is the window after a
+  // visitor session is last seen before the retention job purges it; the
+  // strategy chooses whether expired sessions are anonymized (PII stripped,
+  // row kept for transcript integrity) or hard-deleted (cascading to chats).
+  // See docs/adr/0011-geo-retention-minimization.md and docs/privacy/.
+  VISITOR_DATA_RETENTION_DAYS: num({ default: 90 }),
+  VISITOR_DATA_RETENTION_STRATEGY: str({
+    choices: ['anonymize', 'delete'] as const,
+    default: 'anonymize' as const,
+  }),
 
   APP_URL: url(),
   API_URL: url(),

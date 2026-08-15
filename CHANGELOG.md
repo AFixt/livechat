@@ -9,6 +9,20 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Security
+
+- **Visitor data retention & minimization.** IP, geo, URL, referrer and
+  user-agent were stored on `visitor_sessions` indefinitely. Now:
+  - **Minimized at capture** — `api/src/utils/pii-minimize.ts` truncates the IP
+    (last IPv4 octet / last 80 IPv6 bits zeroed) and coarsens geo to
+    country-level before it is persisted, applied in `visitor-session-service`.
+  - **Retention-bound** — a configurable window (`VISITOR_DATA_RETENTION_DAYS`,
+    default 90) and a retention job (`data-retention-service` +
+    `scripts/purge-expired-visitor-data.ts`) anonymize (default) or hard-delete
+    expired sessions. Idempotent; logs counts.
+  - Geolocation record model, lawful basis and rationale documented in
+    [ADR-0011][adr-0011] and `docs/privacy/data-retention.md`. ([#57])
+
 ### Added
 
 - **Use-case coverage for eleven previously undocumented interactions**
@@ -36,8 +50,10 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
+[#57]: https://github.com/AFixt/livechat/issues/57
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[adr-0011]: docs/adr/0011-geo-retention-minimization.md
 
 ## [0.2.0] - 2026-07-23
 
