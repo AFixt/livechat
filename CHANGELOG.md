@@ -9,6 +9,23 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Security
+
+- **Documented risk acceptance for JWT tokens in console `localStorage`**
+  ([#59], part of the security-baseline program). The support console persists
+  the access + refresh token to `localStorage`, which is XSS-exfiltratable. Per
+  the baseline's exception rules this is now an explicit, owner-approved,
+  time-limited acceptance: [ADR-0011] records the risk, the server-side
+  mitigations already in place (15-minute access TTL, refresh rotation, bcrypt-
+  hashed refresh storage, JTI blacklist, session teardown), the compensating
+  controls (no token logging, no `dangerouslySetInnerHTML`, CSP pending #61),
+  the rejected alternatives (httpOnly refresh cookie; BFF; `sessionStorage` —
+  evaluated and found to be no real improvement), and the conditions that force
+  a revisit. A companion note lives at `docs/security/browser-token-storage.md`,
+  and `ui/src/store/auth.test.ts` pins the accepted exception so it cannot drift
+  silently. No storage change — localStorage auth is intentionally left in
+  place per the issue.
+
 ### Added
 
 - **Use-case coverage for eleven previously undocumented interactions**
@@ -36,8 +53,10 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
+[#59]: https://github.com/AFixt/livechat/issues/59
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[ADR-0011]: docs/adr/0011-jwt-localstorage-risk-acceptance.md
 
 ## [0.2.0] - 2026-07-23
 
