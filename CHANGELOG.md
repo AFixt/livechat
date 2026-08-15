@@ -9,6 +9,15 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Security
+
+- **The widget mute-preference cookie now carries `Secure`** ([#58]). The
+  `afixt_livechat_muted` cookie was written with `SameSite=Lax` but no
+  `Secure`, so on the third-party HTTPS pages the widget embeds into it could
+  travel over a downgraded/plaintext connection. It is now `Secure` on any
+  HTTPS origin (omitted only on a plaintext-HTTP origin, i.e. local dev, where
+  the browser would otherwise drop it).
+
 ### Added
 
 - **Use-case coverage for eleven previously undocumented interactions**
@@ -36,6 +45,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
+[#58]: https://github.com/AFixt/livechat/issues/58
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
 
