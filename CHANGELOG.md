@@ -36,6 +36,19 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
+### Security
+
+- **TLS/HTTPS verification harness for deployed environments** ([#63]).
+  `scripts/check-tls.sh` (npm: `npm run security:tls`) verifies a deployed
+  target's transport security: a deep TLS audit via `testssl.sh` (invoked when
+  present, skipped with an install hint otherwise — not vendored), a permanent
+  HTTP→HTTPS redirect (301/308), HSTS with a sane `max-age` +
+  `includeSubDomains`, and `Secure`/`HttpOnly`/`SameSite` on every `Set-Cookie`.
+  It is deployed-only: with no `TLS_TARGET_URL` configured it is a clear no-op
+  that exits 0, so local/PR runs never fail spuriously; it exits non-zero on any
+  failed check so CI can gate it. Documented in `docs/security/tls-verification.md`.
+
+[#63]: https://github.com/AFixt/livechat/issues/63
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
 
