@@ -49,12 +49,15 @@ function requireVisitorCookie(req: Request): string {
 }
 
 /**
- * Ensure a tracked session exists for a `POST /session` call, honoring the
- * consent gate: an existing row is refreshed; a new row is created only when
- * presence tracking is permitted. Returns null when tracking is suppressed.
+ * Ensure a tracked session for a `POST /session` call, honoring the consent
+ * gate. The presence decision is applied **first**: when tracking is suppressed
+ * (opt-in pre-consent, an opt-out, or a GPC signal) this returns null and does
+ * not create, refresh, or return any row — so a universal opt-out stops ambient
+ * tracking for a returning visitor too, not just a first-time one. When tracking
+ * is permitted, an existing row is refreshed and a missing one is created.
  * @param deps - Router deps.
- * @param tenant - The resolved tenant (carries the embed secret).
- * @param ctx - Subject key, presence decision, request body, and request.
+ * @param tenantId - The resolved tenant id.
+ * @param ctx - Subject key, presence decision, identity sub, body, and request.
  * @returns The tracked session, or null when suppressed.
  */
 async function ensureSessionForInit(
@@ -68,12 +71,12 @@ async function ensureSessionForInit(
     req: Request;
   },
 ): Promise<VisitorSession | null> {
+  if (!ctx.presenceGranted) return null;
   const existing = await deps.visitorSession.findBySubjectKey(ctx.subjectKey);
   if (existing !== null) {
     await deps.visitorSession.heartbeat(existing, ctx.body.currentUrl);
     return existing;
   }
-  if (!ctx.presenceGranted) return null;
   return deps.visitorSession.createTracked({
     tenantId,
     subjectKey: ctx.subjectKey,
@@ -161,7 +164,9 @@ async function runSessionInit(
     country,
     region,
     gpc,
-    source: 'default',
+    // A detected universal opt-out is recorded as a GPC-sourced decision so the
+    // audit trail shows the signal, not just a default page-load decision.
+    source: gpc ? 'gpc' : 'default',
     ip,
     userAgent,
   });

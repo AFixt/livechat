@@ -11,6 +11,20 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Security
 
+- **Global Privacy Control is now detected and honored.** `navigator.globalPrivacyControl`
+  was never read and no universal opt-out signal was honored anywhere. Now: ([#55])
+  - The widget reads `navigator.globalPrivacyControl` and sends it to
+    `POST /visitor/session`; the API also honors the `Sec-GPC: 1` request header.
+    Either source counts.
+  - A detected signal feeds the policy engine as a universal opt-out: it
+    suppresses presence/analytics in every jurisdiction, so **no tracked session
+    is created** — and it stops ambient tracking for an already-tracked returning
+    visitor too, not just a first-time one.
+  - The signal is recorded as a `gpc`-sourced consent record (`legal_basis:
+    opt_out`) and audited as `privacy.gpc_detected` + `privacy.gpc_applied`.
+  - Tests: GPC via header and via the widget signal both yield no tracking plus
+    an audited opt-out record; the effective-state GPC true/false paths are unit
+    tested in `consent-policy.test.ts`.
 - **Visitor presence tracking is now gated behind a consent decision.**
   Previously the widget created a `visitor_sessions` row — capturing IP, user
   agent, current URL, and referrer — for every visitor on page load, in every
@@ -80,6 +94,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
 [#53]: https://github.com/AFixt/livechat/issues/53
+[#55]: https://github.com/AFixt/livechat/issues/55
 [#56]: https://github.com/AFixt/livechat/issues/56
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68

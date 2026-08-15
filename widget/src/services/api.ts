@@ -52,12 +52,24 @@ interface InitSessionResponse {
 }
 
 /**
+ * Read the browser's Global Privacy Control signal, if the runtime exposes it.
+ * `navigator.globalPrivacyControl` is `true` when the visitor has enabled a
+ * universal opt-out. Returns `true` only when explicitly set, never a guess.
+ * @returns Whether GPC is enabled.
+ */
+function detectGpc(): boolean {
+  return (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true;
+}
+
+/**
  * POST /api/v1/visitor/session — run the consent gate and (when permitted)
- * boot a tracked visitor session.
+ * boot a tracked visitor session. Sends the browser's GPC signal so a universal
+ * opt-out suppresses tracking before it starts.
  * @param tenantKey - Tenant slug from `data-tenant-key`.
  * @returns The gate decision + session summary.
  */
 export async function initVisitorSession(tenantKey: string): Promise<InitSessionResponse> {
+  const gpc = detectGpc();
   const body = await apiFetch<InitSessionResponse>('/visitor/session', {
     method: 'POST',
     body: JSON.stringify({
@@ -65,6 +77,7 @@ export async function initVisitorSession(tenantKey: string): Promise<InitSession
       currentUrl: window.location.href,
       referrer: document.referrer.length > 0 ? document.referrer : undefined,
       language: navigator.language,
+      ...(gpc && { gpc: true }),
     }),
   });
   if (body.data === undefined) throw new Error('No session returned');
