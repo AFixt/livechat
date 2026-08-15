@@ -9,6 +9,18 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Security
+
+- **CSRF protection on cookie-authenticated visitor routes.** The API had no CSRF
+  protection despite cookie-authenticated state-changing endpoints
+  (`POST /visitor/chats`, `POST /visitor/heartbeat`); only `SameSite=Lax`
+  incidentally blocked the attack — the exact thing #75 must change for the
+  widget. Added a stateless synchronizer token (`X-XSRF-TOKEN`, HMAC-bound to the
+  visitor cookie, held in the widget's memory — never a cookie an attacker can
+  read), issued by the bootstrap endpoints and required on the write routes.
+  Bearer-token (console) routes are exempt — CSRF applies only to ambient
+  credentials. **Unblocks #75.** ([#77])
+
 ### Added
 
 - **Use-case coverage for eleven previously undocumented interactions**
@@ -38,6 +50,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#77]: https://github.com/AFixt/livechat/issues/77
 
 ## [0.2.0] - 2026-07-23
 

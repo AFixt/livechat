@@ -50,7 +50,7 @@ async function loginAs(baseUrl: string, email: string, password: string): Promis
 async function initVisitor(
   baseUrl: string,
   tenantSlug: string,
-): Promise<{ cookie: string; sessionId: string }> {
+): Promise<{ cookie: string; sessionId: string; csrfToken: string }> {
   const res = await request(baseUrl)
     .post('/api/v1/visitor/session')
     .send({ tenantKey: tenantSlug });
@@ -63,7 +63,11 @@ async function initVisitor(
       : [setCookie];
   const visitorCookie = cookies.find((c) => c.startsWith('livechat_visitor='));
   const cookie = visitorCookie?.split(';')[0]?.replace('livechat_visitor=', '') ?? '';
-  return { cookie, sessionId: res.body.data.sessionId as string };
+  return {
+    cookie,
+    sessionId: res.body.data.sessionId as string,
+    csrfToken: res.body.data.csrfToken as string,
+  };
 }
 
 function waitFor<T>(socket: Socket, event: string, timeoutMs = 3000): Promise<T> {
@@ -97,11 +101,12 @@ describe('chat flow (integration)', () => {
     const { baseUrl } = harness;
     await seedTenantAndStaff('acme', 'staff@acme.example');
     const accessToken = await loginAs(baseUrl, 'staff@acme.example', 'Staff!Password1');
-    const { cookie: visitorCookie } = await initVisitor(baseUrl, 'acme');
+    const { cookie: visitorCookie, csrfToken } = await initVisitor(baseUrl, 'acme');
 
     const initRes = await request(baseUrl)
       .post('/api/v1/visitor/chats')
       .set('cookie', `livechat_visitor=${visitorCookie}`)
+      .set('X-XSRF-TOKEN', csrfToken)
       .send({ customerName: 'Visitor One', body: 'Hello, I need help' });
     expect(initRes.status).toBe(201);
     const chatId = initRes.body.data.chat.id as string;
@@ -167,11 +172,12 @@ describe('chat flow (integration)', () => {
     await seedTenantAndStaff('beta', 'b-staff@beta.example');
 
     const staffAToken = await loginAs(baseUrl, 'a-staff@alpha.example', 'Staff!Password1');
-    const { cookie: bVisitorCookie } = await initVisitor(baseUrl, 'beta');
+    const { cookie: bVisitorCookie, csrfToken } = await initVisitor(baseUrl, 'beta');
 
     const initRes = await request(baseUrl)
       .post('/api/v1/visitor/chats')
       .set('cookie', `livechat_visitor=${bVisitorCookie}`)
+      .set('X-XSRF-TOKEN', csrfToken)
       .send({ customerName: 'B Visitor', body: 'Hello from beta' });
     expect(initRes.status).toBe(201);
     const betaChatId = initRes.body.data.chat.id as string;
@@ -209,13 +215,14 @@ describe('chat flow (integration)', () => {
     const { baseUrl, redis } = harness;
     await seedTenantAndStaff('gamma', 'g-staff@gamma.example');
     const accessToken = await loginAs(baseUrl, 'g-staff@gamma.example', 'Staff!Password1');
-    const { cookie: visitorCookie, sessionId } = await initVisitor(baseUrl, 'gamma');
+    const { cookie: visitorCookie, sessionId, csrfToken } = await initVisitor(baseUrl, 'gamma');
 
     // no_support: with no staff online, initiate reports supportAvailable=false.
     await redis.del('presence:staff:available');
     const offlineRes = await request(baseUrl)
       .post('/api/v1/visitor/chats')
       .set('cookie', `livechat_visitor=${visitorCookie}`)
+      .set('X-XSRF-TOKEN', csrfToken)
       .send({ customerName: 'Gamma Visitor', body: 'anyone home?' });
     expect(offlineRes.status).toBe(201);
     expect(offlineRes.body.data.supportAvailable).toBe(false);
@@ -241,6 +248,7 @@ describe('chat flow (integration)', () => {
     const onlineRes = await request(baseUrl)
       .post('/api/v1/visitor/chats')
       .set('cookie', `livechat_visitor=${visitorCookie}`)
+      .set('X-XSRF-TOKEN', csrfToken)
       .send({ customerName: 'Gamma Visitor', body: 'still here?' });
     expect(onlineRes.body.data.supportAvailable).toBe(true);
 
