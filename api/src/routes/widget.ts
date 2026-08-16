@@ -24,6 +24,9 @@ const CSP_REPORT_CONTENT_TYPES = [
 /** Hard cap on a CSP-report body — reports are tiny; anything larger is abuse. */
 const CSP_REPORT_BODY_LIMIT = '8kb';
 
+/** {@link CSP_REPORT_BODY_LIMIT} in bytes, for the Content-Length pre-check. */
+const CSP_REPORT_BODY_LIMIT_BYTES = 8 * 1024;
+
 /** Dependencies for the widget router. */
 export interface WidgetRouterDeps {
   /** Shared Redis client, for the CSP-report rate limiter. */
@@ -35,6 +38,29 @@ export interface WidgetRouterDeps {
 const noopMiddleware: RequestHandler = (_req, _res, next) => {
   next();
 };
+
+/**
+ * Reject an oversized CSP report by its declared `Content-Length` before any
+ * body is read. The route's own `express.json` enforces the same 8 KB limit
+ * while parsing the browser content types, but a client can also POST
+ * `application/json`, which the app-level 1 MB parser consumes first — leaving
+ * the route parser a no-op. This guard keeps the tighter cap authoritative for
+ * every content type that advertises a length. (A chunked request with no
+ * `Content-Length` still falls back to the global 1 MB limit, same as every
+ * other JSON endpoint.)
+ * @returns Express middleware; 413 when the declared body is too large.
+ */
+function enforceCspReportSize(): RequestHandler {
+  return (req, _res, next) => {
+    const header = req.headers['content-length'];
+    const length = header === undefined ? 0 : Number.parseInt(header, 10);
+    if (Number.isFinite(length) && length > CSP_REPORT_BODY_LIMIT_BYTES) {
+      next(new ApiError(413, 'CSP report too large'));
+      return;
+    }
+    next();
+  };
+}
 
 /**
  * Parse the CSP-report body with a tight size cap, translating body-parser
@@ -68,10 +94,10 @@ function parseCspReportBody(): RequestHandler {
  * @returns Express handler.
  */
 function cspReportHandler(): RequestHandler {
-  return (req, res) => {
+  return (req, res, next) => {
     const parsed = cspReportSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).end();
+      next(ApiError.badRequest('Malformed CSP report'));
       return;
     }
     // pino-http attaches a request-scoped logger (carries the correlation id).
@@ -126,7 +152,13 @@ export function buildWidgetRouter(deps: WidgetRouterDeps): Router {
   // body-size cap (its own express.json overriding the global 1mb limit), a
   // Zod schema that rejects anything not shaped like a CSP report, and logging
   // restricted to whitelisted fields.
-  router.post('/csp-report', cspLimit, parseCspReportBody(), cspReportHandler());
+  router.post(
+    '/csp-report',
+    cspLimit,
+    enforceCspReportSize(),
+    parseCspReportBody(),
+    cspReportHandler(),
+  );
 
   return router;
 }

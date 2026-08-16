@@ -108,4 +108,27 @@ describe('POST /widget/csp-report', () => {
       .send(JSON.stringify({ 'csp-report': { 'document-uri': `https://a/${'x'.repeat(9000)}` } }));
     expect(res.status).toBe(413);
   });
+
+  // The route parser only sees the browser content types; the app-level 1 MB
+  // parser consumes `application/json` first. The Content-Length guard must keep
+  // the 8 KB cap authoritative for that content type too — not silently defer to
+  // the global limit.
+  it('rejects an over-length application/json body (413), not the global 1mb', async () => {
+    const { app, logs } = buildTestApp();
+    const res = await request(app)
+      .post('/widget/csp-report')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ 'csp-report': { 'document-uri': `https://a/${'x'.repeat(9000)}` } }));
+    expect(res.status).toBe(413);
+    expect(logs.find((l) => l.msg === 'csp violation report')).toBeUndefined();
+  });
+
+  it('accepts a small application/json report (204)', async () => {
+    const { app } = buildTestApp();
+    const res = await request(app)
+      .post('/widget/csp-report')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ 'csp-report': { 'document-uri': 'https://client.example.com/p' } }));
+    expect(res.status).toBe(204);
+  });
 });
