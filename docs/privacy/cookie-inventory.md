@@ -52,6 +52,20 @@ Consequently the **only** cookies the widget introduces are the two first-party
 functional/preference cookies listed above. There are no analytics or
 advertising cookies to disclose.
 
+### Vendor declaration
+
+As the embedded vendor, AFixt declares of the data handled through these
+cookies and the widget:
+
+- **No sale** of personal data.
+- **No sharing** with third parties for their own or cross-context behavioral
+  advertising purposes.
+- **No targeted / cross-context advertising.**
+- **No use for AFixt's own purposes beyond delivering the live-chat service**
+  (operating the chat, correlating a session to its chat history, and honoring
+  the mute preference). Data minimization and retention are governed by the
+  visitor data-retention ADR (ADR-0011, landing with issue #57).
+
 ## CMP / consent
 
 Because both cookies are strictly-necessary/functional, most consent regimes
