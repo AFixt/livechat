@@ -53,6 +53,59 @@ async function seedTenantAndStaff(
 }
 
 /**
+ * Create an untenanted "global" AFixt staff user (issue #19) who serves every
+ * tenant. Their availability is bucketed globally, not under a single tenant.
+ * @param email - Staff login email.
+ * @returns The global staff user id.
+ */
+async function seedGlobalStaff(email: string): Promise<{ userId: string }> {
+  const user = await User.create({
+    email,
+    passwordHash: STAFF_PASSWORD,
+    firstName: 'Glo',
+    lastName: 'Bal',
+    role: 'staff',
+    tenantId: null,
+    status: 'active',
+    emailVerified: true,
+    emailVerificationToken: null,
+    emailVerificationExpires: null,
+    passwordResetToken: null,
+    passwordResetExpires: null,
+    lockedUntil: null,
+    lastLoginAt: null,
+    phone: null,
+    timezone: null,
+    avatarUrl: null,
+    preferences: null,
+  });
+  return { userId: user.id };
+}
+
+/**
+ * Open a connected visitor socket for a tenant, returning the socket once it
+ * has joined its tenant room.
+ * @param baseUrl - Live harness base URL.
+ * @param tenantKey - Tenant slug the visitor session is scoped to.
+ * @returns The connected visitor socket.
+ */
+async function connectVisitor(baseUrl: string, tenantKey: string): Promise<Socket> {
+  const initRes = await request(baseUrl).post('/api/v1/visitor/session').send({ tenantKey });
+  expect(initRes.status).toBe(201);
+  const setCookie = initRes.headers['set-cookie'] as string[] | string | undefined;
+  const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+  const cookie = (cookieHeader ?? '').split(';')[0]?.replace('livechat_visitor=', '') ?? '';
+  const socket = ioClient(`${baseUrl}/visitor`, {
+    path: '/api/socket.io',
+    auth: { cookie },
+    transports: ['websocket'],
+    forceNew: true,
+  });
+  await waitFor(socket, 'connect');
+  return socket;
+}
+
+/**
  * Log in a staff user over HTTP and return the access token.
  * @param baseUrl - Live harness base URL.
  * @param email - Login email.
@@ -229,6 +282,65 @@ describe('staff availability (integration)', () => {
     );
     staffSocket.emit('availability:set', { status: 'available' });
     expect((await visitorSeesAvailable).available).toBe(true);
+
+    staffSocket.disconnect();
+    visitorSocket.disconnect();
+  }, 20_000);
+
+  test('anyStaffAvailable prunes an available agent whose connection has expired', async () => {
+    if (harness === null) return;
+    const { baseUrl, redis, services } = harness;
+    const { tenantId, userId } = await seedTenantAndStaff('avail-prune', 'prune@avail.example');
+    const token = await loginAs(baseUrl, 'prune@avail.example');
+
+    const socket = await connectStaff(baseUrl, token);
+    socket.emit('availability:set', { status: 'available' });
+    await waitFor(socket, 'availability:self');
+    // The agent is available and in the tenant's available set.
+    expect(await redis.sismember(`presence:staff:available:${tenantId}`, userId)).toBe(1);
+
+    // Simulate the connection grace window lapsing (all tabs closed) without an
+    // explicit 'away': the liveness marker expires but set membership lingers.
+    await redis.del(`presence:staff:conn:${userId}`);
+    expect(await services.presence.anyStaffAvailable(tenantId)).toBe(false);
+    // Reading availability opportunistically pruned the stale member.
+    expect(await redis.sismember(`presence:staff:available:${tenantId}`, userId)).toBe(0);
+
+    socket.disconnect();
+  }, 20_000);
+
+  test('an untenanted global agent toggling availability live-pushes to a served tenant visitor', async () => {
+    if (harness === null) return;
+    const { baseUrl } = harness;
+    // A tenant with a connected visitor but NO tenant-scoped agent of its own —
+    // only the untenanted global agent (issue #19) can serve it.
+    await seedTenantAndStaff('avail-global', 'ignored@avail.example');
+    await seedGlobalStaff('global@avail.example');
+    const token = await loginAs(baseUrl, 'global@avail.example');
+
+    const visitorSocket = await connectVisitor(baseUrl, 'avail-global');
+    await settle();
+
+    // The global agent connects; nothing should flip yet (they default away).
+    const staffSocket = await connectStaff(baseUrl, token);
+    await settle();
+
+    // Going available must live-push the §5.1.2 transition to the already-
+    // connected visitor even though the agent belongs to no tenant.
+    const visitorSeesAvailable = waitFor<{ available: boolean }>(
+      visitorSocket,
+      'support:availability_changed',
+    );
+    staffSocket.emit('availability:set', { status: 'available' });
+    expect((await visitorSeesAvailable).available).toBe(true);
+
+    // Going away flips it back (§5.1.4), again pushed live to the visitor.
+    const visitorSeesAway = waitFor<{ available: boolean }>(
+      visitorSocket,
+      'support:availability_changed',
+    );
+    staffSocket.emit('availability:set', { status: 'away' });
+    expect((await visitorSeesAway).available).toBe(false);
 
     staffSocket.disconnect();
     visitorSocket.disconnect();

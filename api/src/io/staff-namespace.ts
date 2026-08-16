@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 
 import { GLOBAL_STAFF_TENANT } from '../services/presence-service.js';
 
-import { broadcastTenantAvailability } from './availability.js';
+import { broadcastGlobalStaffAvailability, broadcastTenantAvailability } from './availability.js';
 import { detach } from './detach.js';
 import { GLOBAL_STAFF_ROOM } from './rooms.js';
 
@@ -84,8 +84,20 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
       detach(deps.logger, 'restoring staff availability failed', async () => {
         // Do NOT auto-mark available on connect: keep the user's persisted,
         // explicit status so availability survives reconnects/reloads.
-        const status = await deps.services.presence.restoreOnConnect(userId, availabilityTenant);
-        nsp.to(`user:${userId}`).emit('availability:self', { status });
+        const restore = (): ReturnType<typeof deps.services.presence.restoreOnConnect> =>
+          deps.services.presence.restoreOnConnect(userId, availabilityTenant);
+        // Global (untenanted) staff serve every tenant (issue #19). If the grace
+        // window lapsed while they were gone, re-livening them here can flip
+        // effective availability for tenants that had no other reachable agent,
+        // so live-push those transitions too (bounded like the toggle path).
+        const status =
+          tenantId === null
+            ? await broadcastGlobalStaffAvailability({
+                io: deps.io,
+                presence: deps.services.presence,
+                apply: restore,
+              })
+            : await restore();
         if (tenantId !== null) {
           await broadcastTenantAvailability({
             io: deps.io,
@@ -93,6 +105,7 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
             tenantId,
           });
         }
+        nsp.to(`user:${userId}`).emit('availability:self', { status });
       });
     }
 
@@ -183,17 +196,28 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
       if (!parsed.success) return;
       const status = parsed.data;
       detach(deps.logger, 'staff availability:set failed', async () => {
-        await deps.services.presence.setAvailability(userId, availabilityTenant, status);
-        // Echo to every tab of this user so the console reflects the change
-        // and multi-tab stays in sync (availability is per-user, not per-tab).
-        nsp.to(`user:${userId}`).emit('availability:self', { status });
-        if (tenantId !== null) {
+        if (tenantId === null) {
+          // Global (untenanted) staff serve every tenant (issue #19): a toggle
+          // here can change availability for many tenants at once. Bound the
+          // fan-out to tenants with a connected visitor whose effective state
+          // actually flips (see broadcastGlobalStaffAvailability).
+          await broadcastGlobalStaffAvailability({
+            io: deps.io,
+            presence: deps.services.presence,
+            apply: () =>
+              deps.services.presence.setAvailability(userId, availabilityTenant, status),
+          });
+        } else {
+          await deps.services.presence.setAvailability(userId, availabilityTenant, status);
           await broadcastTenantAvailability({
             io: deps.io,
             presence: deps.services.presence,
             tenantId,
           });
         }
+        // Echo to every tab of this user so the console reflects the change
+        // and multi-tab stays in sync (availability is per-user, not per-tab).
+        nsp.to(`user:${userId}`).emit('availability:self', { status });
       });
     });
 

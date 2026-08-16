@@ -142,8 +142,27 @@ export function createPresenceService(deps: PresenceDeps) {
       if (members.length === 0) return false;
       const pipeline = deps.redis.pipeline();
       for (const userId of members) pipeline.exists(connKey(userId));
-      const results = await pipeline.exec();
-      return (results ?? []).some(([, live]) => live === 1);
+      const results = (await pipeline.exec()) ?? [];
+      let anyLive = false;
+      const dead: string[] = [];
+      results.forEach(([, live], index) => {
+        const member = members[index];
+        if (member === undefined) return;
+        if (live === 1) anyLive = true;
+        else dead.push(member);
+      });
+      // Opportunistic cleanup: an agent who closed all tabs (connection key
+      // expired) but never went 'away' would otherwise linger in the set
+      // forever. Prune those stale members from both the tenant and global
+      // sets — a no-op where absent, and self-healing since restoreOnConnect
+      // re-adds them if they reconnect still 'available'.
+      if (dead.length > 0) {
+        const cleanup = deps.redis.pipeline();
+        cleanup.srem(availableSetKey(tenantId), ...dead);
+        cleanup.srem(availableSetKey(GLOBAL_STAFF_TENANT), ...dead);
+        await cleanup.exec();
+      }
+      return anyLive;
     },
 
     /**
