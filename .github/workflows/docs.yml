@@ -1,8 +1,10 @@
-name: Docs (scheduled link check)
+name: Docs (link check)
 
 on:
-  schedule:
-    - cron: "0 7 * * 1"
+  pull_request:
+    paths:
+      - "**/*.md"
+      - "docs/**"
   workflow_dispatch:
 
 jobs:
@@ -10,6 +12,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: lycheeverse/lychee-action@v2
+
+      # PR runs check offline (internal anchors and file links) for speed and
+      # determinism — the full external-URL sweep runs in ci.yml's lychee step
+      # and on manual dispatch of this workflow.
+      - name: Link check (offline, PR)
+        if: github.event_name == 'pull_request'
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --no-progress --verbose --offline '**/*.md'
+
+      - name: Link check (full, manual)
+        if: github.event_name == 'workflow_dispatch'
+        uses: lycheeverse/lychee-action@v2
         with:
           args: --no-progress --verbose '**/*.md'

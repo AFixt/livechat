@@ -169,6 +169,19 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Changed
 
+- **No more scheduled GitHub Actions.** All four cron-triggered workflows now
+  run at PR time instead of on a timer, so a failure is attributable to the
+  change that caused it ([#50]):
+  - Link check (`docs.yml`) runs on `pull_request` (path-filtered to Markdown
+    and `docs/`) in offline mode; the full external-URL sweep stays available
+    via manual dispatch and already runs in `ci.yml`.
+  - Lighthouse CI (`lhci.yml`) keeps its existing `pull_request` trigger; only
+    the schedule was removed.
+  - CodeQL (`security.yml`) runs on `pull_request` and on pushes to
+    `main`/`develop`.
+  - The OWASP ZAP baseline (`zap.yml`) scans the PR's own UI build served
+    locally on the runner; scanning a deployed URL remains available via
+    manual dispatch.
 - **Use cases now carry `expected_result`, use `extends` for variants, and cover
   more error paths** ([#85]). Every non-`extends` use case gained an
   `expected_result` stating the observable outcome; the `support/login` and
@@ -215,6 +228,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   `alg: none` footgun). All tokens are signed HS256, so the pin is a pure
   hardening with no behavior change. ([#83])
 
+[#50]: https://github.com/AFixt/livechat/issues/50
 [#54]: https://github.com/AFixt/livechat/issues/54
 [#58]: https://github.com/AFixt/livechat/issues/58
 [#59]: https://github.com/AFixt/livechat/issues/59
