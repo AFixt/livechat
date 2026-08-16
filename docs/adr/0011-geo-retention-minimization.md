@@ -9,10 +9,10 @@
 The widget records a `visitor_sessions` row per site visitor carrying IP
 address, coarse geo (country/city columns), current URL, referrer, user-agent
 and an optional client identity-token subject. Until now these were stored
-indefinitely — the model is soft-delete only, so nothing was ever actually
-erased — and the planned geolocation feature (§3, `requirements.md`) had no
-design describing what location data would be kept, at what granularity, or for
-how long.
+indefinitely — no retention window and no purge job, so a row (and every backup
+that captured it) lived forever — and the planned geolocation feature (§3,
+`requirements.md`) had no design describing what location data would be kept, at
+what granularity, or for how long.
 
 Storing precise IPs and city-level geo indefinitely is personal data held
 without a defined purpose limit or retention period. Under GDPR/CCPA that is a
@@ -46,6 +46,23 @@ product purpose (abuse handling, geo routing, presence):
 | Precise coordinates | No | never captured |
 | Full IP | No | truncated `/24` (v4) or `/48` (v6) |
 | Postal code | No | never captured |
+
+**Planned location record (§7.3).** When IP geolocation lands, the resolved
+location is recorded — alongside the country stored on the session — as a
+minimized record so a support agent can see _how confident_ the location is
+without any precise-location data being retained:
+
+| Field | Purpose |
+| --- | --- |
+| `country` | ISO country code — the only geographic granularity stored. |
+| `detection_method` | How it was resolved: `ip-geolocation`, `browser-locale` (weak), or `unknown`. |
+| `confidence` | Resolver confidence (0–1), for the §7.1/7.2 conflict/fallback rules. |
+| `rule_version` | Version of the resolution ruleset, so records stay interpretable as rules change. |
+| `resolved_at` | Timestamp of resolution. |
+
+Precise coordinates are **opt-in only** (§4.6) and are out of scope here — this
+ADR fixes the storage model to country-level; the resolution hierarchy, the
+unknown-location mode, and their tests land with the geolocation feature itself.
 
 **Retention-bound.** Every visitor session has a bounded lifetime controlled by
 `VISITOR_DATA_RETENTION_DAYS` (default 90). A retention job
@@ -90,8 +107,10 @@ compromise never exposes a precise visitor location or a whole IP.
 - **Hash the IP instead of truncating** — rejected: a salted hash is still a
   stable per-visitor identifier (re-identifiable by brute-forcing the small
   IPv4 space) and loses the network-prefix utility truncation keeps.
-- **No retention job, rely on paranoid soft-delete** — rejected: soft-delete
-  never erases anything; it was the original defect.
+- **No retention job, rely on a soft-delete flag** — rejected: a soft delete
+  only hides a row from the default query scope; the personal data stays in the
+  table and in backups. Indefinite retention was the original defect, and only a
+  purge (anonymize or hard-delete) actually removes the data.
 
 ## Links
 
