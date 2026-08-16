@@ -1,0 +1,25 @@
+id: widget-chat-ended--decline
+title: "Visitor declines the email transcript after support ends the chat"
+extends: widget-chat-ended
+type: extension
+description: |
+  §5.1.7 — declining the transcript offer ("No thanks") must return the
+  widget to its initial closed state without collecting an email address.
+
+  A variant of widget-chat-ended: it reuses the parent's ended-state entry
+  and overrides from the email field onward to take the decline path.
+
+preconditions:
+  - The visitor was in an active chat that a support agent has just ended.
+
+data: {}
+
+# Reuse parent step 1 (the "Chat ended…" prompt), then diverge: instead of
+# entering an email and sending, activate "No thanks" and return to the trigger.
+steps_override:
+  from_step: 2
+  steps:
+    - 'locate: button "No thanks"'
+    - 'focus: button "No thanks"'
+    - 'activate: button "No thanks"'
+    - 'locate: button "Chat with support"'

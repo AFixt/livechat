@@ -1,0 +1,26 @@
+id: support-toggle-alert-sound
+title: "Operator mutes the audible new-message alert"
+type: positive
+description: |
+  §3 requires audible alerts for new messages; WCAG requires the sound to be
+  controllable. The Availability page provides a switch that mutes the alert
+  sound. Toggling it announces the new state through the live region so the
+  change is perceivable non-visually as well.
+
+start_location: "http://localhost:5174/settings/availability"
+
+expected_result: >-
+  The audible new-message alert is muted and the toggle reflects the muted
+  state accessibly.
+
+preconditions:
+  - A staff user is authenticated (see support-login.uc.yaml).
+
+data: {}
+
+steps:
+  - locate: heading "Availability"
+  - locate: checkbox "Alert sound muted"
+  - focus: checkbox "Alert sound muted"
+  - select: checkbox "Alert sound muted"
+  - verify: text "Alert sound muted"
