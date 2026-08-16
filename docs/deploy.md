@@ -103,6 +103,15 @@ rate-limit state is reconstructible.
 - **OWASP ZAP baseline**: weekly against `ZAP_TARGET_URL` (configure as a repo
   variable once a public URL exists).
 
+### API documentation
+
+Swagger UI (`/api/docs`) and the raw OpenAPI document (`/api/docs.json`) are
+served **only when `NODE_ENV !== 'production'`** — publishing the full route and
+schema inventory unauthenticated is free reconnaissance (#78). To read the spec,
+run the API locally or in staging (`NODE_ENV=development`) and open
+`http://localhost:23001/api/docs`, or fetch `/api/docs.json` for the machine-
+readable spec. In production both paths return `404`.
+
 ### Scaling
 
 - **api**: bump `instance_count` in `.do/app.yaml` (currently 2). Redis is

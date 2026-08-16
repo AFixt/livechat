@@ -9,6 +9,15 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Security
+
+- **Swagger UI and the OpenAPI document are no longer served in production.**
+  `/api/docs` (and the raw spec at `/api/docs.json`) published the entire route
+  and schema inventory — including every admin surface — unauthenticated. Both
+  are now mounted only when `NODE_ENV !== 'production'` and return `404` in
+  production; developers read the spec from a local/staging run
+  (`docs/deploy.md`). ([#78])
+
 ### Added
 
 - **Use-case coverage for eleven previously undocumented interactions**
@@ -80,6 +89,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#65]: https://github.com/AFixt/livechat/issues/65
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#78]: https://github.com/AFixt/livechat/issues/78
 [#85]: https://github.com/AFixt/livechat/issues/85
 
 ## [0.2.0] - 2026-07-23
