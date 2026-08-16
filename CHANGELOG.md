@@ -60,6 +60,23 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   exceptions and warns within 30 days; `scripts/security-report.sh` emits
   machine-readable scanner output into a gitignored `security-reports/`.
   Indexed in `docs/security/README.md`.
+- **Container, Dockerfile, and IaC scanning** ([#60]) — Hadolint (Dockerfile
+  lint), Trivy `config` (Dockerfile misconfig), Trivy `image` (built api/ui/
+  widget image vulnerabilities), Checkov (Dockerfile IaC), and KICS
+  (`docker-compose.yml` + `docker-compose.prod.yml` misconfig — the tool that
+  actually scans compose, which Trivy and Checkov do not). Each has a
+  `scripts/*.sh` wrapper and a `security:*` npm script; all but the image build
+  are in the aggregate `security` script, and a PR-time
+  `.github/workflows/container-iac-scan.yml` safety net builds the images and
+  runs every scan. Gate policy (ADR-0016, `security/thresholds.yaml`): image
+  vulnerabilities fail on CRITICAL and warn on HIGH (per #60); IaC/Dockerfile
+  misconfigurations fail on HIGH+CRITICAL (documented deviation — misconfigs are
+  directly fixable and the IaC tools emit no CRITICALs). `.do/app.yaml` is a
+  DigitalOcean spec no scanner structurally covers; it is documented as such
+  rather than scanned for show. Accepted findings carry expiry/revisit dates in
+  `.hadolint.yaml`, `.trivyignore` (`exp:`), and `.checkov.yaml` and are
+  catalogued with owners in `security/exceptions.yaml`; a `HEALTHCHECK` was added
+  to all three Dockerfiles. (ADR-0016)
 - Two-tier secret scanning ([#82]). The verified/blocking trufflehog gate is
   unchanged; a new suspected (unverified/unknown) tier reports without blocking,
   via `scripts/secret-scan.sh` + `security:secrets:suspected`. A
@@ -145,6 +162,11 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Fixed
 
+- **`npm ci --omit=dev` no longer crashes on the `prepare` hook.** The root
+  `prepare` script ran `husky` unconditionally, so any production install — the
+  `api/Dockerfile` runtime image and the `.do/app.yaml` migrate job — failed with
+  `husky: command not found` once devDependencies were omitted. Guarded as
+  `husky || true`, husky's documented pattern for CI/production installs. ([#60])
 - The admin "Allowed origins" textarea had no accessible name — the section
   heading above it is not a label. It now carries an explicit one, targeted
   by the new `admin-edit-tenant-settings` use case. ([#66])
@@ -162,6 +184,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#54]: https://github.com/AFixt/livechat/issues/54
 [#58]: https://github.com/AFixt/livechat/issues/58
 [#59]: https://github.com/AFixt/livechat/issues/59
+[#60]: https://github.com/AFixt/livechat/issues/60
 [#61]: https://github.com/AFixt/livechat/issues/61
 [#62]: https://github.com/AFixt/livechat/issues/62
 [#63]: https://github.com/AFixt/livechat/issues/63

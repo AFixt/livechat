@@ -154,6 +154,84 @@ exceptions:
     status: active
     issue: 51
 
+  # --- container / Dockerfile / IaC scanning (ADR-0016, issue #60) --------
+  # The nginx-image non-root deferral is one decision expressed in three tool
+  # configs (Hadolint DL3002, Trivy AVD-DS-0002, Checkov CKV_DOCKER_3); each is
+  # catalogued separately so removing the suppression from any one config is a
+  # tracked action.
+  - id: hadolint-nginx-root
+    tool: hadolint
+    source: .hadolint.yaml (ignored)
+    rules:
+      - DL3002
+    owner: "@AFixt/security"
+    reason: >-
+      ui/ and widget/ are nginx images that bind privileged port 80 to serve
+      static assets; running unprivileged needs the nginx-unprivileged base +
+      nginx.conf changes owned by a separate workstream. api/ already USER node.
+    added: 2026-08-16
+    expires: 2027-02-16
+    status: active
+    issue: 60
+
+  - id: hadolint-apk-nopin
+    tool: hadolint
+    source: .hadolint.yaml (ignored)
+    rules:
+      - DL3018
+    owner: "@AFixt/security"
+    reason: >-
+      `apk add --no-cache brotli` in ui/Dockerfile. Alpine package versions track
+      the base image's repo snapshot, so a hard pin breaks on the next base bump
+      for no security gain; --no-cache already avoids a stale index.
+    added: 2026-08-16
+    expires: 2027-02-16
+    status: active
+    issue: 60
+
+  - id: trivy-nginx-root
+    tool: trivy
+    source: .trivyignore (exp:2027-02-16)
+    rules:
+      - AVD-DS-0002
+    owner: "@AFixt/security"
+    reason: >-
+      Same nginx-root deferral as hadolint-nginx-root, expressed for Trivy's
+      `config` misconfig scan of the ui/ and widget/ Dockerfiles.
+    added: 2026-08-16
+    expires: 2027-02-16
+    status: active
+    issue: 60
+
+  - id: checkov-nginx-root
+    tool: checkov
+    source: .checkov.yaml (skip-check)
+    rules:
+      - CKV_DOCKER_3
+    owner: "@AFixt/security"
+    reason: >-
+      Same nginx-root deferral as hadolint-nginx-root, expressed for Checkov's
+      Dockerfile framework. Checkov skip-check has no native expiry; this entry
+      is the lifecycle.
+    added: 2026-08-16
+    expires: 2027-02-16
+    status: active
+    issue: 60
+
+  - id: kics-compose-dev-secrets
+    tool: kics
+    source: scripts/kics.sh (--exclude-queries)
+    rules:
+      - a88baa34-e2ad-44ea-ad6f-8cac87bc7c71 # Passwords And Secrets
+    owner: "@AFixt/security"
+    reason: >-
+      The only hits are the dev-only placeholder secrets in docker-compose.yml
+      (`dev-*-change-me`) that run the LOCAL stack; prod injects real values at
+      runtime. Authoritative secret detection is trufflehog's job (ADR-0008).
+    added: 2026-08-16
+    expires: 2027-02-16
+    status: active
+    issue: 60
   # --- secret scanning (trufflehog suspected tier — warn only) ------------
   - id: trufflehog-suspected-baseline
     tool: trufflehog
@@ -205,23 +283,11 @@ inactive:
     issue: 65
 
 # --- pending: owned by sibling security-baseline PRs (#82-84) -------------
-# These tools/config files do not exist on `develop` yet. When their PRs land
-# and introduce suppressions (`.trivyignore`, checkov `skip` comments, a ZAP
-# ignore list), move each into `exceptions:` above with owner + expiry. This
-# registry is the agreed home for them.
+# When their PRs land and introduce suppressions (a ZAP ignore list), move each
+# into `exceptions:` above with owner + expiry. This registry is the agreed home
+# for them. (The trivy/checkov container-scan suppressions landed with #60 and
+# are catalogued as active entries above.)
 pending:
-  - id: trivy-ignore
-    tool: trivy
-    source: .trivyignore (not yet added)
-    owner: "@AFixt/security"
-    reason: "Reserved — populate when the trivy PR lands (#82-84)."
-    status: pending
-  - id: checkov-skips
-    tool: checkov
-    source: inline `# checkov:skip=...` comments (not yet added)
-    owner: "@AFixt/security"
-    reason: "Reserved — populate when the checkov PR lands (#82-84)."
-    status: pending
   - id: zap-ignore
     tool: owasp-zap
     source: .zap/ ignore rules (owned by the ZAP PR)
