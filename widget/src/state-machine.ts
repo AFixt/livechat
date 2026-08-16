@@ -78,26 +78,37 @@ function appendUnique(messages: WidgetMessage[], message: WidgetMessage): Widget
  * after a reconnect (issue #69). The server list wins; any local optimistic
  * send (`local-` id) that the server has not yet persisted is preserved so an
  * in-flight message posted during the outage is not lost. Optimistic visitor
- * sends the server already recorded are dropped by body match to avoid a
- * duplicate bubble.
+ * sends the server already recorded are dropped to avoid a duplicate bubble.
+ *
+ * The drop is matched by a *count* of each persisted body, not a set: if the
+ * visitor sent the identical text twice but only one copy persisted before the
+ * drop, exactly one optimistic copy is retired against that server row and the
+ * still-in-flight one is kept. A plain `Set` of bodies would silently drop
+ * both, losing the un-persisted message.
  * @param existing - Messages currently in the model.
  * @param incoming - The server transcript (real ids), oldest first.
  * @returns The reconciled, de-duplicated message list.
  */
-function reconcileMessages(
-  existing: WidgetMessage[],
-  incoming: WidgetMessage[],
-): WidgetMessage[] {
+function reconcileMessages(existing: WidgetMessage[], incoming: WidgetMessage[]): WidgetMessage[] {
   const incomingIds = new Set(incoming.map((m) => m.id));
-  const persistedVisitorBodies = new Set(
-    incoming.filter((m) => m.senderKind === 'visitor').map((m) => m.body),
-  );
-  const pending = existing.filter(
-    (m) =>
-      m.id.startsWith('local-') &&
-      !incomingIds.has(m.id) &&
-      !(m.senderKind === 'visitor' && persistedVisitorBodies.has(m.body)),
-  );
+  const persistedVisitorBodyCounts = new Map<string, number>();
+  for (const m of incoming) {
+    if (m.senderKind !== 'visitor') continue;
+    persistedVisitorBodyCounts.set(m.body, (persistedVisitorBodyCounts.get(m.body) ?? 0) + 1);
+  }
+  const pending: WidgetMessage[] = [];
+  for (const m of existing) {
+    if (!m.id.startsWith('local-') || incomingIds.has(m.id)) continue;
+    if (m.senderKind === 'visitor') {
+      const remaining = persistedVisitorBodyCounts.get(m.body) ?? 0;
+      if (remaining > 0) {
+        // Retire one optimistic copy against this persisted server row.
+        persistedVisitorBodyCounts.set(m.body, remaining - 1);
+        continue;
+      }
+    }
+    pending.push(m);
+  }
   return [...incoming, ...pending];
 }
 

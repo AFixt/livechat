@@ -28,7 +28,10 @@ describe('messages_synced reconciliation (#69)', () => {
   it('preserves an in-flight optimistic send the server has not yet recorded', () => {
     const start = {
       ...initialModel(),
-      messages: [msg('real-1', 'earlier', 'visitor'), msg('local-2', 'sent during outage', 'visitor')],
+      messages: [
+        msg('real-1', 'earlier', 'visitor'),
+        msg('local-2', 'sent during outage', 'visitor'),
+      ],
     };
     const next = reduce(start, {
       type: 'messages_synced',
@@ -47,6 +50,34 @@ describe('messages_synced reconciliation (#69)', () => {
       messages: [msg('real-9', 'dup', 'visitor')],
     });
     expect(next.messages.map((m) => m.id)).toEqual(['real-9']);
+  });
+
+  it('keeps one in-flight copy when an identical body was sent twice but only one persisted', () => {
+    // The visitor sent "dup" twice during the outage; the server persisted only
+    // the first. A body-*set* dedup would drop BOTH optimistic copies and lose
+    // the un-persisted one; a count-based drop retires exactly one.
+    const start = {
+      ...initialModel(),
+      messages: [msg('local-1', 'dup', 'visitor'), msg('local-2', 'dup', 'visitor')],
+    };
+    const next = reduce(start, {
+      type: 'messages_synced',
+      messages: [msg('real-1', 'dup', 'visitor')],
+    });
+    expect(next.messages.map((m) => m.id)).toEqual(['real-1', 'local-2']);
+    expect(next.messages.filter((m) => m.body === 'dup')).toHaveLength(2);
+  });
+
+  it('drops both optimistic copies when the server persisted both identical sends', () => {
+    const start = {
+      ...initialModel(),
+      messages: [msg('local-1', 'dup', 'visitor'), msg('local-2', 'dup', 'visitor')],
+    };
+    const next = reduce(start, {
+      type: 'messages_synced',
+      messages: [msg('real-1', 'dup', 'visitor'), msg('real-2', 'dup', 'visitor')],
+    });
+    expect(next.messages.map((m) => m.id)).toEqual(['real-1', 'real-2']);
   });
 
   it('message_received ignores a duplicate id after a backfill', () => {

@@ -23,7 +23,10 @@ interface SocketMessageEvent {
  * @param chatId - The chat to reconcile.
  * @param dispatch - The widget reducer dispatch.
  */
-async function syncTranscript(chatId: string, dispatch: (action: WidgetAction) => void): Promise<void> {
+async function syncTranscript(
+  chatId: string,
+  dispatch: (action: WidgetAction) => void,
+): Promise<void> {
   try {
     const current = await fetchCurrentChat();
     if (current.chat !== null && current.chat.id === chatId) {
@@ -55,7 +58,10 @@ export function useChatConnection(
     // Whether we have dropped since joining, so the first connect (initial
     // join) does not trigger a redundant backfill.
     let droppedSinceJoin = false;
-    socket.emit('chat:join', { chatId });
+    // Join now only if the socket is already up; otherwise `onConnect` fires on
+    // the first connect and joins there — so we never emit `chat:join` twice on
+    // that first connection (harmless server-side, but avoidable).
+    if (socket.connected) socket.emit('chat:join', { chatId });
 
     const onMessage = (msg: SocketMessageEvent): void => {
       if (msg.chatId !== chatId || msg.senderKind === 'visitor') return;
