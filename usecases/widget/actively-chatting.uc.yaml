@@ -8,6 +8,10 @@ description: |
 
 start_location: "http://localhost:5175/"
 
+expected_result: >-
+  The visitor's message is sent and appears in the transcript; inbound
+  messages are announced via a live region.
+
 preconditions:
   - A chat is already active (see widget-customer-initiates.uc.yaml).
 
