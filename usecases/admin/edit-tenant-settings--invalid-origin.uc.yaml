@@ -1,0 +1,29 @@
+id: admin-edit-tenant-settings--invalid-origin
+title: "Allowed-origins rejects a non-URL entry with an accessible error"
+extends: admin-edit-tenant-settings
+type: negative
+description: |
+  §4.1 — the allowed-origins list gates cross-origin widget requests
+  (ADR-0011), so a malformed origin must be rejected rather than saved. The
+  field must expose the error programmatically (aria-invalid +
+  aria-describedby) so a screen-reader user knows the save failed and why.
+
+  A negative variant of admin-edit-tenant-settings: it reuses the parent's
+  navigation and field focus, then enters an invalid value and asserts the
+  error state.
+
+preconditions:
+  - A super_admin user is authenticated.
+  - At least one tenant exists.
+
+data:
+  invalid_origin: "not-a-valid-origin"
+
+# Reuse parent steps 1–8 (open the settings surface, focus the field), then
+# enter an invalid origin, attempt to save, and assert the accessible error.
+steps_override:
+  from_step: 9
+  steps:
+    - 'enter: field "Allowed origins" value "{{ invalid_origin }}"'
+    - 'activate: button "Save"'
+    - 'verify: field_error "Allowed origins"'

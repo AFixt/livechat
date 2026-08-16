@@ -14,6 +14,10 @@ description: |
 
 start_location: "http://localhost:5175/"
 
+expected_result: >-
+  With no agent available the widget shows the offline state and the
+  configured support-hours text, with no live chat composer.
+
 preconditions:
   - No support agent is available for the tenant.
   - The visitor has initiated a chat (name + first message submitted).
