@@ -5,12 +5,11 @@
 # exactly like scripts/semgrep.sh does for static-analysis rules and
 # scripts/npm-audit.sh does for dependency advisories.
 #
-# What it scans: the Dockerfiles and docker-compose*.yml via Checkov's
-# `dockerfile` and `docker_compose` frameworks, plus a secrets sweep that also
-# covers .do/app.yaml (DigitalOcean App Platform has no dedicated Checkov
-# parser, so its structural misconfig is covered by Trivy's `config` scan in
-# scripts/trivy.sh; Checkov's secrets framework still guards app.yaml against
-# committed credentials). All configuration lives in .checkov.yaml.
+# What it scans: the three Dockerfiles (api/ui/widget) via Checkov's
+# `dockerfile` framework. Checkov has no working docker-compose framework, so
+# compose IaC misconfiguration is handled by KICS (scripts/kics.sh), not here,
+# and .do/app.yaml has no Checkov parser at all. All configuration (scope +
+# documented skip-checks) lives in .checkov.yaml.
 #
 # Checkov is a Python tool. We prefer `pipx run checkov` (isolated, no global
 # install) and fall back to a `checkov` already on PATH. It is NOT an npm
@@ -35,6 +34,6 @@ else
   exit 0
 fi
 
-echo "checkov: scanning Dockerfiles + docker-compose + .do/app.yaml"
+echo "checkov: scanning Dockerfiles (api/ui/widget)"
 # --config-file carries the frameworks, directory, and documented skip-checks.
 exec "${RUNNER[@]}" --config-file .checkov.yaml "$@"

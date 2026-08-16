@@ -1,24 +1,36 @@
-# Trivy config — container / filesystem / IaC misconfiguration scanning.
+# Trivy config — Dockerfile / IaC MISCONFIGURATION scanning (`trivy config`).
 # Run: bash scripts/trivy.sh  (npm run security:trivy)
 #
-# Accepted findings are listed, with justification, in .trivyignore (Trivy reads
-# it from the repo root automatically). This file only tunes what/how we scan.
+# WHAT THIS FILE GATES: the `trivy config` misconfiguration scanner only. Trivy
+# `config` walks the repo and evaluates the file types it recognises — here that
+# is the three Dockerfiles (api/ui/widget). It does NOT scan docker-compose files
+# or .do/app.yaml (Trivy reports "supported files not found" for those); compose
+# IaC misconfig is handled by KICS in scripts/kics.sh.
+#
+# Built-IMAGE vulnerability + secret scanning is a SEPARATE pass — it runs
+# `trivy image` against the images produced by `docker build`, configured by CLI
+# flags in scripts/trivy-image.sh, NOT by this file. (This config's `severity`
+# below applies to the misconfig scan.)
+#
+# Accepted misconfig findings are listed, with justification and an `exp:` date,
+# in .trivyignore (Trivy reads it from the repo root automatically) and
+# catalogued in security/exceptions.yaml.
 
-# Fail the gate on HIGH and CRITICAL only. MEDIUM/LOW are reported by CI in the
-# SARIF upload for visibility but do not block, matching the HIGH/CRITICAL
-# threshold used by scripts/npm-audit.sh and security:audit.
+# Fail the gate on HIGH and CRITICAL misconfigurations. NOTE: this is a
+# deliberate deviation from issue #60's "fail CRITICAL, warn HIGH" policy, which
+# applies to the *vulnerability* scan (scripts/trivy-image.sh). Misconfigurations
+# are directly-fixable config defects, and the config scanners emit few/no
+# CRITICALs, so HIGH is treated as fail-closed here. Recorded in
+# security/thresholds.yaml.
 severity:
   - HIGH
   - CRITICAL
 
-# `trivy config` uses the misconfiguration scanner. In CI we additionally run
-# vuln + secret scanners against the built images; those scanners honour this
-# same config file.
+# Only the misconfiguration scanner runs under `trivy config`. Vulnerability and
+# secret scanning of the built images run under `trivy image` (trivy-image.sh).
 scan:
   scanners:
     - misconfig
-    - vuln
-    - secret
 
 misconfiguration:
   # Only surface actual misconfigurations, not the (large) list of passed
