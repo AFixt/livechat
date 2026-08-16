@@ -8,6 +8,10 @@ description: |
 
 start_location: "http://localhost:5175/"
 
+expected_result: >-
+  The widget renders only its closed launcher trigger, reachable by keyboard
+  with an accessible name.
+
 preconditions:
   - The widget script is loaded on the page.
 

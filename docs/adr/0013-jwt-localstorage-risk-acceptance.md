@@ -1,4 +1,4 @@
-# ADR-0011: Accept JWT access + refresh tokens in console localStorage (time-limited)
+# ADR-0013: Accept JWT access + refresh tokens in console localStorage (time-limited)
 
 - **Status:** Accepted
 - **Date:** 2026-08-15

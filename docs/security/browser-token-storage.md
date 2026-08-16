@@ -1,7 +1,7 @@
 # Browser token storage (support console)
 
 Status: **accepted risk, time-limited** — see
-[ADR-0011](../adr/0011-jwt-localstorage-risk-acceptance.md).
+[ADR-0013](../adr/0013-jwt-localstorage-risk-acceptance.md).
 
 ## What we do today
 
@@ -31,19 +31,19 @@ XSS surface small:
   main compensating control still outstanding.
 
 The full rationale, the alternatives (httpOnly refresh cookie; BFF), and the
-conditions that force us to revisit are in ADR-0011.
+conditions that force us to revisit are in ADR-0013.
 
 ## How this is enforced in tests
 
 `ui/src/store/auth.test.ts` asserts the accepted exception explicitly: the
 tokens persist to `localStorage` under `livechat.auth` and nothing is written to
 `sessionStorage`. If the storage model changes, that test changes with it —
-which is the prompt to revisit ADR-0011 rather than let the exception drift
+which is the prompt to revisit ADR-0013 rather than let the exception drift
 silently.
 
 ## When we will change it
 
 When the review-by date passes, when CSP (#61) fails to ship, when the console
 starts rendering untrusted HTML, or when refresh-token lifetime grows — see
-ADR-0011 "Conditions that force a revisit". The intended successor is an
+ADR-0013 "Conditions that force a revisit". The intended successor is an
 httpOnly, `SameSite` refresh cookie with the access token held in memory.

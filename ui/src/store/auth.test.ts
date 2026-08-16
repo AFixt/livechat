@@ -5,15 +5,15 @@ import { useAuthStore } from './auth.js';
 import type { UserSafe } from '@livechat/shared';
 
 /**
- * Documented-exception regression guard for ADR-0011
- * (`docs/adr/0011-jwt-localstorage-risk-acceptance.md`) and issue #59.
+ * Documented-exception regression guard for ADR-0013
+ * (`docs/adr/0013-jwt-localstorage-risk-acceptance.md`) and issue #59.
  *
  * The console deliberately persists the JWT access + refresh tokens to
  * `localStorage`. That is an *accepted, time-limited* risk, not an oversight —
  * so rather than assert "no token in storage", these tests assert the accepted
  * exception **explicitly** (issue #59 acceptance criterion 3). If the storage
  * model changes (e.g. the refresh token moves to an httpOnly cookie), these
- * tests change with it, which is the prompt to revisit ADR-0011.
+ * tests change with it, which is the prompt to revisit ADR-0013.
  */
 
 const STORAGE_KEY = 'livechat.auth';
@@ -37,7 +37,7 @@ function readPersistedState(): { accessToken?: unknown; refreshToken?: unknown }
   return parsed.state ?? null;
 }
 
-describe('auth store — localStorage token persistence (ADR-0011 accepted exception)', () => {
+describe('auth store — localStorage token persistence (ADR-0013 accepted exception)', () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
@@ -54,7 +54,7 @@ describe('auth store — localStorage token persistence (ADR-0011 accepted excep
     const persisted = readPersistedState();
     expect(persisted).not.toBeNull();
     // The accepted exception, pinned: if either of these stops being true, the
-    // storage model has changed and ADR-0011 must be revisited.
+    // storage model has changed and ADR-0013 must be revisited.
     expect(persisted?.accessToken).toBe('access-token-value');
     expect(persisted?.refreshToken).toBe('refresh-token-value');
   });
@@ -67,7 +67,7 @@ describe('auth store — localStorage token persistence (ADR-0011 accepted excep
     });
 
     // The exception is scoped to localStorage only. sessionStorage is not a
-    // real improvement against XSS (see ADR-0011) and must not accrue a second
+    // real improvement against XSS (see ADR-0013) and must not accrue a second
     // copy of the tokens.
     const sessionDump = JSON.stringify(window.sessionStorage);
     expect(sessionDump).not.toContain('access-token-value');
