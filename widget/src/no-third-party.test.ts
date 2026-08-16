@@ -14,7 +14,15 @@ const SRC_DIR = dirname(fileURLToPath(import.meta.url));
 const SCANNED = /\.(ts|tsx|css)$/;
 const IS_TEST = /\.test\.(ts|tsx)$/;
 
-/** Absolute `http(s)://` URLs — simple, linear-time (no nested quantifiers). */
+/**
+ * Absolute `http(s)://` URLs — simple, linear-time (no nested quantifiers).
+ *
+ * Limitation: protocol-relative origins (`//host/…`) are NOT matched here,
+ * because `//` is also the JS line-comment marker and a structural match would
+ * false-positive on ordinary comments. Such a host is still caught if it is in
+ * {@link BANNED_HOSTS}; a novel protocol-relative tracker host would slip past
+ * this scan. The bundle is same-origin-only, so this is an accepted gap.
+ */
 const ABSOLUTE_URL = /https?:\/\/[^\s"'`)]+/gi;
 /** Local dev hosts that are allowed to appear (never shipped to visitors). */
 const LOCAL_HOST = /^https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d+)?/i;
