@@ -13,6 +13,10 @@ description: |
 
 start_location: "http://localhost:5174/"
 
+expected_result: >-
+  The chat is marked ended, the composer is removed, and the ended state is
+  reflected in the console accessibly.
+
 preconditions:
   - A staff user is authenticated (see support-login.uc.yaml).
   - The operator has an active chat selected (established over sockets — see

@@ -21,6 +21,19 @@ matching usecases/**/*.uc.yaml update. Check ONE:
       below. (Use sparingly.)
 -->
 
+## Cookies / storage
+
+<!--
+Per issue #54 and docs/privacy/cookie-inventory.md, every cookie, storage key,
+or browser-persisted value the widget or its visitor API touches must be listed
+in the inventory. Check ONE:
+
+- [ ] This change adds/removes/alters a cookie or browser-storage key — I
+      updated `docs/privacy/cookie-inventory.md` (and the vendor disclosure if
+      the data category changed).
+- [ ] No cookie or browser-storage behavior changed.
+-->
+
 ## Test plan
 
 <!--

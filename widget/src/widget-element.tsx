@@ -1,6 +1,7 @@
 import { render } from 'preact';
 
 import { App } from './app.js';
+import { consentStore, installConsentApi } from './services/consent.js';
 import widgetStyles from './styles.css?inline';
 
 const TAG = 'afixt-livechat';
@@ -27,6 +28,14 @@ export class AfixtLivechatElement extends HTMLElement {
 
     const slot = document.createElement('div');
     this.#root.append(slot);
+
+    // CMP hook: expose `window.AfixtLiveChat.setConsent(...)` for the host
+    // page, and — when `data-require-consent` is present (and not "false") —
+    // hold all analytics/presence capture until consent is granted. Absent the
+    // attribute the widget behaves as before (capture allowed immediately).
+    installConsentApi(consentStore);
+    const requireConsentAttr = this.getAttribute('data-require-consent');
+    consentStore.requireConsent(requireConsentAttr !== null && requireConsentAttr !== 'false');
 
     const tenantKey = this.getAttribute('data-tenant-key') ?? '';
     render(<App tenantKey={tenantKey} />, slot);

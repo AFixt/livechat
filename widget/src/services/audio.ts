@@ -24,10 +24,17 @@ export function isMuted(): boolean {
 
 /**
  * Persist the mute preference in a 30-day cookie.
+ * @remarks
+ * The widget renders on third-party HTTPS pages, so the cookie carries
+ * `Secure` — it must never travel over plaintext HTTP (geo-privacy #58).
+ * `Secure` is omitted only on a plaintext-HTTP origin (local dev), where the
+ * browser would otherwise silently drop the cookie.
  * @param muted - New mute state.
  */
 export function setMuted(muted: boolean): void {
-  document.cookie = `${COOKIE_NAME}=${muted ? '1' : '0'}; Max-Age=${(30 * 24 * 60 * 60).toString()}; Path=/; SameSite=Lax`;
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  const maxAge = (30 * 24 * 60 * 60).toString();
+  document.cookie = `${COOKIE_NAME}=${muted ? '1' : '0'}; Max-Age=${maxAge}; Path=/; SameSite=Lax${secure}`;
 }
 
 let audio: HTMLAudioElement | null = null;

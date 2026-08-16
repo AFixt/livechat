@@ -432,4 +432,68 @@ describe('chat flow (integration)', () => {
 
     sock.disconnect();
   }, 30_000);
+
+  // Issue #72: the span an untenanted AFixt operator (tenant_id null) enjoys is
+  // granted by role, not by omitting the check. This asserts the *allow* side of
+  // `assertChatAccess` — the deny tests above only cover the reject side, so a
+  // future tightening that broke AFixt staff would otherwise pass unnoticed.
+  test('socket authz: untenanted AFixt staff may accept any tenant chat (span by role)', async () => {
+    if (harness === null) return;
+    const { baseUrl } = harness;
+    await seedTenantAndStaff('ua', 'ua-staff@example.com');
+    const globalStaff = await User.create({
+      email: 'ua-global@afixt.example',
+      passwordHash: 'Staff!Password1',
+      firstName: 'Gl',
+      lastName: 'Obal',
+      role: 'staff',
+      tenantId: null,
+      status: 'active',
+      emailVerified: true,
+      emailVerificationToken: null,
+      emailVerificationExpires: null,
+      passwordResetToken: null,
+      passwordResetExpires: null,
+      lockedUntil: null,
+      lastLoginAt: null,
+      phone: null,
+      timezone: null,
+      avatarUrl: null,
+      preferences: null,
+    });
+    const globalToken = await loginAs(baseUrl, 'ua-global@afixt.example', 'Staff!Password1');
+    const { cookie: visitorCookie } = await initVisitor(baseUrl, 'ua');
+
+    const initRes = await request(baseUrl)
+      .post('/api/v1/visitor/chats')
+      .set('cookie', `livechat_visitor=${visitorCookie}`)
+      .send({ customerName: 'UA Visitor', body: 'need help' });
+    expect(initRes.status).toBe(201);
+    const chatId = initRes.body.data.chat.id as string;
+
+    const globalSocket: Socket = ioClient(`${baseUrl}/staff`, {
+      path: '/api/socket.io',
+      auth: { token: globalToken },
+      transports: ['websocket'],
+      forceNew: true,
+    });
+    await waitFor(globalSocket, 'connect');
+
+    let rejected = false;
+    globalSocket.on('chat:error', () => {
+      rejected = true;
+    });
+    const assigned = waitFor<{ chatId: string; assignedTo: string }>(globalSocket, 'chat:assigned');
+    globalSocket.emit('chat:accept', { chatId });
+    const evt = await assigned;
+    expect(evt.chatId).toBe(chatId);
+    expect(evt.assignedTo).toBe(globalStaff.id);
+    expect(rejected).toBe(false);
+
+    const chatAfter = await Chat.findByPk(chatId);
+    expect(chatAfter?.assignedTo).toBe(globalStaff.id);
+    expect(chatAfter?.status).toBe('active');
+
+    globalSocket.disconnect();
+  }, 30_000);
 });

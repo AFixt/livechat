@@ -75,7 +75,14 @@ export function buildRouter(deps: RouterDeps): Router {
       invitation: deps.services.invitation,
     }),
   );
-  router.use('/widget', originAllowed(), buildWidgetRouter());
+  router.use(
+    '/widget',
+    originAllowed(),
+    buildWidgetRouter({
+      redis: deps.redis,
+      ...(deps.skipRateLimit === true && { skipRateLimit: true }),
+    }),
+  );
   router.use(
     '/visitor',
     originAllowed(),

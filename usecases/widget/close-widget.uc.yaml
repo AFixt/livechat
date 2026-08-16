@@ -8,6 +8,9 @@ description: |
 
 start_location: "http://localhost:5175/"
 
+expected_result: >-
+  The widget closes and keyboard focus returns to the launcher trigger.
+
 preconditions:
   - Widget is open (visitor has activated the trigger).
 
