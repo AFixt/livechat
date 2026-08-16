@@ -109,6 +109,19 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   whitelisted set of fields — never the raw body, the original policy, or the
   violation sample. Also adds an owned, commented OWASP ZAP baseline rule set
   (`.github/zap/rules.tsv`) and `docs/security/zap.md`. ([#84])
+- **Socket.IO chat handlers now enforce tenant/visitor ownership.** Every
+  `/staff` and `/visitor` event trusted a client-supplied `chatId` and acted on
+  it with no tenant check, so any authenticated staff user could read, reply to,
+  take over, or end **any** tenant's chat by id, and any visitor could do the
+  same to another visitor's chat. Ownership is now enforced inside
+  `chat-service` (a `ChatCaller` scope on `getById`/`sendMessage`/`endChat`/
+  `assign`), so the HTTP and socket paths share one control and cannot diverge.
+  The `/staff` handshake now runs the full HTTP auth path (JTI blacklist, active
+  status, tenant expiry) and rejects non-staff roles, so a revoked or
+  deactivated token no longer keeps a live socket. Rejections are returned to
+  the caller as a `chat:error` event instead of being silently swallowed, and a
+  custom Semgrep rule (`.semgrep/rules.yml`) keeps chat lookups behind the
+  scoped service. ([#72])
 
 ### Added
 
@@ -269,6 +282,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#65]: https://github.com/AFixt/livechat/issues/65
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#72]: https://github.com/AFixt/livechat/issues/72
 [#74]: https://github.com/AFixt/livechat/issues/74
 [#80]: https://github.com/AFixt/livechat/issues/80
 [ADR-0017]: docs/adr/0017-defer-chat-attachments.md

@@ -29,7 +29,7 @@ const app = createApp({
   ...(env.NODE_ENV === 'test' && { skipRateLimit: true }),
 });
 const server = createServer(app);
-const io = attachIo(server, { env, logger, services });
+const io = attachIo(server, { env, logger, redis, services });
 
 // A port clash otherwise surfaces as an unhandled EADDRINUSE stack trace (#81).
 server.on('error', (err: NodeJS.ErrnoException) => {

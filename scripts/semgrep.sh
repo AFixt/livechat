@@ -41,6 +41,9 @@ CONFIGS=(
   --config=p/owasp-top-ten
   --config=p/security-audit
   --config=p/secrets
+  # Project-specific rules the registry packs cannot express (e.g. the
+  # Socket.IO tenant-authorization invariant from #72).
+  --config=.semgrep/rules.yml
 )
 
 # Project-specific rules (see .semgrep/rules.yml). Added only when present so
