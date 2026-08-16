@@ -89,7 +89,7 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
       // Data minimization at the point of capture: the IP is truncated (last
       // IPv4 octet / last 80 IPv6 bits zeroed) and geolocation is coarsened to
       // country level before it is ever persisted. See pii-minimize.ts and
-      // docs/adr/0011-geo-retention-minimization.md.
+      // docs/adr/0020-geo-retention-minimization.md.
       const geo = coarsenGeo({ country: null, city: null });
       const session = await VisitorSession.create({
         tenantId: tenant.id,

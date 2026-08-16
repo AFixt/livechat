@@ -2,7 +2,7 @@
 
 How AFixt LiveChat limits and ages out the personal data it captures about site
 visitors. Design rationale and the geolocation record model live in
-[ADR-0011](../adr/0011-geo-retention-minimization.md). Issue #57.
+[ADR-0020](../adr/0020-geo-retention-minimization.md). Issue #57.
 
 ## What is captured
 

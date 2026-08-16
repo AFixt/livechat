@@ -1,4 +1,4 @@
-# ADR-0011: Visitor geolocation minimization and retention-bound storage
+# ADR-0020: Visitor geolocation minimization and retention-bound storage
 
 - **Status:** Accepted
 - **Date:** 2026-08-15

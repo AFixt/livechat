@@ -21,7 +21,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
     `scripts/purge-expired-visitor-data.ts`) anonymize (default) or hard-delete
     expired sessions. Idempotent; logs counts.
   - Geolocation record model, lawful basis and rationale documented in
-    [ADR-0011][adr-0011] and `docs/privacy/data-retention.md`. ([#57])
+    [ADR-0020][adr-0020] and `docs/privacy/data-retention.md`. ([#57])
 
 ### Added
 
@@ -53,7 +53,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#57]: https://github.com/AFixt/livechat/issues/57
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
-[adr-0011]: docs/adr/0011-geo-retention-minimization.md
+[adr-0020]: docs/adr/0020-geo-retention-minimization.md
 
 ## [0.2.0] - 2026-07-23
 

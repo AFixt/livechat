@@ -5,7 +5,7 @@
  * the data useful for abuse handling and geo routing while shrinking the
  * personal data the service retains. Applied in
  * {@link ../services/visitor-session-service} and specified in
- * `docs/adr/0011-geo-retention-minimization.md`.
+ * `docs/adr/0020-geo-retention-minimization.md`.
  *
  * @module
  */
