@@ -39,6 +39,9 @@ test-results/
 playwright-report/
 a11y-reports/
 
+# Security scan report artifacts (npm run security:report)
+security-reports/
+
 # TypeScript
 *.tsbuildinfo
 

@@ -16,6 +16,10 @@ description: |
 
 start_location: "http://localhost:5175/"
 
+expected_result: >-
+  The chat surface is replaced with an accessible offer to email a
+  transcript; submitting an address returns the widget to its closed trigger.
+
 preconditions:
   - The visitor was in an active chat that a support agent has just ended.
 

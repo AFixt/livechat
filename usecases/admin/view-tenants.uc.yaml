@@ -8,6 +8,10 @@ description: |
 
 start_location: "http://localhost:5174/admin/tenants"
 
+expected_result: >-
+  The tenants list renders with each tenant row and its Edit control present
+  in the accessibility tree.
+
 preconditions:
   - A super_admin user is already authenticated.
 
