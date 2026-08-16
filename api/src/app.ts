@@ -69,10 +69,27 @@ export function createApp(deps: AppDeps): Express {
     }),
   );
 
-  /* eslint-disable @typescript-eslint/no-deprecated -- swagger-ui-express 5 still ships .setup; replacement API not yet stable */
-  const openApiSpec = buildOpenApiSpec(env) as unknown as Parameters<typeof swaggerUi.setup>[0];
-  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
-  /* eslint-enable @typescript-eslint/no-deprecated */
+  // The OpenAPI spec + Swagger UI publish the entire route and schema
+  // inventory, including every admin surface, with no auth. Serving that in
+  // production is free reconnaissance for an attacker (#78), so it is mounted
+  // only outside production; developers read it from a local/staging run. See
+  // docs/deploy.md.
+  if (env.NODE_ENV !== 'production') {
+    // `buildOpenApiSpec` is typed `any` by zod-to-openapi; narrow to `object`
+    // so it can be served and handed to swagger-ui without unsafe-any usage.
+    const openApiSpec = buildOpenApiSpec(env) as object;
+    // Raw machine-readable spec for tooling (e.g. schema-based testing).
+    app.get('/api/docs.json', (_req, res) => {
+      res.json(openApiSpec);
+    });
+    /* eslint-disable @typescript-eslint/no-deprecated -- swagger-ui-express 5 still ships .setup; replacement API not yet stable */
+    app.use(
+      '/api/docs',
+      swaggerUi.serve,
+      swaggerUi.setup(openApiSpec as unknown as Parameters<typeof swaggerUi.setup>[0]),
+    );
+    /* eslint-enable @typescript-eslint/no-deprecated */
+  }
 
   const v1 = buildRouter({
     env,

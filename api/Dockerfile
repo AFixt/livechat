@@ -33,4 +33,14 @@ COPY shared/src shared/src
 USER node
 
 EXPOSE 3000
+
+# Liveness probe for the container runtime (and the CKV_DOCKER_2 / Trivy
+# AVD-DS-0026 "no HEALTHCHECK" checks). Hits the same /api/v1/health path the
+# DigitalOcean App Platform spec (.do/app.yaml) uses. busybox wget ships in the
+# node:22-alpine base, so no extra package is installed. Exec form (Hadolint
+# DL3025) — a non-zero wget exit already marks the container unhealthy, so no
+# shell `|| exit 1` is needed.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD ["wget", "--quiet", "--output-document=/dev/null", "http://127.0.0.1:3000/api/v1/health"]
+
 CMD ["npm", "--workspace", "@livechat/api", "run", "start"]

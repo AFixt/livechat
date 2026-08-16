@@ -8,6 +8,10 @@ description: |
 
 start_location: "http://localhost:5174/admin/invitations"
 
+expected_result: >-
+  The invitations list renders as a table with each invitation's status,
+  reachable by keyboard and screen reader.
+
 preconditions:
   - An admin or super_admin user is authenticated.
 

@@ -1,0 +1,31 @@
+# ZAP API-scan rule tuning. SEPARATE from the baseline `rules.tsv` — this file
+# is consumed by an OpenAPI-driven `zaproxy/action-api-scan` (or a manual
+# `zap-api-scan.py`) run, not by the passive baseline crawl. See
+# docs/security/api-testing.md for how the spec is generated and fed in.
+#
+# Format: <ruleId>\t<threshold>\t<comment>   (tab-separated)
+# Thresholds: IGNORE | WARN | FAIL
+#   (default: FAIL for HIGH/MEDIUM, WARN for LOW)
+#
+# Start strict: no rule is downgraded without a documented, owned reason below.
+# The entries here are the ones an OpenAPI-driven active scan commonly trips on
+# for a stateless JSON+JWT API where the alternative is worse than the alert.
+#
+# ---------------------------------------------------------------------------
+# 10096  Timestamp Disclosure — the API returns ISO-8601 timestamps
+#        (createdAt / deliveredAt / expiresAt) as first-class data. These are
+#        not "leaked" secrets; they are the payload. WARN so a genuinely odd
+#        timestamp still shows up in the report without failing the scan.
+10096	WARN	Timestamps (createdAt/deliveredAt/…) are legitimate JSON response fields, not a disclosure.
+#
+# 10015  Re-examine Cache-control Directives — only the public, cacheable
+#        /widget/config route sets Cache-Control; authenticated JSON responses
+#        are uncached by default. WARN rather than FAIL on this LOW-confidence
+#        heuristic; tighten if an authed route starts advertising caching.
+10015	WARN	Only the public widget bootstrap is cacheable; authed JSON is uncached. Low-value on a JSON API.
+#
+# ---------------------------------------------------------------------------
+# Everything else stays at ZAP defaults (FAIL on HIGH/MEDIUM). In particular,
+# do NOT add IGNOREs for: SQL/NoSQL injection, path traversal, XXE, SSRF,
+# auth-bypass, CORS misconfiguration, or missing-security-header rules — those
+# are exactly what this scan exists to catch.
