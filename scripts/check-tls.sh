@@ -25,15 +25,17 @@
 #   TLS_TARGET_URL     target URL/host (or pass it as $1).
 #   TLS_HSTS_MIN_AGE   minimum acceptable HSTS max-age in seconds
 #                      (default 15552000 = 180 days, the hstspreload.org floor).
-#   TESTSSL_SEVERITY   testssl.sh recording threshold (default HIGH). The gate
-#                      fails on any HIGH/CRITICAL finding in testssl's output.
+#   TESTSSL_SEVERITY   testssl.sh recording threshold (default LOW, so that
+#                      deprecated-protocol findings — rated LOW by testssl — are
+#                      recorded). The gate fails on any HIGH/CRITICAL finding and
+#                      on any TLS 1.0/1.1 "offered" result regardless of severity.
 #
 set -euo pipefail
 
 # ---- configuration -------------------------------------------------------
 
 HSTS_MIN_AGE="${TLS_HSTS_MIN_AGE:-15552000}"
-TESTSSL_SEVERITY="${TESTSSL_SEVERITY:-HIGH}"
+TESTSSL_SEVERITY="${TESTSSL_SEVERITY:-LOW}"
 
 # ---- target resolution ---------------------------------------------------
 
@@ -159,13 +161,27 @@ else
   testssl_json="$(mktemp)"
   trap 'rm -f "$testssl_json"' EXIT
   # --jsonfile gives a machine-readable result we can gate on regardless of
-  # testssl's own exit code; --severity limits what it records/prints.
+  # testssl's own exit code. We record at LOW so deprecated-protocol findings
+  # (testssl rates "TLS 1.0/1.1 offered" as LOW, not HIGH) make it into the
+  # JSON — filtering to HIGH here would silently hide them (issue #63).
   "$testssl_bin" --quiet --severity "$TESTSSL_SEVERITY" --jsonfile "$testssl_json" "$HTTPS_URL" || true
   hits="$(grep -oiE '"severity"[[:space:]]*:[[:space:]]*"(HIGH|CRITICAL)"' "$testssl_json" 2>/dev/null | wc -l | tr -d ' ')" || true
   if [[ "${hits:-0}" -gt 0 ]]; then
     fail "testssl.sh reported ${hits} HIGH/CRITICAL finding(s) — see output above / $testssl_json"
   else
     pass "testssl.sh found no HIGH/CRITICAL findings"
+  fi
+  # Deprecated protocols are a required failure (AC1) but are only LOW severity
+  # in testssl, so the HIGH/CRITICAL count above never catches them. Check the
+  # TLS1 / TLS1_1 protocol findings explicitly: an "offered" result is recorded
+  # at LOW+ severity, whereas "not offered" is OK/INFO — so any TLS1/TLS1_1
+  # object at LOW/MEDIUM/HIGH/CRITICAL means the deprecated protocol is live.
+  deprecated="$(grep -oiE '\{[^{}]*"id"[[:space:]]*:[[:space:]]*"TLS1(_1)?"[^{}]*\}' "$testssl_json" 2>/dev/null \
+    | grep -ciE '"severity"[[:space:]]*:[[:space:]]*"(LOW|MEDIUM|HIGH|CRITICAL)"' | tr -d ' ')" || true
+  if [[ "${deprecated:-0}" -gt 0 ]]; then
+    fail "testssl.sh: a deprecated protocol (TLS 1.0/1.1) is still offered — see $testssl_json"
+  else
+    pass "testssl.sh: TLS 1.0 and TLS 1.1 are not offered"
   fi
 fi
 
