@@ -61,3 +61,20 @@ export function createAuthLimiter(redis: Redis): RequestHandler {
     prefix: 'rl:auth:',
   });
 }
+
+/**
+ * CSP-report limiter — applied to the unauthenticated `/widget/csp-report`
+ * sink. Tighter than the global limit so a single browser (or a hostile
+ * client) can't flood the logs; a violating page can legitimately emit a burst,
+ * hence 60 rather than a handful.
+ * @param redis - Shared Redis client.
+ * @returns Configured Express middleware (60 reports per minute per IP).
+ */
+export function createCspReportLimiter(redis: Redis): RequestHandler {
+  return createRateLimiter({
+    redis,
+    windowMs: 60 * 1000,
+    max: 60,
+    prefix: 'rl:csp:',
+  });
+}
