@@ -154,6 +154,25 @@ exceptions:
     status: active
     issue: 51
 
+  # --- secret scanning (trufflehog suspected tier — warn only) ------------
+  - id: trufflehog-suspected-baseline
+    tool: trufflehog
+    source: .trufflehog-exclude.txt (native path allow-list) + .secrets.baseline (detect-secrets)
+    rules:
+      - test fixtures, package-lock.json, i18n strings (paths)
+      - baselined candidate secrets (detect-secrets, hashes only)
+    owner: "@AFixt/security"
+    reason: >-
+      Suppresses only the SUSPECTED (unverified/unknown) warn tier so it surfaces
+      new detector hits instead of known noise — high-noise paths and audited
+      false positives. The VERIFIED blocking tier is never filtered by these, so
+      no confirmed-live secret can be hidden. No plaintext secret is committed
+      (baseline stores SHA hashes only).
+    added: 2026-08-16
+    expires: 2027-02-16
+    status: active
+    issue: 82
+
 # --- catalogued but not currently suppressing anything --------------------
 # Kept so the registry is the exhaustive index; the check script ignores
 # non-active entries.
@@ -172,13 +191,15 @@ inactive:
 
   - id: trufflehog-verified-only
     tool: trufflehog
-    source: package.json (security:secrets, --results=verified)
+    source: scripts/secret-scan.sh (security:secrets, --results=verified)
     rules: []
     owner: "@AFixt/security"
     reason: >-
-      Posture, not a suppression baseline: the secret scan only fails on
-      VERIFIED secrets. There is no allow-listed/baselined secret. If a
-      baseline file is ever introduced, catalogue each entry above.
+      Posture, not a suppression baseline: the blocking VERIFIED tier fails only
+      on confirmed-live secrets and is never filtered by any allow-list. The
+      baseline/exclude files introduced in #82 filter only the SUSPECTED warn
+      tier and are now catalogued as the active `trufflehog-suspected-baseline`
+      entry above.
     added: 2026-08-15
     status: none
     issue: 65

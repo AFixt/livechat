@@ -43,11 +43,28 @@ gates:
     gated: true
 
   trufflehog:
-    npm: security:secrets
-    blocks_at: verified # only VERIFIED secrets fail (`--results=verified`)
-    warns_at: [unverified]
-    allowlist: none (no baseline file)
-    gated: true
+    script: scripts/secret-scan.sh
+    npm: security:secrets # verified tier — the blocking gate
+    blocks_at: verified # only VERIFIED (confirmed-live) secrets fail
+    warns_at: [unverified, unknown] # surfaced by the suspected tier below
+    # Two tiers wired by scripts/secret-scan.sh (ADR 0012-secret-scanning-tiers,
+    # #82). The verified tier is unchanged and blocking; the suspected tier is a
+    # non-blocking warn surface for detector hits verification can't confirm.
+    tiers:
+      verified:
+        npm: security:secrets
+        results: verified # `--results=verified --fail` (exit 183 on live secret)
+        behaviour: blocking
+      suspected:
+        npm: security:secrets:suspected
+        results: unverified,unknown # `--results=unverified,unknown`, no --fail
+        behaviour: warn # always exits 0; PR-time secret-scan.yml (continue-on-error)
+    allowlist: >-
+      .trufflehog-exclude.txt (native path allow-list) + .secrets.baseline
+      (detect-secrets line-level baseline, security:secrets:baseline). Catalogued
+      in security/exceptions.yaml. The verified/blocking tier is never suppressed
+      by the baseline — only the suspected/warn tier is filtered.
+    gated: true # verified tier only; suspected runs in secret-scan.yml, non-blocking
 
   tls:
     script: scripts/check-tls.sh
