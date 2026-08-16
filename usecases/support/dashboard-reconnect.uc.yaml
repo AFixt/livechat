@@ -1,0 +1,27 @@
+id: support-dashboard-reconnect
+title: "Operator sees a reconnecting banner when live updates drop"
+type: extension
+description: |
+  §3 / issue #69 (AC6) — when the console's realtime socket drops, the dashboard
+  shows a visible "reconnecting" banner inside a polite status region, so the
+  change is both seen and announced. On restore the banner confirms it has
+  reconnected and the open chats' transcripts are backfilled, so a message
+  delivered during the outage is never lost from the operator's view.
+
+  The drop/restore is a socket-transport event that cannot be driven through the
+  accessibility DSL, so the full path is exercised in the cross-ends journey
+  suite (ADR-0007) and the api reconnect integration test. This file is the
+  behavioural source of truth for the operator-facing reconnect surface.
+
+start_location: "http://localhost:5174/"
+
+preconditions:
+  - A staff user is already authenticated (see support-login.uc.yaml).
+  - The console's realtime socket has dropped (established over sockets — see
+    the e2e journey suite).
+
+data: {}
+
+steps:
+  - locate: heading "Dashboard"
+  - locate: text "Connection lost. Reconnecting to live updates…"
