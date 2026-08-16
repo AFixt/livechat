@@ -11,10 +11,20 @@ set -euo pipefail
 
 # Degrade gracefully when semgrep is not installed: this gate runs in local
 # pre-push and in CI, but a contributor without semgrep on PATH should get a
-# clear skip rather than a hard failure. CI installs semgrep, so coverage is
-# not lost.
+# clear skip rather than a hard failure.
+#
+# Guard: only skip *locally*. In CI (`CI` is set by GitHub Actions and every
+# major CI provider) a missing semgrep means the install step regressed, and a
+# silent skip would let unscanned code merge — so fail hard there instead. This
+# is what keeps "CI installs semgrep, so coverage is not lost" a guarantee
+# rather than an assumption.
 if ! command -v semgrep >/dev/null 2>&1; then
-  echo "semgrep not found on PATH — skipping static-analysis gate." >&2
+  if [[ -n "${CI:-}" ]]; then
+    echo "semgrep not found on PATH in CI — the install step regressed." >&2
+    echo "The static-analysis gate cannot be skipped in CI." >&2
+    exit 1
+  fi
+  echo "semgrep not found on PATH — skipping static-analysis gate (local only)." >&2
   echo "Install it with: pipx install semgrep   (or) brew install semgrep" >&2
   exit 0
 fi
