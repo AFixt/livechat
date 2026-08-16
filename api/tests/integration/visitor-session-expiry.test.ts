@@ -116,6 +116,26 @@ describe('visitor session expiry + revocation (#79)', () => {
     expect(await socketRefused(baseUrl, cookie)).toBe(true);
   }, 30_000);
 
+  test('"forget me" on an already-expired session still deletes the PII row', async () => {
+    if (harness === null) return;
+    const { baseUrl } = harness;
+    const { cookie, sessionId } = await bootstrap(baseUrl, 'expiry-t');
+    // Session has gone idle-expired before the visitor asks to be forgotten.
+    await VisitorSession.update(
+      { lastSeenAt: new Date(Date.now() - 73 * HOUR_MS) },
+      { where: { id: sessionId } },
+    );
+
+    const forget = await request(baseUrl)
+      .post('/api/v1/visitor/session/forget')
+      .set('cookie', `livechat_visitor=${cookie}`);
+    expect(forget.status).toBe(200);
+
+    // Geo-privacy deletion must happen even though the session was expired.
+    const gone = await VisitorSession.findByPk(sessionId, { paranoid: false });
+    expect(gone).toBeNull();
+  }, 30_000);
+
   test('"forget me" revokes the session: the row is gone and the cookie 401s', async () => {
     if (harness === null) return;
     const { baseUrl } = harness;

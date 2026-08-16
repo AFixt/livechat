@@ -133,10 +133,11 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
       const cookie = typeof rawCookie === 'string' ? rawCookie : undefined;
       if (cookie !== undefined) {
         try {
-          const session = await deps.visitorSession.findByCookie(cookie);
-          await deps.visitorSession.forget(session);
+          // Deletes regardless of expiry, so a stale session's PII is still
+          // purged (geo-privacy deletion), not just its cookie cleared.
+          await deps.visitorSession.forgetByCookie(cookie);
         } catch {
-          // Missing/expired/invalid session — nothing to forget.
+          // Invalid/forged cookie — nothing to forget.
         }
       }
       res.clearCookie(VISITOR_COOKIE_NAME, { path: '/' });

@@ -142,13 +142,23 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
     },
 
     /**
-     * Revoke a visitor session — the "forget me" path (#79). Hard-deletes the
-     * row so the visitor's PII and chat linkage are gone, which also serves the
-     * geo-privacy deletion requirement, and any replay of the cookie 401s.
-     * @param session - The session to forget (from {@link findByCookie}).
+     * Revoke a visitor session by its cookie — the "forget me" path (#79).
+     * Resolves the row from the signed cookie **without** applying the expiry
+     * gate in {@link findByCookie}, then hard-deletes it, so the visitor's PII
+     * and chat linkage are gone even when the session has already gone
+     * absolutely/idle-expired. This is what serves the geo-privacy deletion
+     * requirement; any replay of the cookie afterwards 401s. Idempotent: an
+     * unknown or already-forgotten cookie is a no-op.
+     * @param cookieValue - Raw cookie value from the widget.
+     * @throws 401 if the cookie signature is invalid (nothing to forget).
      */
-    async forget(session: VisitorSession): Promise<void> {
-      await session.destroy({ force: true });
+    async forgetByCookie(cookieValue: string): Promise<void> {
+      const sessionId = verifyVisitorCookie(cookieValue, deps.env.COOKIE_SECRET);
+      const hash = hashSessionId(sessionId, deps.env.COOKIE_SECRET);
+      const session = await VisitorSession.findOne({
+        where: { sessionCookieHash: hash },
+      });
+      if (session !== null) await session.destroy({ force: true });
     },
 
     /**
