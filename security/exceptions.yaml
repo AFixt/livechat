@@ -1,0 +1,230 @@
+# Security exception registry — the single catalogue of every accepted
+# suppression / allow-list entry across the repo's security-baseline tooling.
+#
+# WHY THIS FILE EXISTS
+#   Suppressions were previously scattered across scripts/semgrep.sh,
+#   scripts/npm-audit.sh, osv-scanner.toml, .dependency-check-suppressions.xml,
+#   and (as sibling PRs land) .trivyignore / checkov skips / a secret-scan
+#   baseline. Nothing tied them to an OWNER, an EXPIRY, or a review cadence, so
+#   a "temporary" exception could live forever unnoticed. This registry gives
+#   every one of them a lifecycle.
+#
+# THIS FILE DOES NOT SUPPRESS ANYTHING. The suppression still lives in the tool
+#   config it belongs to (that is where each tool reads it). This registry
+#   CATALOGUES those suppressions and adds the missing governance metadata.
+#   Do not delete a suppression from its tool config just because it is listed
+#   here.
+#
+# LIFECYCLE (see docs/security/README.md for the full process)
+#   - Adding one: add it to the tool's own config with an inline reason, THEN
+#     add an entry here with owner + reason + added + expires.
+#   - Reviewing: `npm run security:exceptions` (scripts/check-exceptions.sh)
+#     fails the gate on any active entry whose `expires` is in the past, and
+#     warns on any expiring within the next 30 days.
+#   - Expiring: on the review date, either remove the suppression (fix the
+#     finding) or renew the entry with a fresh justification + expiry.
+#
+# FIELDS (per entry)
+#   id       stable slug, unique in this file.
+#   tool     which scanner the suppression belongs to.
+#   source   the file where the actual suppression lives.
+#   rule(s)  the rule id(s) / advisory id(s) being suppressed.
+#   owner    who is accountable for reviewing it (GitHub handle or team).
+#   reason   why it is accepted (short; the full rationale stays inline in
+#            `source`).
+#   added    ISO date the exception was first accepted / catalogued.
+#   expires  ISO date it must be re-justified or removed. The gate warns while
+#            this date is within EXCEPTION_WARN_DAYS and goes red once it has
+#            passed — that is the point.
+#   status   active | pending | none. Only `active` entries are gated.
+#   issue    related GitHub issue, if any.
+
+version: 1
+
+# NOTE ON OWNERS: `@AFixt/security` is the accountable team placeholder.
+# Replace with the specific GitHub handle that owns each item as ownership is
+# assigned; the review process in docs/security/README.md drives that.
+
+exceptions:
+  # --- semgrep (scripts/semgrep.sh --exclude-rule) ------------------------
+  - id: semgrep-node-timing-attack
+    tool: semgrep
+    source: scripts/semgrep.sh
+    rules:
+      - ajinabraham.njsscan.crypto.timing_attack_node.node_timing_attack
+    owner: "@AFixt/security"
+    reason: >-
+      False positive. Every hit is a `token === undefined` / `=== null`
+      presence check, not a comparison of secret material.
+    added: 2026-08-15
+    expires: 2027-02-15
+    status: active
+    issue: 65
+
+  - id: semgrep-node-nosqli
+    tool: semgrep
+    source: scripts/semgrep.sh
+    rules:
+      - ajinabraham.njsscan.database.nosql_find_injection.node_nosqli_injection
+    owner: "@AFixt/security"
+    reason: >-
+      False positive. Hits are Sequelize `where` clauses over Zod-validated
+      scalars; the rule targets raw MongoDB query objects.
+    added: 2026-08-15
+    expires: 2027-02-15
+    status: active
+    issue: 65
+
+  - id: semgrep-njsscan-good-helmet
+    tool: semgrep
+    source: scripts/semgrep.sh
+    rules:
+      - ajinabraham.njsscan.good.good_helmet_checks.helmet_header_x_powered_by
+      - ajinabraham.njsscan.good.good_helmet_checks.helmet_header_dns_prefetch
+      - ajinabraham.njsscan.good.good_helmet_checks.helmet_header_hsts
+      - ajinabraham.njsscan.good.good_helmet_checks.helmet_header_ienoopen
+      - ajinabraham.njsscan.good.good_helmet_checks.helmet_header_nosniff
+      - ajinabraham.njsscan.good.good_helmet_checks.helmet_header_xss_filter
+    owner: "@AFixt/security"
+    reason: >-
+      Not findings. The njsscan `good` namespace matches CORRECT usage — these
+      fire because api/src/app.ts configures helmet properly.
+    added: 2026-08-15
+    expires: 2027-02-15
+    status: active
+    issue: 65
+
+  - id: semgrep-nginx-header-redefinition
+    tool: semgrep
+    source: scripts/semgrep.sh
+    rules:
+      - generic.nginx.security.header-redefinition.header-redefinition
+    owner: "@AFixt/security"
+    reason: >-
+      Was real, now fixed. ui/nginx.conf and widget/nginx.conf now repeat the
+      server-block headers inside location blocks; the rule cannot see that.
+    added: 2026-08-15
+    expires: 2027-02-15
+    status: active
+    issue: 65
+
+  - id: semgrep-gha-mutable-action-tag
+    tool: semgrep
+    source: scripts/semgrep.sh
+    rules:
+      - yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag
+    owner: "@AFixt/security"
+    reason: >-
+      Accepted by decision (ADR-0010): keep mutable major tags so upstream
+      security fixes flow, since Dependabot is disabled by choice.
+    added: 2026-08-15
+    expires: 2027-08-15
+    status: active
+    issue: 65
+
+  - id: semgrep-sequelize-tls
+    tool: semgrep
+    source: scripts/semgrep.sh
+    rules:
+      - ajinabraham.njsscan.database.sequelize_tls.sequelize_tls
+    owner: "@AFixt/security"
+    reason: >-
+      TLS on the DB connection is implemented but env-driven (DB_SSL/DB_SSL_CA)
+      so it can stay off for local docker-compose; production sets DB_SSL=true.
+      The rule matches the whole construction and cannot see the runtime env.
+    added: 2026-08-15
+    expires: 2027-02-15
+    status: active
+    issue: 65
+
+  # --- dependency advisories (scripts/npm-audit.sh + osv-scanner.toml) ----
+  - id: dep-extract-zip-symlink-traversal
+    tool: npm-audit, osv-scanner
+    source: scripts/npm-audit.sh (ALLOW) + osv-scanner.toml (IgnoredVulns)
+    rules:
+      - GHSA-jmr9-qjv8-65gv
+    owner: "@AFixt/security"
+    reason: >-
+      extract-zip 2.0.1 unvalidated symlink path traversal. No fixed version
+      exists (2.0.1 is latest). Dev-only: transitive via @puppeteer/browsers in
+      the Lighthouse/estimo perf tooling, never in the production runtime.
+    added: 2026-08-15
+    # Aligned with osv-scanner.toml `ignoreUntil = 2026-11-13`.
+    expires: 2026-11-13
+    status: active
+    issue: 51
+
+  # --- secret scanning (trufflehog suspected tier — warn only) ------------
+  - id: trufflehog-suspected-baseline
+    tool: trufflehog
+    source: .trufflehog-exclude.txt (native path allow-list) + .secrets.baseline (detect-secrets)
+    rules:
+      - test fixtures, package-lock.json, i18n strings (paths)
+      - baselined candidate secrets (detect-secrets, hashes only)
+    owner: "@AFixt/security"
+    reason: >-
+      Suppresses only the SUSPECTED (unverified/unknown) warn tier so it surfaces
+      new detector hits instead of known noise — high-noise paths and audited
+      false positives. The VERIFIED blocking tier is never filtered by these, so
+      no confirmed-live secret can be hidden. No plaintext secret is committed
+      (baseline stores SHA hashes only).
+    added: 2026-08-16
+    expires: 2027-02-16
+    status: active
+    issue: 82
+
+# --- catalogued but not currently suppressing anything --------------------
+# Kept so the registry is the exhaustive index; the check script ignores
+# non-active entries.
+inactive:
+  - id: owasp-dependency-check-suppressions
+    tool: owasp-dependency-check
+    source: .dependency-check-suppressions.xml
+    rules: []
+    owner: "@AFixt/security"
+    reason: >-
+      Suppression file exists but currently holds NO active suppressions (only
+      a template comment). Any future entry must also be recorded above.
+    added: 2026-08-15
+    status: none
+    issue: 65
+
+  - id: trufflehog-verified-only
+    tool: trufflehog
+    source: scripts/secret-scan.sh (security:secrets, --results=verified)
+    rules: []
+    owner: "@AFixt/security"
+    reason: >-
+      Posture, not a suppression baseline: the blocking VERIFIED tier fails only
+      on confirmed-live secrets and is never filtered by any allow-list. The
+      baseline/exclude files introduced in #82 filter only the SUSPECTED warn
+      tier and are now catalogued as the active `trufflehog-suspected-baseline`
+      entry above.
+    added: 2026-08-15
+    status: none
+    issue: 65
+
+# --- pending: owned by sibling security-baseline PRs (#82-84) -------------
+# These tools/config files do not exist on `develop` yet. When their PRs land
+# and introduce suppressions (`.trivyignore`, checkov `skip` comments, a ZAP
+# ignore list), move each into `exceptions:` above with owner + expiry. This
+# registry is the agreed home for them.
+pending:
+  - id: trivy-ignore
+    tool: trivy
+    source: .trivyignore (not yet added)
+    owner: "@AFixt/security"
+    reason: "Reserved — populate when the trivy PR lands (#82-84)."
+    status: pending
+  - id: checkov-skips
+    tool: checkov
+    source: inline `# checkov:skip=...` comments (not yet added)
+    owner: "@AFixt/security"
+    reason: "Reserved — populate when the checkov PR lands (#82-84)."
+    status: pending
+  - id: zap-ignore
+    tool: owasp-zap
+    source: .zap/ ignore rules (owned by the ZAP PR)
+    owner: "@AFixt/security"
+    reason: "Reserved — populate when the ZAP baseline PR lands (#82-84)."
+    status: pending

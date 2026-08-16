@@ -4,6 +4,7 @@ import { LiveRegion } from './components/live-region.js';
 import { useFocusReturn } from './hooks/use-focus-return.js';
 import { fetchCurrentChat, initiateChat, initVisitorSession } from './services/api.js';
 import { playAlert } from './services/audio.js';
+import { consentStore } from './services/consent.js';
 import { announceLiveMessage } from './services/live-region.js';
 import { disconnectVisitorSocket, getVisitorSocket } from './services/socket.js';
 import { initialModel, reduce } from './state-machine.js';
@@ -56,6 +57,13 @@ export function App(props: AppProps): preact.JSX.Element {
       playAlert();
     };
     void (async () => {
+      // CMP consent gate: when the host set `data-require-consent`, hold all
+      // presence/analytics capture (session init + socket) until the host CMP
+      // grants it via `window.AfixtLiveChat.setConsent({ analytics: true })`.
+      // Resolves immediately when consent isn't required. The existing
+      // `live.current` guards below still handle an unmount during the wait.
+      // (#54)
+      await consentStore.whenCaptureAllowed();
       // Reuse an existing session when the visitor already has one — a page
       // reload must not mint a fresh session, which would orphan a prior chat
       // and break the returning-visitor (restart) flow. Probing the resumable

@@ -42,6 +42,16 @@ if ! command -v lychee >/dev/null 2>&1; then
   }
 fi
 
+# detect-secrets (issue #82, ADR-0015) — powers the suspected-tier baseline
+# (.secrets.baseline) via scripts/detect-secrets.sh. Optional locally: the
+# script skips cleanly when it is absent, and CI installs it. Best-effort here —
+# a failed install only warns, never aborts bootstrap.
+if ! command -v detect-secrets >/dev/null 2>&1; then
+  echo "Installing detect-secrets (optional)..."
+  pipx install detect-secrets 2>/dev/null || pip install --user detect-secrets 2>/dev/null \
+    || echo "warn: install detect-secrets via 'pipx install detect-secrets'"
+fi
+
 echo ""
 echo "Installing npm dependencies..."
 npm ci
