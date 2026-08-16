@@ -48,6 +48,7 @@ fi
 SPEC_FILE="$(mktemp -t livechat-openapi.XXXXXX)"
 BOOT_PID=""
 
+# shellcheck disable=SC2329 # invoked indirectly via the EXIT trap below.
 cleanup() {
   [[ -n "$BOOT_PID" ]] && kill "$BOOT_PID" 2>/dev/null || true
   rm -f "$SPEC_FILE"
@@ -108,7 +109,7 @@ rc=0
 schemathesis run "$SPEC_FILE" \
   --base-url "$BASE_URL" \
   --checks all \
-  --hypothesis-max-examples "$MAX_EXAMPLES" \
+  --max-examples "$MAX_EXAMPLES" \
   ${SCHEMATHESIS_ARGS:-} || rc=$?
 
 exit "$rc"

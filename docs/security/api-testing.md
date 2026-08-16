@@ -42,6 +42,15 @@ same base.
 > `auth`, `visitor`, `chats`, `tenants`, `users`, `invitations`, and `admin` is
 > the follow-up that makes this tooling bite. Until then the harness is wired
 > and correct but exercises a single endpoint.
+>
+> **Register paths at module top level.** The spec is assembled by _importing_
+> `api/src/routes/index.js` for its side effects — so a route only appears in the
+> document (and under the fuzzer, the ZAP scan, and the spec-security tripwire) if
+> its `openApiRegistry.registerPath(...)` call runs at **module load**, the way
+> `api/src/routes/health.ts` does it. A `registerPath` placed _inside_ a
+> `buildXRouter(deps)` factory is never executed by the import and stays silently
+> invisible to all three checks. Keep registration at the top level of each route
+> module.
 
 ## 1. Schemathesis fuzzing
 
