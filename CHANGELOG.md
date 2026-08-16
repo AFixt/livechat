@@ -36,6 +36,23 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
+### Security
+
+- **Security-baseline governance** ([#65]) — a governance layer over the
+  scanners (ADR-0011). `security/thresholds.yaml` centralizes what each gate
+  blocks vs warns on; `security/exceptions.yaml` catalogues every accepted
+  suppression across the tooling (semgrep `--exclude-rule`, the npm-audit/osv
+  advisory allow-list, the dependency-check placeholder, plus reserved rows for
+  the trivy/checkov/ZAP PRs) with owner, reason, added date, and expiry.
+  `scripts/check-exceptions.sh` (`npm run security:exceptions`, wired into the
+  aggregate `npm run security`) fails the gate on any expired exception and
+  warns on those expiring within 30 days. `scripts/security-report.sh`
+  (`npm run security:report`) emits machine-readable scanner output into a
+  gitignored `security-reports/` directory. Indexed in
+  `docs/security/README.md`. Suppressions are catalogued, not removed — the
+  registry is updated as sibling PRs land theirs.
+
+[#65]: https://github.com/AFixt/livechat/issues/65
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
 
