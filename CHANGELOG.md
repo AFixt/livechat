@@ -195,6 +195,15 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Fixed
 
+- **A clean clone runs by following the README.** The API read `process.env`
+  with no `.env` loading and no example file, so `npm run dev` exited with an
+  envalid wall of ~15 missing variables. Added `api/.env.example` with working
+  defaults matching the compose ports, `dotenv` loading in development (app,
+  migrate, and seed), wired `npm run seed` to the real dev seeder (it was
+  `sequelize-cli db:seed:all` against a non-existent seeders dir), documented
+  the real steps + dev login accounts in the README, and gave `server.ts` an
+  `error` handler so a port clash prints an actionable message instead of an
+  `EADDRINUSE` stack trace. ([#81])
 - **Integration tests no longer flake under load.** The suite's 10s
   `testTimeout` had no headroom: tests doing several bcrypt-cost-12 hashes plus
   real MySQL round-trips landed near 10s on a busy machine, so unrelated tests
@@ -239,6 +248,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#65]: https://github.com/AFixt/livechat/issues/65
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#81]: https://github.com/AFixt/livechat/issues/81
 [#71]: https://github.com/AFixt/livechat/issues/71
 [#78]: https://github.com/AFixt/livechat/issues/78
 [#82]: https://github.com/AFixt/livechat/issues/82
