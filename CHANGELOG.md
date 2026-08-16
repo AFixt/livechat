@@ -60,6 +60,17 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   exceptions and warns within 30 days; `scripts/security-report.sh` emits
   machine-readable scanner output into a gitignored `security-reports/`.
   Indexed in `docs/security/README.md`.
+- Two-tier secret scanning ([#82]). The verified/blocking trufflehog gate is
+  unchanged; a new suspected (unverified/unknown) tier reports without blocking,
+  via `scripts/secret-scan.sh` + `security:secrets:suspected`. A
+  `.secrets.baseline` (detect-secrets) records known false positives so the
+  suspected tier is actionable, checked by `scripts/detect-secrets.sh` +
+  `security:secrets:baseline`; `.trufflehog-exclude.txt` is the trufflehog-native
+  path allow-list. A `.pre-commit-config.yaml` wires the detect-secrets baseline
+  hook (husky stays the enforced gate); the husky pre-commit now runs both tiers
+  on staged files. PR-time `.github/workflows/secret-scan.yml` surfaces the
+  suspected tier without blocking. The two tiers are recorded in
+  `security/thresholds.yaml`. (See ADR `0015-secret-scanning-tiers`, [#82].)
 
 ### Added
 
@@ -148,6 +159,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
 [#78]: https://github.com/AFixt/livechat/issues/78
+[#82]: https://github.com/AFixt/livechat/issues/82
 [#85]: https://github.com/AFixt/livechat/issues/85
 [ADR-0013]: docs/adr/0013-jwt-localstorage-risk-acceptance.md
 [adr-0014]: docs/adr/0014-widget-consent-hook.md
