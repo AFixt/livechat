@@ -60,6 +60,19 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Security
 
+- **Security headers on the static-hosted console and widget.** Both nginx hosts
+  now send a Content-Security-Policy (`default-src 'self'`, strict `script-src`,
+  no `'unsafe-eval'`; `style-src` allows `'unsafe-inline'` only, for MUI/emotion
+  and the widget's injected styles), `Cross-Origin-Opener-Policy: same-origin`,
+  and `Strict-Transport-Security` (2 years, `includeSubDomains; preload`). The
+  console is locked down (`Cross-Origin-Resource-Policy: same-origin`,
+  `X-Frame-Options: DENY` + `frame-ancestors 'none'`); the widget stays
+  embeddable (`Cross-Origin-Resource-Policy: cross-origin`, `frame-ancestors *`,
+  no `X-Frame-Options`). A new `security:headers` gate
+  (`scripts/check-headers.mjs`) config-lints both `nginx.conf` files — asserting
+  every required directive is repeated in each header-emitting `location` block —
+  and runs inside `check:all`. See ADR-0012. ([#61])
+
 - **TLS/HTTPS verification harness for deployed environments** ([#63]).
   `scripts/check-tls.sh` (npm: `npm run security:tls`) verifies a deployed
   target's transport security: a deep TLS audit via `testssl.sh` (invoked when
@@ -85,6 +98,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   `docs/security/README.md`. Suppressions are catalogued, not removed — the
   registry is updated as sibling PRs land theirs.
 
+[#61]: https://github.com/AFixt/livechat/issues/61
 [#63]: https://github.com/AFixt/livechat/issues/63
 [#65]: https://github.com/AFixt/livechat/issues/65
 [#66]: https://github.com/AFixt/livechat/issues/66
