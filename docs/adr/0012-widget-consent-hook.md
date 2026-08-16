@@ -48,13 +48,21 @@ budget 50 KB).
 ## Consequences
 
 - Host CMPs can defer all presence/analytics capture with one attribute plus a
-  `setConsent` call; strictly-necessary chat still works.
+  `setConsent` call. Note that because the visitor-session init is itself the
+  telemetry-carrying call and the chat depends on that session, enabling the
+  gate holds the **entire** widget bootstrap (session init + socket) until
+  `analytics` is granted — so while gating is on and consent is withheld, chat
+  cannot start either. The `functional` category is stored and emitted for host
+  CMPs and the #56/#53 foundation but does not by itself release the gate; a
+  clean split that keeps strictly-necessary chat available without analytics
+  consent requires that server-side foundation.
 - The public surface (attribute, global API, event, categories) is a committed
   contract — the consent foundation and any host integration depend on it, so
   changes must stay backward-compatible.
 - The gate defers rather than drops capture, so a late grant still works; a
-  never-granted gate means the visitor simply never appears in presence — an
-  intended privacy outcome, but one that must be documented for support staff.
+  never-granted gate means the visitor never appears in presence and cannot
+  start a chat — an intended privacy outcome, but one that must be documented
+  for support staff.
 - Client-side consent alone is advisory; the server still verifies identity
   tokens and applies data minimization/retention (ADR-0011). This hook governs
   _whether_ capture starts, not _what_ is stored once it does.

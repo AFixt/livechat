@@ -14,9 +14,21 @@ The widget recognizes two consent categories:
 | `functional` | The chat itself — message transport and the strictly-necessary `livechat_visitor` session cookie. | Granted |
 | `analytics` | Visitor **presence/telemetry capture**: the session-init call that records current URL, referrer, language and (truncated) IP, and live presence in the support console. | Denied |
 
-When gating is enabled, the widget **holds all presence/analytics capture**
-(the visitor-session init and the socket connection) until the host grants
-`analytics`. Functional chat operation is always permitted.
+When gating is enabled, the widget **holds its entire capture bootstrap** — the
+visitor-session init call (which sets the `livechat_visitor` cookie) and the
+presence socket — until the host grants `analytics`. The session-init call is
+itself what records the presence/telemetry data, and the chat depends on that
+session, so **while gating is on and `analytics` is denied no chat can start**:
+capture is deferred, not dropped, so a later `setConsent({ analytics: true })`
+releases the gate and the chat proceeds normally.
+
+The `functional` category is recorded and emitted for host CMPs (and is the
+integration point the forthcoming #56/#53 server-side consent model consumes),
+but on its own it does **not** release the gate today — the gate keys on
+`analytics`. A clean split that keeps strictly-necessary chat available without
+analytics consent requires the server-side foundation (#56/#53); until it lands,
+only enable `data-require-consent` if holding the whole widget until consent is
+the intended behavior.
 
 ## Enabling the gate
 
@@ -79,8 +91,8 @@ window.addEventListener('afixt-livechat:consent', (e) => {
 
 Calling `setConsent({ analytics: false })` records the withdrawal and blocks
 future capture. (Data already captured under a prior grant is governed by the
-retention/minimization policy — see
-[`data-retention.md`](./data-retention.md).)
+visitor data-retention / minimization policy — ADR-0011, landing with
+issue #57.)
 
 ## Relationship to the consent foundation (#56/#53/#55)
 
