@@ -64,6 +64,12 @@ export function createConsentService(deps: ConsentServiceDeps) {
   /**
    * Read the visitor's latest explicit (banner) choices for non-essential
    * purposes, used as the baseline for the next decision.
+   *
+   * Reads the persisted raw `explicitPurposes` — the choices the visitor
+   * actually made — never the effective `purposes`. The effective purposes fold
+   * in jurisdiction defaults (e.g. presence granted-by-default under an opt-out
+   * regime); reading those back would mis-record a default as an explicit grant
+   * and leak it into a later opt-in re-evaluation. See ADR-0019.
    * @param subjectKey - The visitor subject key.
    * @returns Stored explicit choices (possibly empty).
    */
@@ -72,8 +78,12 @@ export function createConsentService(deps: ConsentServiceDeps) {
       where: { subjectKey, source: 'banner' },
       order: [['created_at', 'DESC']],
     });
-    if (last === null) return {};
-    return { presence: last.purposes.presence, analytics: last.purposes.analytics };
+    const stored = last?.explicitPurposes;
+    if (stored === null || stored === undefined) return {};
+    const explicit: ExplicitConsent = {};
+    if (stored.presence !== undefined) explicit.presence = stored.presence;
+    if (stored.analytics !== undefined) explicit.analytics = stored.analytics;
+    return explicit;
   }
 
   /**
@@ -113,6 +123,9 @@ export function createConsentService(deps: ConsentServiceDeps) {
       gpc: params.gpc,
       ruleVersion: RULE_VERSION,
       purposes: state.purposes,
+      // Persist the raw explicit choices separately from the effective purposes
+      // so they never get re-read as consent under a different jurisdiction.
+      explicitPurposes: explicit,
       ipHash: hashIp(params.ip),
       userAgent: params.userAgent ?? null,
     });

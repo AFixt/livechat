@@ -110,6 +110,44 @@ describe('privacy API (integration)', () => {
     expect(read.body.data.purposes.analytics).toBe('granted');
   });
 
+  test('a default-granted purpose under an opt-out regime is not treated as explicit consent when re-evaluated under opt-in', async () => {
+    if (harness === null) return;
+    const { app } = harness;
+    const agent = request.agent(app);
+    const tenant = await seedTenant(`crossjur-${Math.random().toString(36).slice(2, 8)}`);
+
+    // Opt-out regime (US): the visitor only denies analytics. `presence` is
+    // granted purely by the jurisdiction default — never an explicit choice.
+    const optOut = await agent
+      .post('/api/v1/privacy/consent')
+      .send({ tenantKey: tenant.slug, country: 'US', purposes: { analytics: 'denied' } });
+    expect(optOut.status).toBe(201);
+    expect(optOut.body.data.jurisdiction).toBe('US');
+    expect(optOut.body.data.purposes.presence).toBe('granted'); // default-granted, not explicit
+    expect(optOut.body.data.purposes.analytics).toBe('denied');
+
+    // The persisted record must keep the raw explicit choices separate from the
+    // effective purposes: presence was never explicitly set.
+    const row = await ConsentRecord.findOne({
+      where: { tenantId: tenant.id },
+      order: [['created_at', 'DESC']],
+    });
+    expect(row?.purposes.presence).toBe('granted');
+    expect(row?.explicitPurposes?.presence).toBeUndefined();
+    expect(row?.explicitPurposes?.analytics).toBe('denied');
+
+    // Same subject re-evaluated under an opt-in regime (EU): the default-granted
+    // presence must NOT carry over as consent — there was no real grant.
+    const optIn = await agent
+      .get('/api/v1/privacy/consent')
+      .query({ tenantKey: tenant.slug, country: 'DE' });
+    expect(optIn.status).toBe(200);
+    expect(optIn.body.data.jurisdiction).toBe('EU');
+    expect(optIn.body.data.purposes.presence).toBe('denied');
+    expect(optIn.body.data.purposes.analytics).toBe('denied');
+    expect(optIn.body.data.requiresOptIn).toContain('presence');
+  });
+
   test('POST /privacy/consent/withdraw suppresses non-essential purposes', async () => {
     if (harness === null) return;
     const { app } = harness;
