@@ -44,6 +44,9 @@ fi
 
 # Shared path exclusions (trufflehog-native allow-list). Only passed when the
 # file exists so an accidental deletion doesn't turn the flag into an error.
+# Expanded as ${EXCLUDE[@]+"${EXCLUDE[@]}"} at the call sites so an EMPTY array
+# is safe under `set -u` on bash 3.2 (macOS default), where a bare
+# "${EXCLUDE[@]}" would abort with "unbound variable".
 EXCLUDE=()
 if [ -f .trufflehog-exclude.txt ]; then
   EXCLUDE=(--exclude-paths .trufflehog-exclude.txt)
@@ -53,7 +56,7 @@ case "$TIER" in
   verified)
     echo "secret-scan[verified]: blocking gate — fails on confirmed-live secrets"
     exec trufflehog git "file://$ROOT" \
-      --results=verified --fail --no-update "${EXCLUDE[@]}"
+      --results=verified --fail --no-update ${EXCLUDE[@]+"${EXCLUDE[@]}"}
     ;;
   suspected)
     echo "secret-scan[suspected]: warn only — unverified/unknown detector hits below (does not block)"
@@ -61,7 +64,7 @@ case "$TIER" in
     # promoted to a fix, new false positives are recorded (see the exception
     # lifecycle in docs/adr/0012-*.md).
     exec trufflehog git "file://$ROOT" \
-      --results=unverified,unknown --no-update "${EXCLUDE[@]}"
+      --results=unverified,unknown --no-update ${EXCLUDE[@]+"${EXCLUDE[@]}"}
     ;;
   *)
     echo "usage: secret-scan.sh [verified|suspected]" >&2
