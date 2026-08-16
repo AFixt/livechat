@@ -132,6 +132,15 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   the session (also serving geo-privacy deletion) and clears the cookie. Windows
   are configurable via `VISITOR_SESSION_ABSOLUTE_TTL_HOURS` /
   `VISITOR_SESSION_IDLE_TTL_HOURS`. ([#79])
+- **CSRF protection on cookie-authenticated visitor routes.** The API had no CSRF
+  protection despite cookie-authenticated state-changing endpoints
+  (`POST /visitor/chats`, `POST /visitor/heartbeat`); only `SameSite=Lax`
+  incidentally blocked the attack — the exact thing #75 must change for the
+  widget. Added a stateless synchronizer token (`X-XSRF-TOKEN`, HMAC-bound to the
+  visitor cookie, held in the widget's memory — never a cookie an attacker can
+  read), issued by the bootstrap endpoints and required on the write routes.
+  Bearer-token (console) routes are exempt — CSRF applies only to ambient
+  credentials. **Unblocks #75.** ([#77])
 
 ### Added
 
@@ -292,6 +301,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#65]: https://github.com/AFixt/livechat/issues/65
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#77]: https://github.com/AFixt/livechat/issues/77
 [#79]: https://github.com/AFixt/livechat/issues/79
 [#72]: https://github.com/AFixt/livechat/issues/72
 [#74]: https://github.com/AFixt/livechat/issues/74
