@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 
 import { LiveRegion } from './components/live-region.js';
+import { useDelayedFlag } from './hooks/use-delayed-flag.js';
 import { useFocusReturn } from './hooks/use-focus-return.js';
 import {
   fetchCurrentChat,
@@ -26,6 +27,14 @@ import type { WidgetMessage } from './types.js';
 interface AppProps {
   tenantKey: string;
 }
+
+/**
+ * How long support must stay available before the proactive invitation
+ * surfaces. §5.1.2 calls for the CTA "after a short period" — the widget shows
+ * its plain trigger first and only escalates to the invitation once support has
+ * been online continuously for this long.
+ */
+const INVITATION_DELAY_MS = 5000;
 
 interface SocketMessageEvent {
   chatId: string;
@@ -54,6 +63,10 @@ function noSupportProps(text: string | undefined): { supportHoursText?: string }
 export function App(props: AppProps): preact.JSX.Element {
   const [model, dispatch] = useReducer(reduce, initialModel());
   const [supportHoursText, setSupportHoursText] = useState<string | undefined>(undefined);
+  // §5.1.2: the invitation appears "after a short period", not the instant
+  // support comes online. `supportAvailable` still drives the offline/online
+  // logic everywhere else; only the proactive flourish waits out this delay.
+  const showInvitation = useDelayedFlag(model.supportAvailable, INVITATION_DELAY_MS);
   useFocusReturn(model.open);
   const panelHeaderRef = useRef<HTMLHeadingElement>(null);
 
@@ -285,7 +298,7 @@ export function App(props: AppProps): preact.JSX.Element {
             )}
           </div>
         </section>
-      ) : model.supportAvailable ? (
+      ) : showInvitation ? (
         <InvitationState
           onOpen={() => {
             dispatch({ type: 'open' });

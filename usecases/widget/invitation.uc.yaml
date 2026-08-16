@@ -3,7 +3,8 @@ title: "Visitor sees the proactive invitation while support is online"
 type: extension
 description: |
   §5.1.2 — when a support agent is available, the closed widget swaps its
-  plain trigger for the invitation flourish: "Our support team is online
+  plain trigger for the invitation flourish "after a short period" (it shows
+  the plain trigger first, then escalates): "Our support team is online
   right now." with a primary "Start a chat" action and a dismiss action.
   Activating "Start a chat" opens the panel on the name + first-message
   form; dismissing returns to the plain trigger for the rest of the visit.
@@ -23,6 +24,8 @@ preconditions:
 data: {}
 
 steps:
+  - note: "§5.1.2 — the invitation surfaces only after support has been online continuously for a short period (INVITATION_DELAY_MS in the widget app), not the instant availability arrives; the plain trigger shows until then."
+  - wait: 5000
   - locate: region "Chat invitation"
   - locate: text "Our support team is online right now."
   - locate: button "Start a chat"
