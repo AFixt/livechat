@@ -1,4 +1,4 @@
-# ADR-0011: Container, Dockerfile, and IaC scanning (Hadolint, Trivy, Checkov)
+# ADR-0016: Container, Dockerfile, and IaC scanning (Hadolint, Trivy, Checkov)
 
 - **Status:** Accepted
 - **Date:** 2026-08-15
