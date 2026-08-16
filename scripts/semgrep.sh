@@ -9,6 +9,30 @@
 # 404ing, that is the failure mode to look for.
 set -euo pipefail
 
+# Degrade gracefully when semgrep is not installed: this gate runs in local
+# pre-push and in CI, but a contributor without semgrep on PATH should get a
+# clear skip rather than a hard failure.
+#
+# Guard: only skip *locally*. In CI (`CI` is set by GitHub Actions and every
+# major CI provider) a missing semgrep means the install step regressed, and a
+# silent skip would let unscanned code merge — so fail hard there instead. This
+# is what keeps "CI installs semgrep, so coverage is not lost" a guarantee
+# rather than an assumption.
+if ! command -v semgrep >/dev/null 2>&1; then
+  if [[ -n "${CI:-}" ]]; then
+    echo "semgrep not found on PATH in CI — the install step regressed." >&2
+    echo "The static-analysis gate cannot be skipped in CI." >&2
+    exit 1
+  fi
+  echo "semgrep not found on PATH — skipping static-analysis gate (local only)." >&2
+  echo "Install it with: pipx install semgrep   (or) brew install semgrep" >&2
+  exit 0
+fi
+
+# Repo root, so the custom-rules --config resolves regardless of caller cwd.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CUSTOM_RULES="${REPO_ROOT}/.semgrep/rules.yml"
+
 CONFIGS=(
   --config=p/javascript
   --config=p/typescript
@@ -18,6 +42,12 @@ CONFIGS=(
   --config=p/security-audit
   --config=p/secrets
 )
+
+# Project-specific rules (see .semgrep/rules.yml). Added only when present so
+# the gate still runs on a checkout that predates the file.
+if [[ -f "${CUSTOM_RULES}" ]]; then
+  CONFIGS+=("--config=${CUSTOM_RULES}")
+fi
 
 EXCLUDES=(
   # False positive. Every hit is a `token === undefined` / `=== null`
@@ -62,4 +92,7 @@ EXCLUDES=(
   --exclude-rule=ajinabraham.njsscan.database.sequelize_tls.sequelize_tls
 )
 
-exec semgrep "${CONFIGS[@]}" "${EXCLUDES[@]}" --error --metrics=off "$@"
+# Never scan the rules dir itself: .semgrep/tests/ holds intentionally-insecure
+# fixtures for `semgrep --test` that would otherwise trip both the registry
+# packs and our own rules.
+exec semgrep "${CONFIGS[@]}" "${EXCLUDES[@]}" --exclude='.semgrep' --error --metrics=off "$@"
