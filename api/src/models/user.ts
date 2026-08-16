@@ -10,9 +10,29 @@ import {
 
 import type { Role, UserSafe, UserStatus } from '@livechat/shared';
 
-const BCRYPT_COST = 12;
+/** Production/dev bcrypt cost — the hardening parameter from CLAUDE.md. */
+const BCRYPT_COST_PROD = 12;
+/**
+ * Test-only bcrypt cost. Several integration tests hash multiple passwords per
+ * test; at cost 12 that is ~300ms each, which stacked close enough to the suite
+ * timeout to flake under load (#71). Cost 4 removes that pressure without
+ * weakening what the auth tests verify — they assert hashing/verification
+ * behaviour, not the work factor. The work factor itself is asserted separately
+ * (see `bcrypt-cost.test.ts`), and production always uses {@link BCRYPT_COST_PROD}.
+ */
+const BCRYPT_COST_TEST = 4;
 const LOCKOUT_MINUTES = 30;
 const MAX_FAILED_ATTEMPTS = 5;
+
+/**
+ * The bcrypt cost for the current environment. Read at call time (not module
+ * load) so it always reflects `NODE_ENV`. Only `test` is lowered; every other
+ * environment — including dev — uses the production hardening parameter.
+ * @returns The bcrypt work factor to hash with.
+ */
+export function bcryptCost(): number {
+  return process.env.NODE_ENV === 'test' ? BCRYPT_COST_TEST : BCRYPT_COST_PROD;
+}
 
 /**
  * User — an identity record for staff, clients, and admins. Visitors are
@@ -230,11 +250,11 @@ export function initUserModel(sequelize: Sequelize): void {
       underscored: true,
       hooks: {
         beforeCreate: async (user: User) => {
-          user.passwordHash = await bcrypt.hash(user.passwordHash, BCRYPT_COST);
+          user.passwordHash = await bcrypt.hash(user.passwordHash, bcryptCost());
         },
         beforeUpdate: async (user: User) => {
           if (user.changed('passwordHash')) {
-            user.passwordHash = await bcrypt.hash(user.passwordHash, BCRYPT_COST);
+            user.passwordHash = await bcrypt.hash(user.passwordHash, bcryptCost());
           }
         },
       },

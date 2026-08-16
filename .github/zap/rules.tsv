@@ -1,4 +1,44 @@
-# ZAP baseline rule tuning. Format: <ruleId>	<threshold>	<comment>
-# Thresholds: IGNORE | WARN | FAIL (default is FAIL for HIGH/MEDIUM, WARN for LOW)
+# OWASP ZAP baseline rule tuning for the livechat targets.
 #
-# No overrides today — start strict, relax only with a documented reason.
+# Format (tab-separated): <ruleId>	<threshold>	<comment>
+#   threshold: IGNORE | WARN | FAIL   (default: FAIL for HIGH/MEDIUM, WARN for LOW)
+#
+# Consumed by .github/workflows/zap.yml (rules_file_name). Every override below
+# is a deliberate, documented decision — start strict, relax only with a reason.
+# See docs/security/zap.md for how to run the scan and why each line exists.
+#
+# ---------------------------------------------------------------------------
+# Suppressions (IGNORE) — findings that are false positives or by-design here.
+# ---------------------------------------------------------------------------
+#
+# 10015 — Incomplete or No Cache-control Header.
+# The API deliberately does not send Cache-Control on JSON responses; they are
+# not cacheable by default and carry per-request auth. The static hosts DO set
+# explicit Cache-Control (ui/nginx.conf, widget/nginx.conf). Noise on the API.
+10015	IGNORE	API JSON is non-cacheable by default; static hosts set Cache-Control explicitly
+#
+# 10096 — Timestamp Disclosure.
+# ZAP flags any integer that looks like a Unix timestamp. Our JSON carries
+# `created_at` / `expires_at` ISO fields and numeric ids by design; none are
+# secrets. Pure false positive.
+10096	IGNORE	Timestamps (created_at/expires_at) are intended API data, not a leak
+#
+# 10027 — Information Disclosure - Suspicious Comments.
+# Fires on words like "TODO"/"query" inside the minified widget/console bundles.
+# No secrets are shipped in client code (enforced by trufflehog + no-secrets).
+10027	IGNORE	Suspicious-comment heuristic hits minified bundles; no secrets in client JS
+#
+# ---------------------------------------------------------------------------
+# Downgrades (WARN) — worth seeing, but must not fail the baseline yet.
+# ---------------------------------------------------------------------------
+#
+# 90004 — Insufficient Site Isolation Against Spectre.
+# Cross-Origin-Embedder-Policy is intentionally NOT set: the widget must remain
+# cross-origin embeddable (ADR-0011). COOP + CORP are set where appropriate.
+# Track as WARN rather than fail.
+90004	WARN	COEP intentionally unset so the widget stays cross-origin embeddable (ADR-0011)
+#
+# 10063 — Permissions Policy Header Not Set.
+# The console sets Permissions-Policy; the API (JSON, no browsing context) does
+# not need one. WARN so a genuinely missing header on the console still surfaces.
+10063	WARN	API responses have no browsing context; console sets Permissions-Policy

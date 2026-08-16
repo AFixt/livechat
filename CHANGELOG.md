@@ -9,8 +9,129 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Removed
+
+- **Chat attachments deferred until the feature is built (part of #80).** The
+  `chat_attachments` table, model, and associations existed and `S3_ACCESS_KEY`
+  / `S3_SECRET_KEY` / `S3_BUCKET` were **required at boot**, but there was no
+  upload/download route, no UI, and no `@aws-sdk` usage — every deployment had
+  to supply real S3 credentials for a feature that did not exist. The table
+  (via a reversible migration), model, and associations are removed, and the
+  `S3_*` env vars are now optional. Typing indicators and the email-transcript
+  affordance (the other two parts of #80) are handled separately. See
+  [ADR-0017]. ([#80])
 ### Security
 
+- **The widget mute-preference cookie now carries `Secure`** ([#58]). The
+  `afixt_livechat_muted` cookie was written with `SameSite=Lax` but no
+  `Secure`, so on the third-party HTTPS pages the widget embeds into it could
+  travel over a downgraded/plaintext connection. It is now `Secure` on any
+  HTTPS origin (omitted only on a plaintext-HTTP origin, i.e. local dev, where
+  the browser would otherwise drop it).
+- **Documented risk acceptance for JWT tokens in console `localStorage`**
+  ([#59], part of the security-baseline program). The support console persists
+  the access + refresh token to `localStorage`, which is XSS-exfiltratable. Per
+  the baseline's exception rules this is now an explicit, owner-approved,
+  time-limited acceptance: [ADR-0013] records the risk, the server-side
+  mitigations already in place (15-minute access TTL, refresh rotation, bcrypt-
+  hashed refresh storage, JTI blacklist, session teardown), the compensating
+  controls (no token logging, no `dangerouslySetInnerHTML`, CSP pending #61),
+  the rejected alternatives (httpOnly refresh cookie; BFF; `sessionStorage` —
+  evaluated and found to be no real improvement), and the conditions that force
+  a revisit. A companion note lives at `docs/security/browser-token-storage.md`,
+  and `ui/src/store/auth.test.ts` pins the accepted exception so it cannot drift
+  silently. No storage change — localStorage auth is intentionally left in
+  place per the issue.
+- **Swagger UI and the OpenAPI document are no longer served in production.**
+  `/api/docs` (and the raw spec at `/api/docs.json`) published the entire route
+  and schema inventory — including every admin surface — unauthenticated. Both
+  are now mounted only when `NODE_ENV !== 'production'` and return `404` in
+  production; developers read the spec from a local/staging run
+  (`docs/deploy.md`). ([#78])
+- **Security headers on the static-hosted console and widget.** Both nginx hosts
+  send a Content-Security-Policy (`default-src 'self'`, strict `script-src`, no
+  `'unsafe-eval'`; `style-src 'unsafe-inline'` only, for MUI/emotion), COOP
+  `same-origin`, and HSTS (2 years, `includeSubDomains; preload`). The console is
+  locked down (CORP `same-origin`, `X-Frame-Options: DENY` + `frame-ancestors
+  'none'`); the widget stays embeddable (CORP `cross-origin`, `frame-ancestors
+  *`, no `X-Frame-Options`). A new `security:headers` gate
+  (`scripts/check-headers.mjs`) config-lints both `nginx.conf` files and runs in
+  `check:all`. See ADR-0012. ([#61])
+- **TLS/HTTPS verification harness for deployed environments** ([#63]).
+  `scripts/check-tls.sh` (`npm run security:tls`) verifies a deployed target's
+  transport security via `testssl.sh` (fails on weak ciphers, an invalid chain,
+  or a still-offered TLS 1.0/1.1), an HTTP→HTTPS redirect, HSTS, and
+  `Secure`/`HttpOnly`/`SameSite` on every `Set-Cookie`. No-op without
+  `TLS_TARGET_URL`. Documented in `docs/security/tls-verification.md`.
+- **Security-baseline governance** ([#65]) — a governance layer over the
+  scanners (ADR-0011). `security/thresholds.yaml` centralizes what each gate
+  blocks vs warns on; `security/exceptions.yaml` catalogues every accepted
+  suppression with owner, reason, added date, and expiry;
+  `scripts/check-exceptions.sh` (`npm run security:exceptions`) fails on expired
+  exceptions and warns within 30 days; `scripts/security-report.sh` emits
+  machine-readable scanner output into a gitignored `security-reports/`.
+  Indexed in `docs/security/README.md`.
+- **Container, Dockerfile, and IaC scanning** ([#60]) — Hadolint (Dockerfile
+  lint), Trivy `config` (Dockerfile misconfig), Trivy `image` (built api/ui/
+  widget image vulnerabilities), Checkov (Dockerfile IaC), and KICS
+  (`docker-compose.yml` + `docker-compose.prod.yml` misconfig — the tool that
+  actually scans compose, which Trivy and Checkov do not). Each has a
+  `scripts/*.sh` wrapper and a `security:*` npm script; all but the image build
+  are in the aggregate `security` script, and a PR-time
+  `.github/workflows/container-iac-scan.yml` safety net builds the images and
+  runs every scan. Gate policy (ADR-0016, `security/thresholds.yaml`): image
+  vulnerabilities fail on CRITICAL and warn on HIGH (per #60); IaC/Dockerfile
+  misconfigurations fail on HIGH+CRITICAL (documented deviation — misconfigs are
+  directly fixable and the IaC tools emit no CRITICALs). `.do/app.yaml` is a
+  DigitalOcean spec no scanner structurally covers; it is documented as such
+  rather than scanned for show. Accepted findings carry expiry/revisit dates in
+  `.hadolint.yaml`, `.trivyignore` (`exp:`), and `.checkov.yaml` and are
+  catalogued with owners in `security/exceptions.yaml`; a `HEALTHCHECK` was added
+  to all three Dockerfiles. (ADR-0016)
+- Two-tier secret scanning ([#82]). The verified/blocking trufflehog gate is
+  unchanged; a new suspected (unverified/unknown) tier reports without blocking,
+  via `scripts/secret-scan.sh` + `security:secrets:suspected`. A
+  `.secrets.baseline` (detect-secrets) records known false positives so the
+  suspected tier is actionable, checked by `scripts/detect-secrets.sh` +
+  `security:secrets:baseline`; `.trufflehog-exclude.txt` is the trufflehog-native
+  path allow-list. A `.pre-commit-config.yaml` wires the detect-secrets baseline
+  hook (husky stays the enforced gate); the husky pre-commit now runs both tiers
+  on staged files. PR-time `.github/workflows/secret-scan.yml` surfaces the
+  suspected tier without blocking. The two tiers are recorded in
+  `security/thresholds.yaml`. (See ADR `0015-secret-scanning-tiers`, [#82].)
+- **`POST /widget/csp-report` is no longer an unvalidated public log sink.** The
+  unauthenticated endpoint previously logged whatever was posted — a
+  log-injection and unbounded-log DoS vector. It now validates the body against
+  a Zod schema (both the classic `application/csp-report` object form and the
+  Reporting-API `report-to` array), rejects anything that doesn't match with a
+  400, caps the body at 8 KB with its own parser (413 over that, overriding the
+  global 1 MB limit), rate-limits per IP (60/min), and logs only a bounded,
+  whitelisted set of fields — never the raw body, the original policy, or the
+  violation sample. Also adds an owned, commented OWASP ZAP baseline rule set
+  (`.github/zap/rules.tsv`) and `docs/security/zap.md`. ([#84])
+- **Socket.IO chat handlers now enforce tenant/visitor ownership.** Every
+  `/staff` and `/visitor` event trusted a client-supplied `chatId` and acted on
+  it with no tenant check, so any authenticated staff user could read, reply to,
+  take over, or end **any** tenant's chat by id, and any visitor could do the
+  same to another visitor's chat. Ownership is now enforced inside
+  `chat-service` (a `ChatCaller` scope on `getById`/`sendMessage`/`endChat`/
+  `assign`), so the HTTP and socket paths share one control and cannot diverge.
+  The `/staff` handshake now runs the full HTTP auth path (JTI blacklist, active
+  status, tenant expiry) and rejects non-staff roles, so a revoked or
+  deactivated token no longer keeps a live socket. Rejections are returned to
+  the caller as a `chat:error` event instead of being silently swallowed, and a
+  custom Semgrep rule (`.semgrep/rules.yml`) keeps chat lookups behind the
+  scoped service. ([#72])
+- **Visitor sessions now expire and can be revoked.** The session cookie was a
+  30-day, non-revocable credential: `findByCookie` matched on the hash alone,
+  with no absolute/idle expiry and no server-side bound beyond the client cookie
+  `maxAge`. Absolute (default 30d) and idle (default 3d) expiry are now enforced
+  server-side in `findByCookie` — which the `/visitor` socket handshake also
+  goes through, so both the HTTP routes and the socket reject expired sessions.
+  A visitor "forget me" endpoint (`POST /visitor/session/forget`) hard-deletes
+  the session (also serving geo-privacy deletion) and clears the cookie. Windows
+  are configurable via `VISITOR_SESSION_ABSOLUTE_TTL_HOURS` /
+  `VISITOR_SESSION_IDLE_TTL_HOURS`. ([#79])
 - **CSRF protection on cookie-authenticated visitor routes.** The API had no CSRF
   protection despite cookie-authenticated state-changing endpoints
   (`POST /visitor/chats`, `POST /visitor/heartbeat`); only `SameSite=Lax`
@@ -23,6 +144,73 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Added
 
+- **The widget can work on third-party sites: CORS is now per-tenant.** The API
+  reflected only the console origin (`APP_URL`), so every credentialed
+  cross-origin widget request was blocked by the browser. Widget-facing routes
+  (`/api/v1/visitor/*`, `/api/v1/widget/*`) and the Socket.IO handshake now
+  reflect the requesting origin when it belongs to an active tenant's
+  `allowed_origins`, set `Vary: Origin`, and reject unknown origins
+  (default-deny — see [ADR-0018](docs/adr/0018-widget-cors-default-deny.md));
+  console routes keep the strict `APP_URL` policy. Note the widget also needs
+  the `SameSite=None` cookie change (#75) to actually work cross-site. ([#74])
+
+- **Custom Semgrep rules** ([#83]) in `.semgrep/rules.yml`, wired into the gate
+  by `scripts/semgrep.sh` alongside the registry packs. Twelve project-specific
+  rules covering the `secure-project-baseline` §17 categories that fit this
+  codebase, which the public packs miss: chat lookups must go through the
+  tenant-scoped service, tenant-owned model lookups in handlers need a scoping
+  predicate, permissive CORS origin (`origin: true` / `'*'`), CORS reflecting
+  the request Origin header, a credentialed CORS config with a single fixed
+  origin and no per-tenant callback (the #74 pattern; the first-party `APP_URL`
+  console origin is a documented carve-out until #74 lands), `jwt.verify`
+  without an `algorithms` pin, `jwt.decode` where verification is required,
+  cookies set without `httpOnly` + `secure`, raw SQL built by string
+  interpolation, `child_process` exec with an interpolated command, outbound
+  `fetch` of a request-controlled URL (SSRF), and dynamic code execution
+  (`eval` / `new Function`). Every rule ships a `ruleid:` detect fixture and an
+  `ok:` near-miss under `.semgrep/tests/`. The
+  `jwt-verify-without-algorithm-pin` rule immediately caught three unpinned
+  verifiers (see Fixed). `scripts/semgrep.sh` now skips gracefully when semgrep
+  is not on PATH locally (but fails hard in CI so coverage cannot silently
+  regress) and excludes the fixtures dir from the scan.
+
+- **API security testing driven by the OpenAPI spec** ([#62]). Three additions,
+  all fed from a spec generated by `api/src/scripts/generate-openapi.ts` (which
+  serializes the live document without booting the API):
+  - **Schemathesis fuzzing** — `scripts/api-fuzz.sh` (npm `security:api-fuzz`)
+    generates the spec, targets a running API (`API_TARGET_URL`) or boots the
+    local one, and runs `schemathesis run --checks all`. Skips cleanly with an
+    install hint when schemathesis is absent, and when a local boot cannot be
+    brought up.
+  - **A ZAP API scan config** separate from the passive baseline —
+    `.github/zap/api-scan-rules.tsv` (owned, commented exclusions).
+    `.github/zap/rules.tsv` and `.github/workflows/zap.yml` are untouched.
+  - **Spec security validation** — `api/src/config/swagger.security.test.ts`
+    asserts `components.securitySchemes` declares the `bearerAuth` (JWT) and
+    `visitorCookie` mechanisms and that every non-public operation carries a
+    `security` requirement. The schemes are now declared in
+    `api/src/config/swagger.ts`.
+  - Docs: `docs/security/api-testing.md`. Known gap: only `GET /health` is
+    currently registered in the OpenAPI document, so the fuzzer/scan exercise a
+    single endpoint until the other routers register their paths.
+- **Cookie inventory, vendor disclosure, and a CMP consent hook for the
+  embedded widget** ([#54]):
+  - `docs/privacy/cookie-inventory.md` documents the only two cookies the widget
+    introduces — `livechat_visitor` (first-party, HttpOnly, signed session) and
+    `afixt_livechat_muted` (first-party mute preference) — with duration, flags
+    and data category; confirms **no** `localStorage`/`sessionStorage` and **no**
+    third-party trackers/fonts/analytics (the widget loads only same-origin
+    relative endpoints and an inlined audio data-URI).
+  - A dependency-free **consent hook** (`widget/src/services/consent.ts`): the
+    `data-require-consent` attribute plus
+    `window.AfixtLiveChat.setConsent/getConsent/onConsentChange` and an
+    `afixt-livechat:consent` DOM event let a host CMP grant/deny before the
+    widget captures any presence/analytics data. The widget bootstrap awaits the
+    capture gate. Additive integration point for the #56/#53 consent foundation.
+  - `docs/privacy/cmp-integration.md` (copy-paste snippet) and
+    [ADR-0014][adr-0014] (the hook contract). Bundle stays at 20.7 KB brotli
+    (budget 50 KB). New unit tests: consent-hook behavior + a source scan
+    asserting no third-party origins.
 - **Use-case coverage for eleven previously undocumented interactions**
   ([#66]): widget invitation state (§5.1.2, open + dismiss), widget
   chat-ended / email-transcript state (§5.1.7, send + decline), operator
@@ -32,8 +220,55 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   `admin-view-invitations` and `support-toggle-alert-sound` join the
   runnable e2e projects.
 
+### Changed
+
+- **No more scheduled GitHub Actions.** All four cron-triggered workflows now
+  run at PR time instead of on a timer, so a failure is attributable to the
+  change that caused it ([#50]):
+  - Link check (`docs.yml`) runs on `pull_request` (path-filtered to Markdown
+    and `docs/`) in offline mode; the full external-URL sweep stays available
+    via manual dispatch and already runs in `ci.yml`.
+  - Lighthouse CI (`lhci.yml`) keeps its existing `pull_request` trigger; only
+    the schedule was removed.
+  - CodeQL (`security.yml`) runs on `pull_request` and on pushes to
+    `main`/`develop`.
+  - The OWASP ZAP baseline (`zap.yml`) scans the PR's own UI build served
+    locally on the runner; scanning a deployed URL remains available via
+    manual dispatch.
+- **Use cases now carry `expected_result`, use `extends` for variants, and cover
+  more error paths** ([#85]). Every non-`extends` use case gained an
+  `expected_result` stating the observable outcome; the `support/login` and
+  `widget/chat-ended` variant pairs were converted from duplicated files to
+  `extends` + `steps_override`; three `type: negative` cases were added
+  (invalid allowed-origin, already-revoked invitation, invalid user role); and
+  `usecases/README.md` now documents the positive/negative/extension
+  distinction. (The `widget/invitation` pair is handled with #76, which makes
+  that state reachable.) `usecases:validate` passes (31 cases) and specs were
+  regenerated.
+
 ### Fixed
 
+- **A clean clone runs by following the README.** The API read `process.env`
+  with no `.env` loading and no example file, so `npm run dev` exited with an
+  envalid wall of ~15 missing variables. Added `api/.env.example` with working
+  defaults matching the compose ports, `dotenv` loading in development (app,
+  migrate, and seed), wired `npm run seed` to the real dev seeder (it was
+  `sequelize-cli db:seed:all` against a non-existent seeders dir), documented
+  the real steps + dev login accounts in the README, and gave `server.ts` an
+  `error` handler so a port clash prints an actionable message instead of an
+  `EADDRINUSE` stack trace. ([#81])
+- **Integration tests no longer flake under load.** The suite's 10s
+  `testTimeout` had no headroom: tests doing several bcrypt-cost-12 hashes plus
+  real MySQL round-trips landed near 10s on a busy machine, so unrelated tests
+  timed out intermittently and adding any new integration test destabilised
+  existing ones. Test-environment bcrypt cost is now 4 (production/dev stay at
+  12, asserted by `bcrypt-cost.test.ts`), and the integration `testTimeout` is
+  raised to 30s. ([#71])
+- **`npm ci --omit=dev` no longer crashes on the `prepare` hook.** The root
+  `prepare` script ran `husky` unconditionally, so any production install — the
+  `api/Dockerfile` runtime image and the `.do/app.yaml` migrate job — failed with
+  `husky: command not found` once devDependencies were omitted. Guarded as
+  `husky || true`, husky's documented pattern for CI/production installs. ([#60])
 - The admin "Allowed origins" textarea had no accessible name — the section
   heading above it is not a label. It now carries an explicit one, targeted
   by the new `admin-edit-tenant-settings` use case. ([#66])
@@ -47,10 +282,40 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   reconnect to the replacement instance), idle connections are dropped, and the
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
+- **JWT verification now pins `algorithms: ['HS256']`** at all three verify
+  call sites — `middlewares/authenticate.ts`, `io/staff-namespace.ts`, and
+  `services/auth-service.ts` — surfaced by the new
+  `jwt-verify-without-algorithm-pin` Semgrep rule. Without a pin, `jwt.verify`
+  accepts whatever algorithm the token header claims (algorithm-confusion /
+  `alg: none` footgun). All tokens are signed HS256, so the pin is a pure
+  hardening with no behavior change. ([#83])
 
+[#50]: https://github.com/AFixt/livechat/issues/50
+[#54]: https://github.com/AFixt/livechat/issues/54
+[#58]: https://github.com/AFixt/livechat/issues/58
+[#59]: https://github.com/AFixt/livechat/issues/59
+[#60]: https://github.com/AFixt/livechat/issues/60
+[#61]: https://github.com/AFixt/livechat/issues/61
+[#62]: https://github.com/AFixt/livechat/issues/62
+[#63]: https://github.com/AFixt/livechat/issues/63
+[#65]: https://github.com/AFixt/livechat/issues/65
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
 [#77]: https://github.com/AFixt/livechat/issues/77
+[#79]: https://github.com/AFixt/livechat/issues/79
+[#72]: https://github.com/AFixt/livechat/issues/72
+[#74]: https://github.com/AFixt/livechat/issues/74
+[#80]: https://github.com/AFixt/livechat/issues/80
+[ADR-0017]: docs/adr/0017-defer-chat-attachments.md
+[#81]: https://github.com/AFixt/livechat/issues/81
+[#71]: https://github.com/AFixt/livechat/issues/71
+[#78]: https://github.com/AFixt/livechat/issues/78
+[#82]: https://github.com/AFixt/livechat/issues/82
+[#83]: https://github.com/AFixt/livechat/issues/83
+[#84]: https://github.com/AFixt/livechat/issues/84
+[#85]: https://github.com/AFixt/livechat/issues/85
+[ADR-0013]: docs/adr/0013-jwt-localstorage-risk-acceptance.md
+[adr-0014]: docs/adr/0014-widget-consent-hook.md
 
 ## [0.2.0] - 2026-07-23
 

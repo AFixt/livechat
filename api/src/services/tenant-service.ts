@@ -1,3 +1,4 @@
+import { clearOriginCache } from '../middlewares/cors.js';
 import { generateEmbedSecret, Tenant } from '../models/tenant.js';
 import { ApiError } from '../utils/api-error.js';
 
@@ -101,6 +102,12 @@ export function createTenantService() {
       const tenant = await this.getById(id);
       tenant.allowedOrigins = origins;
       await tenant.save();
+      // Drop the CORS origin-decision cache so an edit takes effect immediately
+      // in this process rather than after the 60s TTL — in particular so a
+      // newly authorized origin is not held in the negative cache, and a
+      // de-authorized origin stops being reflected at once (ADR-0011). In a
+      // multi-process deployment other workers still converge within the TTL.
+      clearOriginCache();
       return tenant;
     },
   };
