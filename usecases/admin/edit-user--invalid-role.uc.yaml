@@ -1,0 +1,30 @@
+id: admin-edit-user--invalid-role
+title: "Editing a user rejects an invalid role with an accessible error"
+extends: admin-edit-user
+type: negative
+description: |
+  The user-edit API has a distinct zod-rejection branch for an out-of-enum
+  role/status. When the dialog submits an invalid role, the Role control must
+  surface the rejection programmatically (aria-invalid + aria-describedby) and
+  keep the dialog open so the change is not silently lost.
+
+  A negative variant of admin-edit-user. Like its parent it is not in the
+  runnable set — the role/status controls are MUI comboboxes, not native
+  selects (upstream @afixt/usecase-runner#6) — but it is the behavioural
+  source of truth for the invalid-role error path.
+
+preconditions:
+  - An admin or super_admin user is authenticated.
+  - At least one user row is listed.
+
+data:
+  invalid_role: "not-a-real-role"
+
+# Reuse parent steps 1–4 (open the edit dialog), then submit an invalid role
+# and assert the accessible error keeps the dialog open.
+steps_override:
+  from_step: 5
+  steps:
+    - 'enter: field "Role" value "{{ invalid_role }}"'
+    - 'activate: button "Save"'
+    - 'verify: field_error "Role"'

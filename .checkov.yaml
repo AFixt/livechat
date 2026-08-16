@@ -1,0 +1,39 @@
+# Checkov config — Dockerfile IaC scanning. Run: bash scripts/checkov.sh
+# (npm run security:checkov)
+#
+# SCOPE: the three Dockerfiles (api/ui/widget) via Checkov's `dockerfile`
+# framework only. Checkov has NO docker-compose framework in any current release
+# and its `yaml` framework produces zero checks on docker-compose.yml /
+# .do/app.yaml (verified against Checkov 3.x) — so scanning them here would be
+# coverage in name only. Compose IaC misconfiguration is handled by KICS
+# (scripts/kics.sh), which has a real DockerCompose query set; Dockerfile
+# misconfig is additionally covered by Trivy `config` and Hadolint. Repo-wide
+# secret detection is trufflehog's job (ADR-0008).
+#
+# Every skipped check carries its justification below, mirroring how
+# scripts/semgrep.sh annotates each --exclude-rule. Keep skip-check in lockstep
+# with .hadolint.yaml and .trivyignore so all three Dockerfile scanners agree.
+
+file:
+  - api/Dockerfile
+  - ui/Dockerfile
+  - widget/Dockerfile
+
+framework:
+  - dockerfile
+
+# Fail the run on any violation not skipped below.
+soft-fail: false
+compact: true
+quiet: true
+
+skip-check:
+  # CKV_DOCKER_3 — "Ensure that a user for the container has been created."
+  # ui/Dockerfile and widget/Dockerfile are nginx images that must bind the
+  # privileged port 80; running as a non-root user needs the
+  # nginxinc/nginx-unprivileged base + nginx.conf changes owned by a separate
+  # workstream. api/Dockerfile already sets `USER node`. Same deferral as
+  # Hadolint DL3002 and Trivy AVD-DS-0002. Checkov skip-check has no native
+  # expiry, so the lifecycle lives in security/exceptions.yaml
+  # (`checkov-nginx-root`); revisit: 2027-02-16.
+  - CKV_DOCKER_3

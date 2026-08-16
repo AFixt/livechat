@@ -40,6 +40,12 @@ export interface ServerToClientEvents {
   }) => void;
   /** Chat has ended. */
   'chat:ended': (payload: { chatId: string; endedBy: 'customer' | 'support' }) => void;
+  /**
+   * A client event was rejected — authorization (wrong tenant/visitor) or
+   * validation. Sent only to the socket that triggered it so the caller can
+   * surface the failure instead of silently hanging (issue #72).
+   */
+  'chat:error': (payload: { event: string; message: string }) => void;
   /** Staff availability flipped (visitor-facing). */
   'support:availability_changed': (payload: { available: boolean }) => void;
   /**
