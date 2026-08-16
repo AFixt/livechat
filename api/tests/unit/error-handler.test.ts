@@ -35,6 +35,13 @@ function buildApp(jsonLimit = '20kb'): Express {
   app.get('/throw-apierror', () => {
     throw ApiError.forbidden('Insufficient permissions');
   });
+  app.get('/throw-typed-no-status', () => {
+    // An unrelated internal error that merely carries a string `type` (but no
+    // numeric 4xx status) must NOT be mistaken for a body-parser client error.
+    const e = new Error(LEAKY_MESSAGE) as Error & { type: string };
+    e.type = 'some.internal.type';
+    throw e;
+  });
 
   app.use(errorHandler(pino({ level: 'silent' })));
   return app;
@@ -73,6 +80,13 @@ describe('errorHandler — no error leakage (unit)', () => {
     }
     if (prev === undefined) delete process.env['NODE_ENV'];
     else process.env['NODE_ENV'] = prev;
+  });
+
+  test('an error carrying a string `type` but no numeric status stays a generic 500', async () => {
+    const res = await request(buildApp()).get('/throw-typed-no-status');
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ success: false, message: 'Internal server error' });
+    expect(JSON.stringify(res.body)).not.toContain('SELECT');
   });
 
   test('ApiError is serialized with its own status and message', async () => {

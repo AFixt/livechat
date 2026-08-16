@@ -14,6 +14,20 @@ interface ErrorPayload {
 }
 
 /**
+ * Extract a numeric HTTP status from a body-parser / `http-errors` failure,
+ * which always carries `status` (and a mirrored `statusCode`).
+ * @param err - The thrown error.
+ * @returns The numeric status, or `null` if neither field is a number.
+ */
+function bodyErrorStatus(err: Error): number | null {
+  const raw = (err as { status?: unknown }).status;
+  const rawCode = (err as { statusCode?: unknown }).statusCode;
+  if (typeof raw === 'number') return raw;
+  if (typeof rawCode === 'number') return rawCode;
+  return null;
+}
+
+/**
  * Map a body-parser / `http-errors` failure (malformed JSON, oversized body,
  * unsupported charset) to a client 4xx with a generic, non-leaking message.
  *
@@ -25,13 +39,14 @@ interface ErrorPayload {
  * @returns A `{ status, message }` for known body-parser errors, else `null`.
  */
 function clientBodyError(err: unknown): { status: number; message: string } | null {
-  if (!(err instanceof Error) || !('type' in err) || typeof err.type !== 'string') {
+  if (!(err instanceof Error) || typeof (err as { type?: unknown }).type !== 'string') {
     return null;
   }
-  const raw = (err as { status?: unknown; statusCode?: unknown }).status;
-  const rawCode = (err as { statusCode?: unknown }).statusCode;
-  const status = typeof raw === 'number' ? raw : typeof rawCode === 'number' ? rawCode : 400;
-  if (status < 400 || status >= 500) return null;
+  // Require a real numeric 4xx status; a body-parser error always carries one.
+  // Without this, an unrelated internal error that happens to have a string
+  // `type` but no status would be silently mapped to 400 and skip the error log.
+  const status = bodyErrorStatus(err);
+  if (status === null || status < 400 || status >= 500) return null;
   if (status === 413) return { status, message: 'Request payload too large' };
   if (status === 415) return { status, message: 'Unsupported media type' };
   return { status: 400, message: 'Malformed request body' };
