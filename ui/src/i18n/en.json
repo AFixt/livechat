@@ -31,6 +31,10 @@
   },
   "dashboard": {
     "heading": "Dashboard",
+    "connection": {
+      "reconnecting": "Connection lost. Reconnecting to live updates…",
+      "reconnected": "Reconnected to live updates."
+    },
     "visitors": {
       "heading": "Visitors on site",
       "empty": "No visitors are currently on the site.",

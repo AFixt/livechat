@@ -112,12 +112,25 @@ run the API locally or in staging (`NODE_ENV=development`) and open
 `http://localhost:23001/api/docs`, or fetch `/api/docs.json` for the machine-
 readable spec. In production both paths return `404`.
 
-### Scaling
+### Horizontal scaling
 
 - **api**: bump `instance_count` in `.do/app.yaml` (currently 2). Redis is
-  shared — rate-limit counters and Socket.IO adapter state both live there, so
-  horizontal scaling is safe. Socket.IO needs a Redis adapter when > 1 instance;
-  confirm before flipping to 3+.
+  shared, so both stateful layers span instances:
+  - **Rate-limit counters** and **presence** (staff availability + the visitor
+    list) are plain Redis keys — already global.
+  - **Socket.IO rooms** are per-process by default. The **Redis adapter**
+    (`api/src/io/adapter.ts`, wired in `server.ts` via `attachIo`) publishes
+    every room broadcast through Redis so a visitor on instance A and an agent
+    on instance B reach each other. **This is required for
+    `instance_count > 1`** — without it roughly half of all cross-instance
+    messages are silently lost (issue #73). It is on by default; there is
+    nothing to enable.
+  - The adapter uses two dedicated Redis connections (a subscriber connection
+    cannot serve other commands), separate from the shared client.
+  - **Verify after scaling:** `GET /api/v1/health` reports `data.socketAdapter`.
+    It must be `"ready"`; `"degraded"` means the adapter's Redis connection is
+    down and rooms are **not** spanning instances — treat it as a real-time
+    outage even though liveness stays `200`.
 - **Managed MySQL**: resize via the DO UI. No app changes.
 - **widget + ui**: static sites; App Platform serves them through its CDN. No
   scaling knobs.

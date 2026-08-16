@@ -1,0 +1,28 @@
+id: widget-reconnect
+title: "Visitor sees a reconnecting banner when the socket drops"
+type: extension
+description: |
+  §3 / issue #69 — while the widget's realtime socket is down, the panel shows a
+  visible "reconnecting" banner, and the change is announced through the global
+  live region. The banner itself carries NO live-region role, so a screen-reader
+  user hears the status once (from the global region), not twice. When the
+  socket returns the banner clears and the transcript is backfilled from the
+  server so no message sent during the outage is lost.
+
+  The drop/restore is a socket-transport event that cannot be driven through the
+  accessibility DSL, so the full path is exercised in the cross-ends journey
+  suite (ADR-0007). This file is the behavioural source of truth for the
+  visitor-facing reconnect surface.
+
+start_location: "http://localhost:5175/"
+
+preconditions:
+  - A chat is already active (see widget-customer-initiates.uc.yaml).
+  - The visitor's realtime socket has dropped (established over sockets — see
+    the e2e journey suite).
+
+data: {}
+
+steps:
+  - locate: region "Chat transcript"
+  - locate: text "Connection lost. Reconnecting…"

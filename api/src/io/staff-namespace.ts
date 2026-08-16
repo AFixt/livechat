@@ -138,6 +138,18 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
       });
     });
 
+    socket.on('chat:join', (payload) => {
+      guard(deps.logger, emitError, 'chat:join', async () => {
+        // Re-enter a chat room the operator already had open (e.g. after a
+        // reconnect) without touching assignment (issue #69). `getById`
+        // enforces the same tenant scoping as `chat:accept` — a null-tenant
+        // AFixt operator spans all tenants, a scoped one is limited to theirs
+        // (#72) — so a client-supplied chatId cannot cross the boundary.
+        const chat = await deps.services.chat.getById(payload.chatId, caller);
+        await socket.join(`chat:${chat.id}`);
+      });
+    });
+
     socket.on('chat:message', (payload) => {
       guard(deps.logger, emitError, 'chat:message', async () => {
         const msg = await deps.services.chat.sendMessage(
