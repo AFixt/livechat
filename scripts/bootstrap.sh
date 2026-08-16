@@ -42,7 +42,7 @@ if ! command -v lychee >/dev/null 2>&1; then
   }
 fi
 
-# detect-secrets (issue #82, ADR-0012) — powers the suspected-tier baseline
+# detect-secrets (issue #82, ADR-0015) — powers the suspected-tier baseline
 # (.secrets.baseline) via scripts/detect-secrets.sh. Optional locally: the
 # script skips cleanly when it is absent, and CI installs it. Best-effort here —
 # a failed install only warns, never aborts bootstrap.

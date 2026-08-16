@@ -1,4 +1,4 @@
-# ADR-0012: Two-tier secret scanning + false-positive baseline
+# ADR-0015: Two-tier secret scanning + false-positive baseline
 
 - **Status:** Accepted
 - **Date:** 2026-08-15

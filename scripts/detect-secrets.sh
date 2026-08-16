@@ -11,7 +11,7 @@
 # exits 0 — it never blocks (the blocking path is the verified trufflehog gate
 # and, for staged files, the pre-commit hooks). New true positives should be
 # fixed; new false positives should be recorded, see the exception lifecycle in
-# docs/adr/0012-secret-scanning-tiers.md.
+# docs/adr/0015-secret-scanning-tiers.md.
 #
 # detect-secrets is a Python tool, run via `pipx`/`pip`, never an npm dep — so
 # the axe-core-banned Node tree is untouched (`npm ls axe-core` is unaffected).

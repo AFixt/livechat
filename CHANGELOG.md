@@ -70,7 +70,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   hook (husky stays the enforced gate); the husky pre-commit now runs both tiers
   on staged files. PR-time `.github/workflows/secret-scan.yml` surfaces the
   suspected tier without blocking. The two tiers are recorded in
-  `security/thresholds.yaml`. (See ADR `0012-secret-scanning-tiers`, [#82].)
+  `security/thresholds.yaml`. (See ADR `0015-secret-scanning-tiers`, [#82].)
 
 ### Added
 

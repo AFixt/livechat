@@ -1,7 +1,7 @@
 npx lint-staged
 npx tsc-files --noEmit
 
-# Two-tier secret scan of the staged files (issue #82, ADR-0012). trufflehog has
+# Two-tier secret scan of the staged files (issue #82, ADR-0015). trufflehog has
 # no staged-diff mode, so scan the working-tree content of the staged files.
 # The authoritative full-history scans run at pre-push and in CI via
 # `npm run security:secrets` (verified/blocking) and `security:secrets:suspected`
