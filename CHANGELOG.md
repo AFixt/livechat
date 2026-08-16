@@ -58,16 +58,24 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 ### Added
 
 - **Custom Semgrep rules** ([#83]) in `.semgrep/rules.yml`, wired into the gate
-  by `scripts/semgrep.sh` alongside the registry packs. Seven project-specific
-  rules the public packs miss: chat lookups must go through the tenant-scoped
-  service, tenant-owned model lookups in handlers need a scoping predicate,
-  permissive CORS origin (`origin: true` / `'*'`), CORS reflecting the request
-  Origin header, `jwt.verify` without an `algorithms` pin, `jwt.decode` where
-  verification is required, and cookies set without `httpOnly` + `secure`. Rule
-  fixtures under `.semgrep/tests/` are validated by `semgrep --test`. The
+  by `scripts/semgrep.sh` alongside the registry packs. Twelve project-specific
+  rules covering the `secure-project-baseline` §17 categories that fit this
+  codebase, which the public packs miss: chat lookups must go through the
+  tenant-scoped service, tenant-owned model lookups in handlers need a scoping
+  predicate, permissive CORS origin (`origin: true` / `'*'`), CORS reflecting
+  the request Origin header, a credentialed CORS config with a single fixed
+  origin and no per-tenant callback (the #74 pattern; the first-party `APP_URL`
+  console origin is a documented carve-out until #74 lands), `jwt.verify`
+  without an `algorithms` pin, `jwt.decode` where verification is required,
+  cookies set without `httpOnly` + `secure`, raw SQL built by string
+  interpolation, `child_process` exec with an interpolated command, outbound
+  `fetch` of a request-controlled URL (SSRF), and dynamic code execution
+  (`eval` / `new Function`). Every rule ships a `ruleid:` detect fixture and an
+  `ok:` near-miss under `.semgrep/tests/`. The
   `jwt-verify-without-algorithm-pin` rule immediately caught three unpinned
   verifiers (see Fixed). `scripts/semgrep.sh` now skips gracefully when semgrep
-  is not on PATH and excludes the fixtures dir from the scan.
+  is not on PATH locally (but fails hard in CI so coverage cannot silently
+  regress) and excludes the fixtures dir from the scan.
 
 - **Use-case coverage for eleven previously undocumented interactions**
   ([#66]): widget invitation state (§5.1.2, open + dismiss), widget
