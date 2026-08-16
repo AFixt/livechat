@@ -9,6 +9,20 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Security
+
+- **Visitor data retention & minimization.** IP, geo, URL, referrer and
+  user-agent were stored on `visitor_sessions` indefinitely. Now:
+  - **Minimized at capture** — `api/src/utils/pii-minimize.ts` truncates the IP
+    (last IPv4 octet / last 80 IPv6 bits zeroed) and coarsens geo to
+    country-level before it is persisted, applied in `visitor-session-service`.
+  - **Retention-bound** — a configurable window (`VISITOR_DATA_RETENTION_DAYS`,
+    default 90) and a retention job (`data-retention-service` +
+    `scripts/purge-expired-visitor-data.ts`) anonymize (default) or hard-delete
+    expired sessions. Idempotent; logs counts.
+  - Geolocation record model, lawful basis and rationale documented in
+    [ADR-0020][adr-0020] and `docs/privacy/data-retention.md`. ([#57])
+
 ### Removed
 
 - **Chat attachments deferred until the feature is built (part of #80).** The
@@ -332,6 +346,11 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   `415 Unsupported media type` with a fixed, non-leaking message (the offending
   payload slice body-parser puts in `err.message` is never echoed).
 
+[#57]: https://github.com/AFixt/livechat/issues/57
+[#66]: https://github.com/AFixt/livechat/issues/66
+[#68]: https://github.com/AFixt/livechat/issues/68
+[adr-0020]: docs/adr/0020-geo-retention-minimization.md
+
 [#56]: https://github.com/AFixt/livechat/issues/56
 
 [#64]: https://github.com/AFixt/livechat/issues/64
@@ -344,8 +363,6 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#62]: https://github.com/AFixt/livechat/issues/62
 [#63]: https://github.com/AFixt/livechat/issues/63
 [#65]: https://github.com/AFixt/livechat/issues/65
-[#66]: https://github.com/AFixt/livechat/issues/66
-[#68]: https://github.com/AFixt/livechat/issues/68
 [#77]: https://github.com/AFixt/livechat/issues/77
 [#79]: https://github.com/AFixt/livechat/issues/79
 [#72]: https://github.com/AFixt/livechat/issues/72

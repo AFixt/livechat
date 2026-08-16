@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 
 import { Tenant, VisitorSession } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
+import { coarsenGeo, truncateIp } from '../utils/pii-minimize.js';
 
 import { hashSessionId, mintVisitorCookie, verifyVisitorCookie } from './visitor-cookie.js';
 
@@ -116,14 +117,19 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
       const { sessionId, cookieValue } = mintVisitorCookie(deps.env.COOKIE_SECRET);
       const hash = hashSessionId(sessionId, deps.env.COOKIE_SECRET);
       const now = new Date();
+      // Data minimization at the point of capture: the IP is truncated (last
+      // IPv4 octet / last 80 IPv6 bits zeroed) and geolocation is coarsened to
+      // country level before it is ever persisted. See pii-minimize.ts and
+      // docs/adr/0020-geo-retention-minimization.md.
+      const geo = coarsenGeo({ country: null, city: null });
       const session = await VisitorSession.create({
         tenantId: tenant.id,
         sessionCookieHash: hash,
         identityTokenSub,
         userAgent: params.userAgent ?? null,
-        ipAddress: params.ipAddress ?? null,
-        country: null,
-        city: null,
+        ipAddress: truncateIp(params.ipAddress),
+        country: geo.country,
+        city: geo.city,
         language: params.language ?? null,
         currentUrl: params.currentUrl ?? null,
         referrer: params.referrer ?? null,

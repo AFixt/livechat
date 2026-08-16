@@ -1,5 +1,5 @@
 import { config as loadDotenv } from 'dotenv';
-import { bool, cleanEnv, host, makeValidator, port, str, url } from 'envalid';
+import { bool, cleanEnv, host, makeValidator, num, port, str, url } from 'envalid';
 
 /**
  * Envalid validator for a strictly positive number of hours. Guards the
@@ -49,6 +49,16 @@ const envSpec = {
 
   COOKIE_SECRET: str(),
 
+  // Visitor data retention. `VISITOR_DATA_RETENTION_DAYS` is the window after a
+  // visitor session is last seen before the retention job purges it; the
+  // strategy chooses whether expired sessions are anonymized (PII stripped,
+  // row kept for transcript integrity) or hard-deleted (cascading to chats).
+  // See docs/adr/0020-geo-retention-minimization.md and docs/privacy/.
+  VISITOR_DATA_RETENTION_DAYS: num({ default: 90 }),
+  VISITOR_DATA_RETENTION_STRATEGY: str({
+    choices: ['anonymize', 'delete'] as const,
+    default: 'anonymize' as const,
+  }),
   // Visitor session lifetime, enforced server-side in `findByCookie` (#79) —
   // the cookie `maxAge` is only a client-side hint. Absolute: hard cap from
   // first contact. Idle: max gap since the last request/heartbeat. Defaults:
