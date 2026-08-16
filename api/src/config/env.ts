@@ -43,11 +43,14 @@ const envSpec = {
   SMTP_PORT: port({ default: 1025 }),
   SMTP_FROM: str({ default: 'no-reply@livechat.afixt.com' }),
 
+  // S3 is for chat attachments, which are deferred (#80) — no upload/download
+  // route or UI exists. Optional so a deployment does not need credentials for
+  // an absent feature; make them required again when attachments are built.
   S3_ENDPOINT: str({ default: '' }),
   S3_REGION: str({ default: 'us-east-1' }),
-  S3_ACCESS_KEY: str(),
-  S3_SECRET_KEY: str(),
-  S3_BUCKET: str(),
+  S3_ACCESS_KEY: str({ default: '' }),
+  S3_SECRET_KEY: str({ default: '' }),
+  S3_BUCKET: str({ default: '' }),
 
   LOG_LEVEL: str({
     choices: ['trace', 'debug', 'info', 'warn', 'error', 'fatal'] as const,

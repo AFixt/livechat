@@ -19,9 +19,8 @@ const REQUIRED_ENV: Record<string, string> = {
   API_URL: 'http://localhost:3001',
   WIDGET_URL: 'http://localhost:3002',
   SMTP_HOST: 'localhost',
-  S3_ACCESS_KEY: 'access-key',
-  S3_SECRET_KEY: 'secret-key',
-  S3_BUCKET: 'bucket',
+  // S3_* are intentionally absent: attachments are deferred (#80) and the vars
+  // are optional. Their optionality is asserted separately below.
 };
 
 const REQUIRED_KEYS = Object.keys(REQUIRED_ENV);
@@ -72,6 +71,29 @@ describe('loadEnv', () => {
     loadEnv();
 
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('boots without S3_* vars — attachments are deferred (#80), so they are optional', async () => {
+    for (const [key, value] of Object.entries(REQUIRED_ENV)) process.env[key] = value;
+    process.env['NODE_ENV'] = 'production';
+    // Explicitly ensure the S3 credentials are absent from the environment.
+    for (const key of ['S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_BUCKET', 'S3_ENDPOINT']) {
+      Reflect.deleteProperty(process.env, key);
+    }
+
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+
+    const { loadEnv } = await import('./env.js');
+    const env = loadEnv();
+
+    // Missing S3 vars must NOT trigger the envalid failure reporter/exit.
+    expect(exitSpy).not.toHaveBeenCalled();
+    // They fall back to their documented defaults instead of being required.
+    expect(env.S3_ACCESS_KEY).toBe('');
+    expect(env.S3_SECRET_KEY).toBe('');
+    expect(env.S3_BUCKET).toBe('');
+    expect(env.S3_ENDPOINT).toBe('');
+    expect(env.S3_REGION).toBe('us-east-1');
   });
 
   it('loads a local .env in development but never under test', async () => {

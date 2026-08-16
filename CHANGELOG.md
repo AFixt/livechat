@@ -9,6 +9,17 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Removed
+
+- **Chat attachments deferred until the feature is built (part of #80).** The
+  `chat_attachments` table, model, and associations existed and `S3_ACCESS_KEY`
+  / `S3_SECRET_KEY` / `S3_BUCKET` were **required at boot**, but there was no
+  upload/download route, no UI, and no `@aws-sdk` usage — every deployment had
+  to supply real S3 credentials for a feature that did not exist. The table
+  (via a reversible migration), model, and associations are removed, and the
+  `S3_*` env vars are now optional. Typing indicators and the email-transcript
+  affordance (the other two parts of #80) are handled separately. See
+  [ADR-0017]. ([#80])
 ### Security
 
 - **The widget mute-preference cookie now carries `Secure`** ([#58]). The
@@ -248,6 +259,8 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#65]: https://github.com/AFixt/livechat/issues/65
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#80]: https://github.com/AFixt/livechat/issues/80
+[ADR-0017]: docs/adr/0017-defer-chat-attachments.md
 [#81]: https://github.com/AFixt/livechat/issues/81
 [#71]: https://github.com/AFixt/livechat/issues/71
 [#78]: https://github.com/AFixt/livechat/issues/78
