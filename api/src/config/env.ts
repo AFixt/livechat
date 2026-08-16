@@ -1,4 +1,18 @@
-import { bool, cleanEnv, host, num, port, str, url } from 'envalid';
+import { bool, cleanEnv, host, makeValidator, port, str, url } from 'envalid';
+
+/**
+ * Envalid validator for a strictly positive number of hours. Guards the
+ * visitor-session TTLs: `0` would expire every session on first contact
+ * (locking all visitors out), and a negative value would disable the bound
+ * entirely — both are misconfigurations, not valid settings.
+ */
+const positiveHours = makeValidator<number>((input) => {
+  const parsed = Number(input);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error('Expected a positive number of hours');
+  }
+  return parsed;
+});
 
 /**
  * Env spec used by {@link loadEnv}.
@@ -38,8 +52,8 @@ const envSpec = {
   // the cookie `maxAge` is only a client-side hint. Absolute: hard cap from
   // first contact. Idle: max gap since the last request/heartbeat. Defaults:
   // 30 days absolute, 3 days idle.
-  VISITOR_SESSION_ABSOLUTE_TTL_HOURS: num({ default: 720 }),
-  VISITOR_SESSION_IDLE_TTL_HOURS: num({ default: 72 }),
+  VISITOR_SESSION_ABSOLUTE_TTL_HOURS: positiveHours({ default: 720 }),
+  VISITOR_SESSION_IDLE_TTL_HOURS: positiveHours({ default: 72 }),
 
   APP_URL: url(),
   API_URL: url(),
