@@ -1,4 +1,4 @@
-# ADR-0012: Widget consent hook for host-site CMPs
+# ADR-0014: Widget consent hook for host-site CMPs
 
 - **Status:** Accepted
 - **Date:** 2026-08-15

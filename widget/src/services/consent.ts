@@ -10,7 +10,7 @@
  * When the AFixt consent foundation (#56/#53) lands it consumes this same hook;
  * until then the hook stores the host's decision and exposes it. See
  * `docs/privacy/cmp-integration.md` and
- * `docs/adr/0012-widget-consent-hook.md`.
+ * `docs/adr/0014-widget-consent-hook.md`.
  *
  * @module
  */

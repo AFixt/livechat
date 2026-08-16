@@ -9,6 +9,58 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Security
+
+- **The widget mute-preference cookie now carries `Secure`** ([#58]). The
+  `afixt_livechat_muted` cookie was written with `SameSite=Lax` but no
+  `Secure`, so on the third-party HTTPS pages the widget embeds into it could
+  travel over a downgraded/plaintext connection. It is now `Secure` on any
+  HTTPS origin (omitted only on a plaintext-HTTP origin, i.e. local dev, where
+  the browser would otherwise drop it).
+- **Documented risk acceptance for JWT tokens in console `localStorage`**
+  ([#59], part of the security-baseline program). The support console persists
+  the access + refresh token to `localStorage`, which is XSS-exfiltratable. Per
+  the baseline's exception rules this is now an explicit, owner-approved,
+  time-limited acceptance: [ADR-0013] records the risk, the server-side
+  mitigations already in place (15-minute access TTL, refresh rotation, bcrypt-
+  hashed refresh storage, JTI blacklist, session teardown), the compensating
+  controls (no token logging, no `dangerouslySetInnerHTML`, CSP pending #61),
+  the rejected alternatives (httpOnly refresh cookie; BFF; `sessionStorage` —
+  evaluated and found to be no real improvement), and the conditions that force
+  a revisit. A companion note lives at `docs/security/browser-token-storage.md`,
+  and `ui/src/store/auth.test.ts` pins the accepted exception so it cannot drift
+  silently. No storage change — localStorage auth is intentionally left in
+  place per the issue.
+- **Swagger UI and the OpenAPI document are no longer served in production.**
+  `/api/docs` (and the raw spec at `/api/docs.json`) published the entire route
+  and schema inventory — including every admin surface — unauthenticated. Both
+  are now mounted only when `NODE_ENV !== 'production'` and return `404` in
+  production; developers read the spec from a local/staging run
+  (`docs/deploy.md`). ([#78])
+- **Security headers on the static-hosted console and widget.** Both nginx hosts
+  send a Content-Security-Policy (`default-src 'self'`, strict `script-src`, no
+  `'unsafe-eval'`; `style-src 'unsafe-inline'` only, for MUI/emotion), COOP
+  `same-origin`, and HSTS (2 years, `includeSubDomains; preload`). The console is
+  locked down (CORP `same-origin`, `X-Frame-Options: DENY` + `frame-ancestors
+  'none'`); the widget stays embeddable (CORP `cross-origin`, `frame-ancestors
+  *`, no `X-Frame-Options`). A new `security:headers` gate
+  (`scripts/check-headers.mjs`) config-lints both `nginx.conf` files and runs in
+  `check:all`. See ADR-0012. ([#61])
+- **TLS/HTTPS verification harness for deployed environments** ([#63]).
+  `scripts/check-tls.sh` (`npm run security:tls`) verifies a deployed target's
+  transport security via `testssl.sh` (fails on weak ciphers, an invalid chain,
+  or a still-offered TLS 1.0/1.1), an HTTP→HTTPS redirect, HSTS, and
+  `Secure`/`HttpOnly`/`SameSite` on every `Set-Cookie`. No-op without
+  `TLS_TARGET_URL`. Documented in `docs/security/tls-verification.md`.
+- **Security-baseline governance** ([#65]) — a governance layer over the
+  scanners (ADR-0011). `security/thresholds.yaml` centralizes what each gate
+  blocks vs warns on; `security/exceptions.yaml` catalogues every accepted
+  suppression with owner, reason, added date, and expiry;
+  `scripts/check-exceptions.sh` (`npm run security:exceptions`) fails on expired
+  exceptions and warns within 30 days; `scripts/security-report.sh` emits
+  machine-readable scanner output into a gitignored `security-reports/`.
+  Indexed in `docs/security/README.md`.
+
 ### Added
 
 - **Cookie inventory, vendor disclosure, and a CMP consent hook for the
@@ -26,7 +78,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
     widget captures any presence/analytics data. The widget bootstrap awaits the
     capture gate. Additive integration point for the #56/#53 consent foundation.
   - `docs/privacy/cmp-integration.md` (copy-paste snippet) and
-    [ADR-0012][adr-0012] (the hook contract). Bundle stays at 20.7 KB brotli
+    [ADR-0014][adr-0014] (the hook contract). Bundle stays at 20.7 KB brotli
     (budget 50 KB). New unit tests: consent-hook behavior + a source scan
     asserting no third-party origins.
 - **Use-case coverage for eleven previously undocumented interactions**
@@ -37,6 +89,19 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   admin invitations list + revoke. Generated Playwright specs committed;
   `admin-view-invitations` and `support-toggle-alert-sound` join the
   runnable e2e projects.
+
+### Changed
+
+- **Use cases now carry `expected_result`, use `extends` for variants, and cover
+  more error paths** ([#85]). Every non-`extends` use case gained an
+  `expected_result` stating the observable outcome; the `support/login` and
+  `widget/chat-ended` variant pairs were converted from duplicated files to
+  `extends` + `steps_override`; three `type: negative` cases were added
+  (invalid allowed-origin, already-revoked invitation, invalid user role); and
+  `usecases/README.md` now documents the positive/negative/extension
+  distinction. (The `widget/invitation` pair is handled with #76, which makes
+  that state reachable.) `usecases:validate` passes (31 cases) and specs were
+  regenerated.
 
 ### Fixed
 
@@ -55,9 +120,17 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
 [#54]: https://github.com/AFixt/livechat/issues/54
+[#58]: https://github.com/AFixt/livechat/issues/58
+[#59]: https://github.com/AFixt/livechat/issues/59
+[#61]: https://github.com/AFixt/livechat/issues/61
+[#63]: https://github.com/AFixt/livechat/issues/63
+[#65]: https://github.com/AFixt/livechat/issues/65
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
-[adr-0012]: docs/adr/0012-widget-consent-hook.md
+[#78]: https://github.com/AFixt/livechat/issues/78
+[#85]: https://github.com/AFixt/livechat/issues/85
+[ADR-0013]: docs/adr/0013-jwt-localstorage-risk-acceptance.md
+[adr-0014]: docs/adr/0014-widget-consent-hook.md
 
 ## [0.2.0] - 2026-07-23
 

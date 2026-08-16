@@ -1,0 +1,101 @@
+# Central security-gate thresholds — the single source of truth for what each
+# scanner blocks on versus warns on.
+#
+# This file is DOCUMENTATION-AS-CONFIG: it records the policy that the existing
+# gate scripts already encode (scripts/npm-audit.sh, scripts/semgrep.sh, the
+# `security:*` npm scripts, osv-scanner.toml). Changing a number here is a
+# decision to change the corresponding gate — update the script/config in the
+# same PR so the two never drift. docs/security/README.md references this file.
+#
+# Legend
+#   blocks_at  the lowest severity that FAILS the gate (non-zero exit / red CI).
+#   warns_at   severities that are surfaced but do NOT fail the gate.
+#   gated      whether this runs in the aggregate `npm run security` /
+#              `check:all` (local + CI), or is scheduled/deployed-only.
+
+version: 1
+
+# Ordered high→low; used as the shared vocabulary below.
+severity_scale: [critical, high, medium, moderate, low, info]
+
+gates:
+  npm-audit:
+    script: scripts/npm-audit.sh
+    npm: security:audit
+    blocks_at: high # high + critical fail; moderate/low are informational
+    warns_at: [moderate, low]
+    allowlist: scripts/npm-audit.sh (ALLOW) — mirrored in osv-scanner.toml
+    gated: true
+
+  osv-scanner:
+    config: osv-scanner.toml
+    npm: security:osv
+    blocks_at: any # any advisory not in IgnoredVulns fails
+    allowlist: osv-scanner.toml (IgnoredVulns, each with ignoreUntil)
+    gated: true
+
+  semgrep:
+    script: scripts/semgrep.sh
+    npm: security:semgrep
+    blocks_at: error # `--error`: ERROR-severity findings fail; WARN/INFO do not
+    warns_at: [warning, info]
+    allowlist: scripts/semgrep.sh (--exclude-rule entries)
+    gated: true
+
+  trufflehog:
+    npm: security:secrets
+    blocks_at: verified # only VERIFIED secrets fail (`--results=verified`)
+    warns_at: [unverified]
+    allowlist: none (no baseline file)
+    gated: true
+
+  tls:
+    script: scripts/check-tls.sh
+    npm: security:tls
+    blocks_at: high # testssl HIGH/CRITICAL, plus any failed redirect/HSTS/cookie check
+    allowlist: none
+    gated: deployed-only # no-op with exit 0 when TLS_TARGET_URL is unset (added in #63)
+
+  license-check:
+    npm: license:check
+    blocks_at: any # any production dep outside the SPDX allowlist fails
+    allowlist: onlyAllow list in package.json (license:check)
+    gated: true
+
+  codeql:
+    workflow: .github/workflows/security.yml
+    blocks_at: high # security-extended query pack; GitHub code-scanning alerts
+    gated: scheduled # weekly + workflow_dispatch, not in the local gate
+
+  # --- pending: introduced by sibling security-baseline PRs (#82-84) ------
+  # Recorded here so the threshold policy is complete; wire the real numbers
+  # when each tool lands.
+  trivy:
+    status: pending
+    blocks_at: high # proposed: HIGH/CRITICAL image/fs vulns fail
+    allowlist: .trivyignore (catalogue entries in security/exceptions.yaml)
+    gated: pending
+
+  checkov:
+    status: pending
+    blocks_at: high # proposed: HIGH+ IaC misconfigurations fail
+    allowlist: inline `# checkov:skip=...` (catalogue in security/exceptions.yaml)
+    gated: pending
+
+  owasp-zap:
+    workflow: .github/workflows/zap.yml
+    status: pending
+    blocks_at: high # proposed: baseline HIGH alerts fail
+    gated: scheduled
+
+policy:
+  # What "blocks" means in practice.
+  blocking: >-
+    A blocking finding fails the gate: the script exits non-zero, the aggregate
+    `npm run security` fails, and (via check:all) pre-push and CI go red. The
+    only way past a blocking finding is to fix it or add a justified, time-boxed
+    exception to security/exceptions.yaml AND the tool's own config.
+  warning: >-
+    A warning is surfaced in output but does not fail the gate. Warnings are
+    reviewed opportunistically, not blocked on.
+  exceptions: security/exceptions.yaml

@@ -8,6 +8,10 @@ description: |
 
 start_location: "http://localhost:5174/admin/invitations"
 
+expected_result: >-
+  The invitation is created and the invitee appears in the invitations list
+  as pending; the form confirms accessibly.
+
 preconditions:
   - An admin or super_admin is authenticated.
   - At least one tenant exists.

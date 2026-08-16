@@ -8,6 +8,10 @@ description: |
 
 start_location: "http://localhost:5174/admin/invitations"
 
+expected_result: >-
+  The invitation's status changes to "revoked" and the Revoke control is no
+  longer actionable.
+
 preconditions:
   - An admin or super_admin user is authenticated.
   - At least one invitation with status "pending" is listed (see

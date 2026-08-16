@@ -3,7 +3,7 @@
 How a client site's Consent Management Platform (CMP) grants or denies consent
 before the AFixt LiveChat widget captures any analytics/presence data. Tracked
 in issue #54; the contract is specified in
-[ADR-0012](../adr/0012-widget-consent-hook.md).
+[ADR-0014](../adr/0014-widget-consent-hook.md).
 
 ## What consent gates
 
