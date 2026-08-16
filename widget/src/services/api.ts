@@ -86,7 +86,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     headers.set('X-XSRF-TOKEN', csrfToken);
   }
   // Send the session token when the browser blocks the third-party cookie
-  // (#75). Ignored by the server when the cookie is present.
+  // (#75). The server prefers this header over the cookie when both arrive.
   if (sessionToken !== null && !headers.has('X-Visitor-Session')) {
     headers.set('X-Visitor-Session', sessionToken);
   }

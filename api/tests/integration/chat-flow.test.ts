@@ -1,8 +1,9 @@
+import jwt from 'jsonwebtoken';
 import { io as ioClient, type Socket } from 'socket.io-client';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-import { Tenant, User } from '../../src/models/index.js';
+import { Chat, Tenant, User } from '../../src/models/index.js';
 
 import { probeLiveHarness, type LiveTestHarness } from './setup.js';
 
@@ -341,5 +342,166 @@ describe('chat flow (integration)', () => {
     globalSocket.disconnect();
     omegaSocket.disconnect();
     visitorSocket.disconnect();
+  }, 30_000);
+
+  // Issue #72: the socket layer must enforce the same tenant/visitor ownership
+  // the HTTP layer does. These are active cross-boundary attacks, not the
+  // passive broadcast-isolation check above.
+  test("socket authz: tenant-A staff cannot accept or message another tenant's chat", async () => {
+    if (harness === null) return;
+    const { baseUrl } = harness;
+    await seedTenantAndStaff('sa-a', 'sa-a-staff@example.com');
+    await seedTenantAndStaff('sa-b', 'sa-b-staff@example.com');
+    const staffAToken = await loginAs(baseUrl, 'sa-a-staff@example.com', 'Staff!Password1');
+    const { cookie: bVisitorCookie } = await initVisitor(baseUrl, 'sa-b');
+
+    const initRes = await request(baseUrl)
+      .post('/api/v1/visitor/chats')
+      .set('cookie', `livechat_visitor=${bVisitorCookie}`)
+      .send({ customerName: 'B Visitor', body: 'from tenant B' });
+    expect(initRes.status).toBe(201);
+    const betaChatId = initRes.body.data.chat.id as string;
+
+    const staffA: Socket = ioClient(`${baseUrl}/staff`, {
+      path: '/api/socket.io',
+      auth: { token: staffAToken },
+      transports: ['websocket'],
+      forceNew: true,
+    });
+    await waitFor(staffA, 'connect');
+
+    let assigned = false;
+    staffA.on('chat:assigned', () => {
+      assigned = true;
+    });
+
+    const acceptErr = waitFor<{ event: string }>(staffA, 'chat:error');
+    staffA.emit('chat:accept', { chatId: betaChatId });
+    expect((await acceptErr).event).toBe('chat:accept');
+
+    const messageErr = waitFor<{ event: string }>(staffA, 'chat:error');
+    staffA.emit('chat:message', { chatId: betaChatId, body: 'hijack attempt' });
+    expect((await messageErr).event).toBe('chat:message');
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(assigned).toBe(false);
+    const chatAfter = await Chat.findByPk(betaChatId);
+    expect(chatAfter?.assignedTo).toBeNull();
+    expect(chatAfter?.status).toBe('pending');
+
+    staffA.disconnect();
+  }, 30_000);
+
+  test("socket authz: visitor A cannot join another visitor's chat", async () => {
+    if (harness === null) return;
+    const { baseUrl } = harness;
+    await seedTenantAndStaff('sv', 'sv-staff@example.com');
+    const { cookie: aCookie } = await initVisitor(baseUrl, 'sv');
+    const { cookie: bCookie } = await initVisitor(baseUrl, 'sv');
+
+    const bInit = await request(baseUrl)
+      .post('/api/v1/visitor/chats')
+      .set('cookie', `livechat_visitor=${bCookie}`)
+      .send({ customerName: 'B Visitor', body: 'b chat' });
+    expect(bInit.status).toBe(201);
+    const bChatId = bInit.body.data.chat.id as string;
+
+    const visitorA: Socket = ioClient(`${baseUrl}/visitor`, {
+      path: '/api/socket.io',
+      auth: { cookie: aCookie },
+      transports: ['websocket'],
+      forceNew: true,
+    });
+    await waitFor(visitorA, 'connect');
+
+    const joinErr = waitFor<{ event: string }>(visitorA, 'chat:error');
+    visitorA.emit('chat:join', { chatId: bChatId });
+    expect((await joinErr).event).toBe('chat:join');
+
+    visitorA.disconnect();
+  }, 30_000);
+
+  test('socket handshake: a blacklisted access token is refused', async () => {
+    if (harness === null) return;
+    const { baseUrl, redis } = harness;
+    await seedTenantAndStaff('bl', 'bl-staff@example.com');
+    const token = await loginAs(baseUrl, 'bl-staff@example.com', 'Staff!Password1');
+    const decoded = jwt.decode(token) as { jti: string };
+    await redis.set(`bl:${decoded.jti}`, '1');
+
+    const sock: Socket = ioClient(`${baseUrl}/staff`, {
+      path: '/api/socket.io',
+      auth: { token },
+      transports: ['websocket'],
+      forceNew: true,
+    });
+    const err = await waitFor<Error>(sock, 'connect_error');
+    expect(err.message).toBe('Invalid token');
+
+    sock.disconnect();
+  }, 30_000);
+
+  // Issue #72: the span an untenanted AFixt operator (tenant_id null) enjoys is
+  // granted by role, not by omitting the check. This asserts the *allow* side of
+  // `assertChatAccess` — the deny tests above only cover the reject side, so a
+  // future tightening that broke AFixt staff would otherwise pass unnoticed.
+  test('socket authz: untenanted AFixt staff may accept any tenant chat (span by role)', async () => {
+    if (harness === null) return;
+    const { baseUrl } = harness;
+    await seedTenantAndStaff('ua', 'ua-staff@example.com');
+    const globalStaff = await User.create({
+      email: 'ua-global@afixt.example',
+      passwordHash: 'Staff!Password1',
+      firstName: 'Gl',
+      lastName: 'Obal',
+      role: 'staff',
+      tenantId: null,
+      status: 'active',
+      emailVerified: true,
+      emailVerificationToken: null,
+      emailVerificationExpires: null,
+      passwordResetToken: null,
+      passwordResetExpires: null,
+      lockedUntil: null,
+      lastLoginAt: null,
+      phone: null,
+      timezone: null,
+      avatarUrl: null,
+      preferences: null,
+    });
+    const globalToken = await loginAs(baseUrl, 'ua-global@afixt.example', 'Staff!Password1');
+    const { cookie: visitorCookie } = await initVisitor(baseUrl, 'ua');
+
+    const initRes = await request(baseUrl)
+      .post('/api/v1/visitor/chats')
+      .set('cookie', `livechat_visitor=${visitorCookie}`)
+      .send({ customerName: 'UA Visitor', body: 'need help' });
+    expect(initRes.status).toBe(201);
+    const chatId = initRes.body.data.chat.id as string;
+
+    const globalSocket: Socket = ioClient(`${baseUrl}/staff`, {
+      path: '/api/socket.io',
+      auth: { token: globalToken },
+      transports: ['websocket'],
+      forceNew: true,
+    });
+    await waitFor(globalSocket, 'connect');
+
+    let rejected = false;
+    globalSocket.on('chat:error', () => {
+      rejected = true;
+    });
+    const assigned = waitFor<{ chatId: string; assignedTo: string }>(globalSocket, 'chat:assigned');
+    globalSocket.emit('chat:accept', { chatId });
+    const evt = await assigned;
+    expect(evt.chatId).toBe(chatId);
+    expect(evt.assignedTo).toBe(globalStaff.id);
+    expect(rejected).toBe(false);
+
+    const chatAfter = await Chat.findByPk(chatId);
+    expect(chatAfter?.assignedTo).toBe(globalStaff.id);
+    expect(chatAfter?.status).toBe('active');
+
+    globalSocket.disconnect();
   }, 30_000);
 });

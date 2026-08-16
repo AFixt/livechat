@@ -9,6 +9,10 @@ description: |
 
 start_location: "http://localhost:5174/"
 
+expected_result: >-
+  After login the dashboard shows empty visitor and chat lists under
+  accessible headings.
+
 preconditions:
   - A staff user is already authenticated (see support-login.uc.yaml).
 

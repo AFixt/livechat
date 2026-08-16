@@ -16,18 +16,18 @@ test.describe('Visitor declines the email transcript after support ends the chat
     // Step 2: Locate text "Chat ended. Would you like an email copy of this conversation?" (chat-ended--decline.uc.yaml:1)
     await expect(page.getByText('Chat ended. Would you like an email copy of this conversation?')).toBeVisible();
 
-    // Step 3: Locate button "No thanks" (chat-ended--decline.uc.yaml:2)
+    // Step 3: Locate button "No thanks" (chat-ended--decline.uc.yaml:1)
     await expect(page.getByRole('button', { name: 'No thanks' })).toBeVisible();
 
-    // Step 4: Focus button "No thanks" (chat-ended--decline.uc.yaml:3)
+    // Step 4: Focus button "No thanks" (chat-ended--decline.uc.yaml:2)
     const step4_el = page.getByRole('button', { name: 'No thanks' });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
-    // Step 5: Activate button "No thanks" (chat-ended--decline.uc.yaml:4)
+    // Step 5: Activate button "No thanks" (chat-ended--decline.uc.yaml:3)
     await page.getByRole('button', { name: 'No thanks' }).click();
 
-    // Step 6: Locate button "Chat with support" (chat-ended--decline.uc.yaml:5)
+    // Step 6: Locate button "Chat with support" (chat-ended--decline.uc.yaml:4)
     await expect(page.getByRole('button', { name: 'Chat with support' })).toBeVisible();
 
   });

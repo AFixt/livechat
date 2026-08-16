@@ -8,8 +8,13 @@ import { hashSessionId, mintVisitorCookie, verifyVisitorCookie } from './visitor
 import type { Env } from '../config/env.js';
 
 interface VisitorSessionDeps {
-  env: Pick<Env, 'COOKIE_SECRET'>;
+  env: Pick<
+    Env,
+    'COOKIE_SECRET' | 'VISITOR_SESSION_ABSOLUTE_TTL_HOURS' | 'VISITOR_SESSION_IDLE_TTL_HOURS'
+  >;
 }
+
+const MS_PER_HOUR = 60 * 60 * 1000;
 
 interface InitParams {
   tenantSlug: string;
@@ -104,10 +109,15 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
     },
 
     /**
-     * Look up a VisitorSession by its signed cookie value.
+     * Look up a VisitorSession by its signed cookie value, enforcing absolute
+     * and idle expiry server-side (#79). The cookie `maxAge` is only a
+     * client-side hint and is trivially replayable, so the real bound lives
+     * here — and, because the socket handshake also calls this, it covers the
+     * `/visitor` namespace too.
      * @param cookieValue - Raw cookie value from the widget.
-     * @returns The matching session.
-     * @throws 401 if the cookie is missing/invalid or the session has been removed.
+     * @returns The matching, non-expired session.
+     * @throws 401 if the cookie is invalid, the session is gone, or it has
+     *   passed its absolute or idle lifetime.
      */
     async findByCookie(cookieValue: string): Promise<VisitorSession> {
       const sessionId = verifyVisitorCookie(cookieValue, deps.env.COOKIE_SECRET);
@@ -115,8 +125,40 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
       const session = await VisitorSession.findOne({
         where: { sessionCookieHash: hash },
       });
+      // A revoked ("forget me") session is hard-deleted, so a missing row is
+      // also the revoked case.
       if (session === null) throw ApiError.unauthorized('Visitor session not found');
+
+      const now = Date.now();
+      const absoluteMs = deps.env.VISITOR_SESSION_ABSOLUTE_TTL_HOURS * MS_PER_HOUR;
+      const idleMs = deps.env.VISITOR_SESSION_IDLE_TTL_HOURS * MS_PER_HOUR;
+      if (now - new Date(session.firstSeenAt).getTime() > absoluteMs) {
+        throw ApiError.unauthorized('Visitor session expired');
+      }
+      if (now - new Date(session.lastSeenAt).getTime() > idleMs) {
+        throw ApiError.unauthorized('Visitor session expired');
+      }
       return session;
+    },
+
+    /**
+     * Revoke a visitor session by its cookie — the "forget me" path (#79).
+     * Resolves the row from the signed cookie **without** applying the expiry
+     * gate in {@link findByCookie}, then hard-deletes it, so the visitor's PII
+     * and chat linkage are gone even when the session has already gone
+     * absolutely/idle-expired. This is what serves the geo-privacy deletion
+     * requirement; any replay of the cookie afterwards 401s. Idempotent: an
+     * unknown or already-forgotten cookie is a no-op.
+     * @param cookieValue - Raw cookie value from the widget.
+     * @throws 401 if the cookie signature is invalid (nothing to forget).
+     */
+    async forgetByCookie(cookieValue: string): Promise<void> {
+      const sessionId = verifyVisitorCookie(cookieValue, deps.env.COOKIE_SECRET);
+      const hash = hashSessionId(sessionId, deps.env.COOKIE_SECRET);
+      const session = await VisitorSession.findOne({
+        where: { sessionCookieHash: hash },
+      });
+      if (session !== null) await session.destroy({ force: true });
     },
 
     /**

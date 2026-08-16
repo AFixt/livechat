@@ -1,16 +1,70 @@
-name: OWASP ZAP baseline (scheduled)
+name: OWASP ZAP baseline
 
 on:
-  schedule:
-    - cron: "0 6 * * 2"
+  pull_request:
   workflow_dispatch:
     inputs:
       target_url:
         description: "URL to scan (e.g., https://chat.afixt.com). Falls back to ZAP_TARGET_URL repo variable."
         required: false
 
+concurrency:
+  group: zap-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  zap-baseline:
+  # Scans the PR's own build: the UI bundle is built from the head commit and
+  # served locally, so a finding is attributable to the change under review.
+  # action-baseline runs the ZAP container with --network=host, so a
+  # localhost target on the runner is reachable.
+  zap-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # Least privilege: this job neither uploads SARIF (no security-events)
+    # nor opens issues (allow_issue_writing: false), so read is sufficient.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          # Writes a runner-local .npmrc so NODE_AUTH_TOKEN authenticates
+          # the private @afixt/* packages. Kept out of the committed .npmrc
+          # so local installs keep using the developer's own credentials.
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Build shared, UI and widget
+        run: npm run build
+
+      - name: Serve the UI preview
+        run: |
+          npx --yes http-server ./ui/dist --port 8080 --silent &
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:8080/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "UI preview did not become ready" >&2
+          exit 1
+
+      - name: ZAP baseline scan (PR build)
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: http://localhost:8080
+          rules_file_name: .github/zap/rules.tsv
+          fail_action: true
+          allow_issue_writing: false
+          cmd_options: "-a -j"
+
+  # Manual scan of a deployed environment (post-deploy gate).
+  zap-deployed:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read

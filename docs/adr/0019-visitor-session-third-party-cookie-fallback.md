@@ -1,4 +1,4 @@
-# ADR-0012: Visitor session survives third-party-cookie blocking via a header fallback
+# ADR-0019: Visitor session survives third-party-cookie blocking via a header fallback
 
 - **Status:** Accepted
 - **Date:** 2026-08-14

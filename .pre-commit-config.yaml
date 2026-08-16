@@ -1,0 +1,35 @@
+# Python pre-commit framework config (https://pre-commit.com).
+#
+# Relationship to husky: husky is THE enforced pre-commit gate in this repo
+# (.husky/pre-commit runs lint-staged, tsc-files, and the tiered trufflehog
+# staged-file secret scan). This file is an OPTIONAL, parallel path for
+# contributors who use the Python `pre-commit` framework, and — more
+# importantly — it is the canonical home of the detect-secrets baseline hook
+# that keeps .secrets.baseline honest. It is NOT auto-installed by `npm install`
+# (that wires husky). To opt in: `pipx install pre-commit && pre-commit install`.
+#
+# The two secret tiers (issue #82, ADR-0012):
+#   - trufflehog `--only-verified` = the BLOCKING/verified tier.
+#   - detect-secrets against .secrets.baseline = the SUSPECTED tier's
+#     false-positive baseline; the hook fails on any NEW candidate secret not
+#     already recorded in the baseline, so contributors add real findings-as-
+#     fixes or record justified false positives before committing.
+repos:
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: detect-secrets (suspected-tier baseline)
+        args: ["--baseline", ".secrets.baseline"]
+
+  - repo: https://github.com/trufflesecurity/trufflehog
+    rev: v3.95.2
+    hooks:
+      - id: trufflehog
+        name: trufflehog (verified-tier, blocking)
+        # Mirrors `npm run security:secrets`: fail only on confirmed-live
+        # secrets. Staged working-tree scan; the full-history verified scan runs
+        # at pre-push and in CI.
+        entry: trufflehog filesystem --results=verified --fail --no-update
+        language: system
+        stages: [pre-commit]
