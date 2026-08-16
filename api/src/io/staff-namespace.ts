@@ -1,5 +1,9 @@
-import { authenticateAccessToken } from '../middlewares/authenticate.js';
+import { availabilityStatusSchema } from '@livechat/shared';
 
+import { authenticateAccessToken } from '../middlewares/authenticate.js';
+import { GLOBAL_STAFF_TENANT } from '../services/presence-service.js';
+
+import { broadcastGlobalStaffAvailability, broadcastTenantAvailability } from './availability.js';
 import { detach, guard, type SocketErrorPayload } from './detach.js';
 import { GLOBAL_STAFF_ROOM } from './rooms.js';
 
@@ -72,7 +76,7 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
   });
 
   nsp.on('connection', (socket: StaffSocket) => {
-    const { userId, tenantId } = socket.data;
+    const { userId, role, tenantId } = socket.data;
     // The handshake already rejected any non-staff role, so every connected
     // socket is a staff operator. `tenantId === null` is an untenanted AFixt
     // operator who serves every tenant (issue #72).
@@ -91,10 +95,38 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
       if (tenantId === null) await socket.join(GLOBAL_STAFF_ROOM);
       else await socket.join(`tenant:${tenantId}`);
     });
-    detach(deps.logger, 'marking staff available failed', async () =>
-      deps.services.presence.setStaffAvailable(userId),
-    );
-    nsp.emit('support:availability_changed', { available: true });
+    const isStaff = ['super_admin', 'admin', 'staff'].includes(role);
+    // Untenanted AFixt staff serve every tenant (issue #19); bucket their
+    // availability globally rather than under a single tenant.
+    const availabilityTenant = tenantId ?? GLOBAL_STAFF_TENANT;
+    if (isStaff) {
+      detach(deps.logger, 'restoring staff availability failed', async () => {
+        // Do NOT auto-mark available on connect: keep the user's persisted,
+        // explicit status so availability survives reconnects/reloads.
+        const restore = (): ReturnType<typeof deps.services.presence.restoreOnConnect> =>
+          deps.services.presence.restoreOnConnect(userId, availabilityTenant);
+        // Global (untenanted) staff serve every tenant (issue #19). If the grace
+        // window lapsed while they were gone, re-livening them here can flip
+        // effective availability for tenants that had no other reachable agent,
+        // so live-push those transitions too (bounded like the toggle path).
+        const status =
+          tenantId === null
+            ? await broadcastGlobalStaffAvailability({
+                io: deps.io,
+                presence: deps.services.presence,
+                apply: restore,
+              })
+            : await restore();
+        if (tenantId !== null) {
+          await broadcastTenantAvailability({
+            io: deps.io,
+            presence: deps.services.presence,
+            tenantId,
+          });
+        }
+        nsp.to(`user:${userId}`).emit('availability:self', { status });
+      });
+    }
 
     socket.on('chat:accept', (payload) => {
       guard(deps.logger, emitError, 'chat:accept', async () => {
@@ -191,15 +223,52 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
       });
     });
 
-    socket.on('disconnect', () => {
-      detach(deps.logger, 'staff disconnect cleanup failed', async () => {
-        await deps.services.presence.setStaffUnavailable(userId);
-        const anyLeft = await deps.services.presence.anyStaffAvailable();
-        if (!anyLeft) {
-          nsp.emit('support:availability_changed', { available: false });
+    socket.on('availability:set', (payload) => {
+      if (!isStaff) return;
+      // Validate at runtime: the payload is untrusted socket input (a client
+      // can emit anything, including no payload), so a malformed status must
+      // not be persisted or echoed back to the client.
+      const raw = payload as { status?: unknown } | null | undefined;
+      const parsed = availabilityStatusSchema.safeParse(raw?.status);
+      if (!parsed.success) return;
+      const status = parsed.data;
+      detach(deps.logger, 'staff availability:set failed', async () => {
+        if (tenantId === null) {
+          // Global (untenanted) staff serve every tenant (issue #19): a toggle
+          // here can change availability for many tenants at once. Bound the
+          // fan-out to tenants with a connected visitor whose effective state
+          // actually flips (see broadcastGlobalStaffAvailability).
+          await broadcastGlobalStaffAvailability({
+            io: deps.io,
+            presence: deps.services.presence,
+            apply: () =>
+              deps.services.presence.setAvailability(userId, availabilityTenant, status),
+          });
+        } else {
+          await deps.services.presence.setAvailability(userId, availabilityTenant, status);
+          await broadcastTenantAvailability({
+            io: deps.io,
+            presence: deps.services.presence,
+            tenantId,
+          });
         }
+        // Echo to every tab of this user so the console reflects the change
+        // and multi-tab stays in sync (availability is per-user, not per-tab).
+        nsp.to(`user:${userId}`).emit('availability:self', { status });
       });
     });
+
+    socket.on('availability:heartbeat', () => {
+      if (!isStaff) return;
+      detach(deps.logger, 'staff availability:heartbeat failed', async () =>
+        deps.services.presence.heartbeat(userId),
+      );
+    });
+
+    // No availability change on disconnect: status is explicit and persists.
+    // A full disconnect (all tabs closed, heartbeats stop) stops the agent
+    // counting only once the connection grace window lapses — a dropped
+    // socket never flips them away immediately.
   });
 
   return nsp;

@@ -46,8 +46,20 @@ export interface ServerToClientEvents {
    * surface the failure instead of silently hanging (issue #72).
    */
   'chat:error': (payload: { event: string; message: string }) => void;
-  /** Staff availability flipped (visitor-facing). */
+  /**
+   * Aggregate tenant support availability flipped. Emitted to the tenant's
+   * visitor room (drives the widget's invitation / no-support states) and to
+   * the staff room. Reflects whether *any* agent is explicitly available and
+   * reachable AND the tenant is within its support hours.
+   */
   'support:availability_changed': (payload: { available: boolean }) => void;
+  /**
+   * Echo of the connected staff user's *own* explicit status, sent on connect
+   * and whenever they change it (fanned out to all of their tabs). Lets the
+   * console reflect the current status on reload and keep multiple tabs in
+   * sync.
+   */
+  'availability:self': (payload: { status: 'available' | 'away' }) => void;
   /**
    * Support proactively started a chat with this visitor (§5.1.5). Emitted to
    * the visitor's own room so the widget can surface the `support_initiated`
@@ -77,6 +89,10 @@ export interface StaffToServerEvents {
   'chat:end': (payload: { chatId: string }) => void;
   /** Staff-initiated chat (§5.1.5). */
   'chat:initiate': (payload: { visitorSessionId: string }) => void;
+  /** Staff sets their own explicit availability. */
+  'availability:set': (payload: { status: 'available' | 'away' }) => void;
+  /** Periodic connection-liveness ping that refreshes the grace window. */
+  'availability:heartbeat': () => void;
 }
 
 /**

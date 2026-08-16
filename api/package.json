@@ -21,7 +21,7 @@
     "migrate": "sequelize-cli db:migrate",
     "migrate:undo": "sequelize-cli db:migrate:undo",
     "migrate:undo:all": "sequelize-cli db:migrate:undo:all",
-    "seed": "sequelize-cli db:seed:all",
+    "seed": "tsx scripts/seed-dev.mjs",
     "seed:undo": "sequelize-cli db:seed:undo:all"
   },
   "dependencies": {
@@ -32,6 +32,7 @@
     "compression": "1.8.1",
     "cookie-parser": "1.4.7",
     "cors": "2.8.6",
+    "dotenv": "16.6.1",
     "envalid": "8.1.1",
     "express": "5.2.1",
     "express-rate-limit": "8.4.0",

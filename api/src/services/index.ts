@@ -1,6 +1,7 @@
 import { createAuditService } from './audit-service.js';
 import { createAuthService } from './auth-service.js';
 import { createChatService } from './chat-service.js';
+import { createConsentService } from './consent-service.js';
 import { createEmailService } from './email-service.js';
 import { createInvitationService } from './invitation-service.js';
 import { createPresenceService } from './presence-service.js';
@@ -11,6 +12,7 @@ import { createVisitorSessionService } from './visitor-session-service.js';
 import type { AuditService } from './audit-service.js';
 import type { AuthService } from './auth-service.js';
 import type { ChatCaller, ChatService } from './chat-service.js';
+import type { ConsentService } from './consent-service.js';
 import type { EmailService } from './email-service.js';
 import type { InvitationService } from './invitation-service.js';
 import type { PresenceService } from './presence-service.js';
@@ -26,6 +28,7 @@ export type {
   AuthService,
   ChatCaller,
   ChatService,
+  ConsentService,
   EmailService,
   InvitationService,
   PresenceService,
@@ -56,6 +59,8 @@ export interface Services {
   chat: ChatService;
   /** Staff availability + visitor presence (Redis-backed). */
   presence: PresenceService;
+  /** Consent records + jurisdiction policy + tracking-decision audit trail. */
+  consent: ConsentService;
 }
 
 interface ServicesDeps {
@@ -79,6 +84,7 @@ export function createServices(deps: ServicesDeps): Services {
   const visitorSession = createVisitorSessionService({ env: deps.env });
   const chat = createChatService();
   const presence = createPresenceService({ redis: deps.redis });
+  const consent = createConsentService({ env: deps.env, audit });
   return {
     auth,
     tenant,
@@ -89,5 +95,6 @@ export function createServices(deps: ServicesDeps): Services {
     visitorSession,
     chat,
     presence,
+    consent,
   };
 }

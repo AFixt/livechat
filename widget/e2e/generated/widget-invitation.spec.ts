@@ -14,30 +14,36 @@ test.describe('Visitor sees the proactive invitation while support is online', (
     // Step 1: Access start location
     await page.goto('http://localhost:5175/');
 
-    // Step 2: Locate region "Chat invitation" (invitation.uc.yaml:1)
+    // Step 2: Note §5.1.2 — the invitation surfaces only after support has been online continuously for a short period (INVITATION_DELAY_MS in the widget app), not the instant availability arrives; the plain trigger shows until then. (invitation.uc.yaml:1)
+    // Note: §5.1.2 — the invitation surfaces only after support has been online continuously for a short period (INVITATION_DELAY_MS in the widget app), not the instant availability arrives; the plain trigger shows until then.
+
+    // Step 3: Wait 5000 (invitation.uc.yaml:2)
+    await page.waitForTimeout(5000);
+
+    // Step 4: Locate region "Chat invitation" (invitation.uc.yaml:3)
     await expect(page.getByRole('region', { name: 'Chat invitation' })).toBeVisible();
 
-    // Step 3: Locate text "Our support team is online right now." (invitation.uc.yaml:2)
+    // Step 5: Locate text "Our support team is online right now." (invitation.uc.yaml:4)
     await expect(page.getByText('Our support team is online right now.')).toBeVisible();
 
-    // Step 4: Locate button "Start a chat" (invitation.uc.yaml:3)
+    // Step 6: Locate button "Start a chat" (invitation.uc.yaml:5)
     await expect(page.getByRole('button', { name: 'Start a chat' })).toBeVisible();
 
-    // Step 5: Locate button "Dismiss chat invitation" (invitation.uc.yaml:4)
+    // Step 7: Locate button "Dismiss chat invitation" (invitation.uc.yaml:6)
     await expect(page.getByRole('button', { name: 'Dismiss chat invitation' })).toBeVisible();
 
-    // Step 6: Focus button "Start a chat" (invitation.uc.yaml:5)
-    const step6_el = page.getByRole('button', { name: 'Start a chat' });
-    await step6_el.focus();
-    await expect(step6_el).toBeFocused();
+    // Step 8: Focus button "Start a chat" (invitation.uc.yaml:7)
+    const step8_el = page.getByRole('button', { name: 'Start a chat' });
+    await step8_el.focus();
+    await expect(step8_el).toBeFocused();
 
-    // Step 7: Activate button "Start a chat" (invitation.uc.yaml:6)
+    // Step 9: Activate button "Start a chat" (invitation.uc.yaml:8)
     await page.getByRole('button', { name: 'Start a chat' }).click();
 
-    // Step 8: Locate heading "Chat with support" (invitation.uc.yaml:7)
+    // Step 10: Locate heading "Chat with support" (invitation.uc.yaml:9)
     await expect(page.getByRole('heading', { name: 'Chat with support' })).toBeVisible();
 
-    // Step 9: Locate field "Your name" (invitation.uc.yaml:8)
+    // Step 11: Locate field "Your name" (invitation.uc.yaml:10)
     await expect(page.getByLabel('Your name')).toBeVisible();
 
   });

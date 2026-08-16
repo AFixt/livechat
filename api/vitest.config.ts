@@ -26,7 +26,14 @@ export default defineConfig({
         functions: 80,
       },
     },
-    testTimeout: 10_000,
+    // 30s (was 10s). Integration tests do multiple bcrypt hashes plus real
+    // MySQL round-trips in a single test; at 10s the margin was thin enough
+    // that unrelated tests intermittently timed out under load, and adding any
+    // new integration test destabilised existing ones (#71). Test-env bcrypt
+    // cost is also lowered (see `bcryptCost()` in models/user.ts); this timeout
+    // is the belt to that suspenders. Unit tests still finish in milliseconds —
+    // this only raises the ceiling for a genuine hang.
+    testTimeout: 30_000,
     // Integration tests share a single MySQL + Redis, so test files must
     // run sequentially — otherwise one file's schema rebuild
     // (`resetSchemaFromMigrations`) drops tables out from under another.

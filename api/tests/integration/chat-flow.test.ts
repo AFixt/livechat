@@ -51,7 +51,7 @@ async function loginAs(baseUrl: string, email: string, password: string): Promis
 async function initVisitor(
   baseUrl: string,
   tenantSlug: string,
-): Promise<{ cookie: string; sessionId: string }> {
+): Promise<{ cookie: string; sessionId: string; csrfToken: string }> {
   const res = await request(baseUrl)
     .post('/api/v1/visitor/session')
     .send({ tenantKey: tenantSlug });
@@ -64,7 +64,11 @@ async function initVisitor(
       : [setCookie];
   const visitorCookie = cookies.find((c) => c.startsWith('livechat_visitor='));
   const cookie = visitorCookie?.split(';')[0]?.replace('livechat_visitor=', '') ?? '';
-  return { cookie, sessionId: res.body.data.sessionId as string };
+  return {
+    cookie,
+    sessionId: res.body.data.sessionId as string,
+    csrfToken: res.body.data.csrfToken as string,
+  };
 }
 
 function waitFor<T>(socket: Socket, event: string, timeoutMs = 3000): Promise<T> {
@@ -98,11 +102,12 @@ describe('chat flow (integration)', () => {
     const { baseUrl } = harness;
     await seedTenantAndStaff('acme', 'staff@acme.example');
     const accessToken = await loginAs(baseUrl, 'staff@acme.example', 'Staff!Password1');
-    const { cookie: visitorCookie } = await initVisitor(baseUrl, 'acme');
+    const { cookie: visitorCookie, csrfToken } = await initVisitor(baseUrl, 'acme');
 
     const initRes = await request(baseUrl)
       .post('/api/v1/visitor/chats')
       .set('cookie', `livechat_visitor=${visitorCookie}`)
+      .set('X-XSRF-TOKEN', csrfToken)
       .send({ customerName: 'Visitor One', body: 'Hello, I need help' });
     expect(initRes.status).toBe(201);
     const chatId = initRes.body.data.chat.id as string;
@@ -168,11 +173,12 @@ describe('chat flow (integration)', () => {
     await seedTenantAndStaff('beta', 'b-staff@beta.example');
 
     const staffAToken = await loginAs(baseUrl, 'a-staff@alpha.example', 'Staff!Password1');
-    const { cookie: bVisitorCookie } = await initVisitor(baseUrl, 'beta');
+    const { cookie: bVisitorCookie, csrfToken } = await initVisitor(baseUrl, 'beta');
 
     const initRes = await request(baseUrl)
       .post('/api/v1/visitor/chats')
       .set('cookie', `livechat_visitor=${bVisitorCookie}`)
+      .set('X-XSRF-TOKEN', csrfToken)
       .send({ customerName: 'B Visitor', body: 'Hello from beta' });
     expect(initRes.status).toBe(201);
     const betaChatId = initRes.body.data.chat.id as string;
@@ -210,13 +216,14 @@ describe('chat flow (integration)', () => {
     const { baseUrl, redis } = harness;
     await seedTenantAndStaff('gamma', 'g-staff@gamma.example');
     const accessToken = await loginAs(baseUrl, 'g-staff@gamma.example', 'Staff!Password1');
-    const { cookie: visitorCookie, sessionId } = await initVisitor(baseUrl, 'gamma');
+    const { cookie: visitorCookie, sessionId, csrfToken } = await initVisitor(baseUrl, 'gamma');
 
     // no_support: with no staff online, initiate reports supportAvailable=false.
     await redis.del('presence:staff:available');
     const offlineRes = await request(baseUrl)
       .post('/api/v1/visitor/chats')
       .set('cookie', `livechat_visitor=${visitorCookie}`)
+      .set('X-XSRF-TOKEN', csrfToken)
       .send({ customerName: 'Gamma Visitor', body: 'anyone home?' });
     expect(offlineRes.status).toBe(201);
     expect(offlineRes.body.data.supportAvailable).toBe(false);
@@ -230,7 +237,8 @@ describe('chat flow (integration)', () => {
     expect(currentRes.body.data.chat.id).toBe(priorChatId);
     expect((currentRes.body.data.messages as unknown[]).length).toBeGreaterThanOrEqual(1);
 
-    // A connected staff socket flips availability to true.
+    // Availability is now explicit, not a side effect of connecting: the
+    // agent must opt in to `available` before support counts as online.
     const staffSocket: Socket = ioClient(`${baseUrl}/staff`, {
       path: '/api/socket.io',
       auth: { token: accessToken },
@@ -238,10 +246,12 @@ describe('chat flow (integration)', () => {
       forceNew: true,
     });
     await waitFor(staffSocket, 'connect');
+    staffSocket.emit('availability:set', { status: 'available' });
     await new Promise((resolve) => setTimeout(resolve, 200));
     const onlineRes = await request(baseUrl)
       .post('/api/v1/visitor/chats')
       .set('cookie', `livechat_visitor=${visitorCookie}`)
+      .set('X-XSRF-TOKEN', csrfToken)
       .send({ customerName: 'Gamma Visitor', body: 'still here?' });
     expect(onlineRes.body.data.supportAvailable).toBe(true);
 
@@ -431,5 +441,69 @@ describe('chat flow (integration)', () => {
     expect(err.message).toBe('Invalid token');
 
     sock.disconnect();
+  }, 30_000);
+
+  // Issue #72: the span an untenanted AFixt operator (tenant_id null) enjoys is
+  // granted by role, not by omitting the check. This asserts the *allow* side of
+  // `assertChatAccess` — the deny tests above only cover the reject side, so a
+  // future tightening that broke AFixt staff would otherwise pass unnoticed.
+  test('socket authz: untenanted AFixt staff may accept any tenant chat (span by role)', async () => {
+    if (harness === null) return;
+    const { baseUrl } = harness;
+    await seedTenantAndStaff('ua', 'ua-staff@example.com');
+    const globalStaff = await User.create({
+      email: 'ua-global@afixt.example',
+      passwordHash: 'Staff!Password1',
+      firstName: 'Gl',
+      lastName: 'Obal',
+      role: 'staff',
+      tenantId: null,
+      status: 'active',
+      emailVerified: true,
+      emailVerificationToken: null,
+      emailVerificationExpires: null,
+      passwordResetToken: null,
+      passwordResetExpires: null,
+      lockedUntil: null,
+      lastLoginAt: null,
+      phone: null,
+      timezone: null,
+      avatarUrl: null,
+      preferences: null,
+    });
+    const globalToken = await loginAs(baseUrl, 'ua-global@afixt.example', 'Staff!Password1');
+    const { cookie: visitorCookie } = await initVisitor(baseUrl, 'ua');
+
+    const initRes = await request(baseUrl)
+      .post('/api/v1/visitor/chats')
+      .set('cookie', `livechat_visitor=${visitorCookie}`)
+      .send({ customerName: 'UA Visitor', body: 'need help' });
+    expect(initRes.status).toBe(201);
+    const chatId = initRes.body.data.chat.id as string;
+
+    const globalSocket: Socket = ioClient(`${baseUrl}/staff`, {
+      path: '/api/socket.io',
+      auth: { token: globalToken },
+      transports: ['websocket'],
+      forceNew: true,
+    });
+    await waitFor(globalSocket, 'connect');
+
+    let rejected = false;
+    globalSocket.on('chat:error', () => {
+      rejected = true;
+    });
+    const assigned = waitFor<{ chatId: string; assignedTo: string }>(globalSocket, 'chat:assigned');
+    globalSocket.emit('chat:accept', { chatId });
+    const evt = await assigned;
+    expect(evt.chatId).toBe(chatId);
+    expect(evt.assignedTo).toBe(globalStaff.id);
+    expect(rejected).toBe(false);
+
+    const chatAfter = await Chat.findByPk(chatId);
+    expect(chatAfter?.assignedTo).toBe(globalStaff.id);
+    expect(chatAfter?.status).toBe('active');
+
+    globalSocket.disconnect();
   }, 30_000);
 });
