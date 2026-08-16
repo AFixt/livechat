@@ -63,6 +63,24 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Added
 
+- **Cookie inventory, vendor disclosure, and a CMP consent hook for the
+  embedded widget** ([#54]):
+  - `docs/privacy/cookie-inventory.md` documents the only two cookies the widget
+    introduces — `livechat_visitor` (first-party, HttpOnly, signed session) and
+    `afixt_livechat_muted` (first-party mute preference) — with duration, flags
+    and data category; confirms **no** `localStorage`/`sessionStorage` and **no**
+    third-party trackers/fonts/analytics (the widget loads only same-origin
+    relative endpoints and an inlined audio data-URI).
+  - A dependency-free **consent hook** (`widget/src/services/consent.ts`): the
+    `data-require-consent` attribute plus
+    `window.AfixtLiveChat.setConsent/getConsent/onConsentChange` and an
+    `afixt-livechat:consent` DOM event let a host CMP grant/deny before the
+    widget captures any presence/analytics data. The widget bootstrap awaits the
+    capture gate. Additive integration point for the #56/#53 consent foundation.
+  - `docs/privacy/cmp-integration.md` (copy-paste snippet) and
+    [ADR-0014][adr-0014] (the hook contract). Bundle stays at 20.7 KB brotli
+    (budget 50 KB). New unit tests: consent-hook behavior + a source scan
+    asserting no third-party origins.
 - **Use-case coverage for eleven previously undocumented interactions**
   ([#66]): widget invitation state (§5.1.2, open + dismiss), widget
   chat-ended / email-transcript state (§5.1.7, send + decline), operator
@@ -101,6 +119,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
+[#54]: https://github.com/AFixt/livechat/issues/54
 [#58]: https://github.com/AFixt/livechat/issues/58
 [#59]: https://github.com/AFixt/livechat/issues/59
 [#61]: https://github.com/AFixt/livechat/issues/61
@@ -111,6 +130,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#78]: https://github.com/AFixt/livechat/issues/78
 [#85]: https://github.com/AFixt/livechat/issues/85
 [ADR-0013]: docs/adr/0013-jwt-localstorage-risk-acceptance.md
+[adr-0014]: docs/adr/0014-widget-consent-hook.md
 
 ## [0.2.0] - 2026-07-23
 
