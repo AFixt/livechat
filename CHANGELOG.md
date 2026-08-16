@@ -71,6 +71,16 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   on staged files. PR-time `.github/workflows/secret-scan.yml` surfaces the
   suspected tier without blocking. The two tiers are recorded in
   `security/thresholds.yaml`. (See ADR `0015-secret-scanning-tiers`, [#82].)
+- **`POST /widget/csp-report` is no longer an unvalidated public log sink.** The
+  unauthenticated endpoint previously logged whatever was posted — a
+  log-injection and unbounded-log DoS vector. It now validates the body against
+  a Zod schema (both the classic `application/csp-report` object form and the
+  Reporting-API `report-to` array), rejects anything that doesn't match with a
+  400, caps the body at 8 KB with its own parser (413 over that, overriding the
+  global 1 MB limit), rate-limits per IP (60/min), and logs only a bounded,
+  whitelisted set of fields — never the raw body, the original policy, or the
+  violation sample. Also adds an owned, commented OWASP ZAP baseline rule set
+  (`.github/zap/rules.tsv`) and `docs/security/zap.md`. ([#84])
 
 ### Added
 
@@ -160,6 +170,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#68]: https://github.com/AFixt/livechat/issues/68
 [#78]: https://github.com/AFixt/livechat/issues/78
 [#82]: https://github.com/AFixt/livechat/issues/82
+[#84]: https://github.com/AFixt/livechat/issues/84
 [#85]: https://github.com/AFixt/livechat/issues/85
 [ADR-0013]: docs/adr/0013-jwt-localstorage-risk-acceptance.md
 [adr-0014]: docs/adr/0014-widget-consent-hook.md
