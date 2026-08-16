@@ -1,4 +1,4 @@
-# ADR-0011: Security headers for the static-hosted console and widget
+# ADR-0012: Security headers for the static-hosted console and widget
 
 - **Status:** Accepted
 - **Date:** 2026-08-15
