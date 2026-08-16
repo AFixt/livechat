@@ -1,4 +1,4 @@
-# ADR-0011: Per-tenant CORS with default-deny for the embeddable widget
+# ADR-0018: Per-tenant CORS with default-deny for the embeddable widget
 
 - **Status:** Accepted
 - **Date:** 2026-08-14

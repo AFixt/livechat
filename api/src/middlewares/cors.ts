@@ -52,7 +52,7 @@ function isWidgetFacingPath(path: string): boolean {
  * Whether `origin` appears in some active tenant's `allowed_origins`. This is
  * the cross-origin gate for the widget: an origin no tenant has authorized is
  * never reflected, so an unconfigured tenant cannot be embedded cross-site
- * (ADR-0011). The per-tenant match (this origin belongs to *this* tenant) is
+ * (ADR-0018). The per-tenant match (this origin belongs to *this* tenant) is
  * still enforced on the request itself by `originAllowed()`.
  *
  * Cached for {@link ORIGIN_CACHE_TTL_MS} because both the preflight and the

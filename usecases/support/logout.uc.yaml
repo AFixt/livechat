@@ -7,6 +7,9 @@ description: |
 
 start_location: "http://localhost:5174/"
 
+expected_result: >-
+  The staff user's session ends and they are returned to the sign-in page.
+
 preconditions:
   - A staff user is already authenticated.
 

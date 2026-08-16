@@ -1,5 +1,4 @@
 import { AuditLog, initAuditLogModel } from './audit-log.js';
-import { ChatAttachment, initChatAttachmentModel } from './chat-attachment.js';
 import { ChatEvent, initChatEventModel } from './chat-event.js';
 import { ChatMessage, initChatMessageModel } from './chat-message.js';
 import { Chat, initChatModel } from './chat.js';
@@ -30,7 +29,6 @@ export function initModels(sequelize: Sequelize): void {
   initChatModel(sequelize);
   initChatMessageModel(sequelize);
   initChatEventModel(sequelize);
-  initChatAttachmentModel(sequelize);
 
   Tenant.hasMany(User, { foreignKey: 'tenant_id', as: 'users' });
   Tenant.hasMany(Invitation, { foreignKey: 'tenant_id', as: 'invitations' });
@@ -72,27 +70,17 @@ export function initModels(sequelize: Sequelize): void {
   Chat.belongsTo(User, { foreignKey: 'assigned_to', as: 'assignee' });
   Chat.hasMany(ChatMessage, { foreignKey: 'chat_id', as: 'messages' });
   Chat.hasMany(ChatEvent, { foreignKey: 'chat_id', as: 'events' });
-  Chat.hasMany(ChatAttachment, { foreignKey: 'chat_id', as: 'attachments' });
 
   ChatMessage.belongsTo(Chat, { foreignKey: 'chat_id', as: 'chat' });
   ChatMessage.belongsTo(User, { foreignKey: 'sender_user_id', as: 'senderUser' });
-  ChatMessage.hasMany(ChatAttachment, { foreignKey: 'message_id', as: 'attachments' });
 
   ChatEvent.belongsTo(Chat, { foreignKey: 'chat_id', as: 'chat' });
   ChatEvent.belongsTo(User, { foreignKey: 'actor_user_id', as: 'actorUser' });
-
-  ChatAttachment.belongsTo(Chat, { foreignKey: 'chat_id', as: 'chat' });
-  ChatAttachment.belongsTo(ChatMessage, { foreignKey: 'message_id', as: 'message' });
-  ChatAttachment.belongsTo(User, {
-    foreignKey: 'uploaded_by_user_id',
-    as: 'uploaderUser',
-  });
 }
 
 export {
   AuditLog,
   Chat,
-  ChatAttachment,
   ChatEvent,
   ChatMessage,
   Invitation,

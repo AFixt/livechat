@@ -1,9 +1,14 @@
-name: Security (scheduled)
+name: Security (CodeQL)
 
 on:
-  schedule:
-    - cron: "0 6 * * 1"
+  pull_request:
+  push:
+    branches: [main, develop]
   workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   codeql:
