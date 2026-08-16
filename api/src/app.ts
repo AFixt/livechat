@@ -8,6 +8,7 @@ import swaggerUi from 'swagger-ui-express';
 
 import { buildOpenApiSpec } from './config/swagger.js';
 import { correlationMiddleware } from './middlewares/correlation.js';
+import { buildCorsDelegate } from './middlewares/cors.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { notFoundHandler } from './middlewares/not-found-handler.js';
 import { createGlobalLimiter } from './middlewares/rate-limit.js';
@@ -43,14 +44,10 @@ export function createApp(deps: AppDeps): Express {
   app.set('trust proxy', 1);
 
   app.use(helmet());
-  app.use(
-    cors({
-      origin: env.APP_URL,
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Correlation-ID', 'X-XSRF-TOKEN'],
-    }),
-  );
+  // Console routes keep the strict single-origin (APP_URL) policy; widget-facing
+  // routes reflect the requesting origin when it belongs to a tenant's
+  // allowed_origins, so the embeddable widget works cross-site (#74).
+  app.use(cors(buildCorsDelegate(env)));
   app.use(compression());
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));

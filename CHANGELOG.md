@@ -112,6 +112,16 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Added
 
+- **The widget can work on third-party sites: CORS is now per-tenant.** The API
+  reflected only the console origin (`APP_URL`), so every credentialed
+  cross-origin widget request was blocked by the browser. Widget-facing routes
+  (`/api/v1/visitor/*`, `/api/v1/widget/*`) and the Socket.IO handshake now
+  reflect the requesting origin when it belongs to an active tenant's
+  `allowed_origins`, set `Vary: Origin`, and reject unknown origins
+  (default-deny — see [ADR-0018](docs/adr/0018-widget-cors-default-deny.md));
+  console routes keep the strict `APP_URL` policy. Note the widget also needs
+  the `SameSite=None` cookie change (#75) to actually work cross-site. ([#74])
+
 - **Custom Semgrep rules** ([#83]) in `.semgrep/rules.yml`, wired into the gate
   by `scripts/semgrep.sh` alongside the registry packs. Twelve project-specific
   rules covering the `secure-project-baseline` §17 categories that fit this
@@ -259,6 +269,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#65]: https://github.com/AFixt/livechat/issues/65
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#74]: https://github.com/AFixt/livechat/issues/74
 [#80]: https://github.com/AFixt/livechat/issues/80
 [ADR-0017]: docs/adr/0017-defer-chat-attachments.md
 [#81]: https://github.com/AFixt/livechat/issues/81
