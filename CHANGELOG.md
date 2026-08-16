@@ -55,18 +55,22 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   machine-readable scanner output into a gitignored `security-reports/`.
   Indexed in `docs/security/README.md`.
 - **Container, Dockerfile, and IaC scanning** ([#60]) — Hadolint (Dockerfile
-  lint), Trivy (Dockerfile + IaC misconfig via `trivy config`, and built-image
-  vulnerability scanning via `trivy image`), and Checkov (Dockerfile IaC). Each
-  has a `scripts/{hadolint,trivy,checkov}.sh` wrapper with a `security:hadolint`
-  / `security:trivy` / `security:trivy:image` / `security:checkov` npm script,
-  folded into the aggregate `security` script, plus a PR-time
-  `.github/workflows/container-iac-scan.yml` safety net that builds the api/ui/
-  widget images and scans them. `trivy config` covers `docker-compose.yml`,
-  `docker-compose.prod.yml`, and `.do/app.yaml`. Gate policy: CRITICAL fails,
-  HIGH warns (per #60). Accepted findings are documented with expiry dates in
-  `.hadolint.yaml`, `.trivyignore`, and `.checkov.yaml` and catalogued in
-  `security/exceptions.yaml`; a `HEALTHCHECK` was added to all three Dockerfiles.
-  (ADR-0011)
+  lint), Trivy `config` (Dockerfile misconfig), Trivy `image` (built api/ui/
+  widget image vulnerabilities), Checkov (Dockerfile IaC), and KICS
+  (`docker-compose.yml` + `docker-compose.prod.yml` misconfig — the tool that
+  actually scans compose, which Trivy and Checkov do not). Each has a
+  `scripts/*.sh` wrapper and a `security:*` npm script; all but the image build
+  are in the aggregate `security` script, and a PR-time
+  `.github/workflows/container-iac-scan.yml` safety net builds the images and
+  runs every scan. Gate policy (ADR-0011, `security/thresholds.yaml`): image
+  vulnerabilities fail on CRITICAL and warn on HIGH (per #60); IaC/Dockerfile
+  misconfigurations fail on HIGH+CRITICAL (documented deviation — misconfigs are
+  directly fixable and the IaC tools emit no CRITICALs). `.do/app.yaml` is a
+  DigitalOcean spec no scanner structurally covers; it is documented as such
+  rather than scanned for show. Accepted findings carry expiry/revisit dates in
+  `.hadolint.yaml`, `.trivyignore` (`exp:`), and `.checkov.yaml` and are
+  catalogued with owners in `security/exceptions.yaml`; a `HEALTHCHECK` was added
+  to all three Dockerfiles. (ADR-0011)
 
 ### Added
 
@@ -94,6 +98,11 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Fixed
 
+- **`npm ci --omit=dev` no longer crashes on the `prepare` hook.** The root
+  `prepare` script ran `husky` unconditionally, so any production install — the
+  `api/Dockerfile` runtime image and the `.do/app.yaml` migrate job — failed with
+  `husky: command not found` once devDependencies were omitted. Guarded as
+  `husky || true`, husky's documented pattern for CI/production installs. ([#60])
 - The admin "Allowed origins" textarea had no accessible name — the section
   heading above it is not a label. It now carries an explicit one, targeted
   by the new `admin-edit-tenant-settings` use case. ([#66])
