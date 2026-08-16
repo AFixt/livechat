@@ -45,7 +45,9 @@ fi
 # Container / Dockerfile / IaC scanners (ADR-0011, issue #60). Optional locally:
 # scripts/{hadolint,trivy,checkov}.sh skip cleanly when these are absent, and CI
 # installs them. Best-effort here — a failed install only warns, never aborts
-# bootstrap, unlike the required tools above.
+# bootstrap, unlike the required tools above. (KICS — scripts/kics.sh — needs no
+# install: it runs via its pinned Docker image, or a `kics` binary if present.
+# scripts/trivy-image.sh reuses the trivy install below plus docker.)
 if ! command -v hadolint >/dev/null 2>&1; then
   echo "Installing hadolint (optional)..."
   brew install hadolint 2>/dev/null \

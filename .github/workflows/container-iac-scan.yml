@@ -56,7 +56,7 @@ jobs:
         run: bash scripts/trivy.sh
 
   checkov:
-    name: Checkov (IaC)
+    name: Checkov (Dockerfiles)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -68,5 +68,33 @@ jobs:
       - name: Install checkov
         run: pip install checkov
 
-      - name: Scan Dockerfiles + docker-compose + app.yaml
+      - name: Scan Dockerfiles
         run: bash scripts/checkov.sh
+
+  kics:
+    name: KICS (docker-compose IaC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # scripts/kics.sh runs KICS via the pinned checkmarx/kics image, which is
+      # already available on the runner's Docker — no separate install step.
+      - name: Scan docker-compose files for misconfigurations
+        run: bash scripts/kics.sh
+
+  trivy-image:
+    name: Trivy (built-image vulnerabilities)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install trivy
+        run: |
+          set -euo pipefail
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sudo sh -s -- -b /usr/local/bin
+
+      # scripts/trivy-image.sh builds the api/ui/widget images and runs
+      # `trivy image` against each: CRITICAL fails, HIGH is reported (warn tier).
+      - name: Build images and scan for vulnerabilities
+        run: bash scripts/trivy-image.sh

@@ -53,7 +53,7 @@
     "engine.io": "^6.6.7"
   },
   "scripts": {
-    "prepare": "husky",
+    "prepare": "husky || true",
     "dev": "npm-run-all -p dev:*",
     "dev:api": "npm --workspace api run dev",
     "dev:ui": "npm --workspace ui run dev",
@@ -109,7 +109,8 @@
     "security:trivy": "bash scripts/trivy.sh",
     "security:trivy:image": "bash scripts/trivy-image.sh",
     "security:checkov": "bash scripts/checkov.sh",
-    "security": "npm-run-all -p security:audit security:osv security:semgrep security:secrets security:exceptions security:tls security:headers security:hadolint security:trivy security:checkov",
+    "security:kics": "bash scripts/kics.sh",
+    "security": "npm-run-all -p security:audit security:osv security:semgrep security:secrets security:exceptions security:tls security:headers security:hadolint security:trivy security:checkov security:kics",
     "license:check": "license-checker-rseidelsohn --production --onlyAllow 'MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;Unlicense;Python-2.0;WTFPL;BlueOak-1.0.0' --excludePrivatePackages --summary",
     "license:report": "license-checker-rseidelsohn --production --csv --out reports/licenses.csv",
     "check": "npm-run-all -p lint typecheck stylelint markdownlint usecases:validate",
