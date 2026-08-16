@@ -11,7 +11,7 @@ import {
 /**
  * The version stamp of the jurisdiction ruleset below. Bump whenever {@link RULES}
  * changes so audit rows and consent records pin the ruleset that governed them.
- * See ADR-0011 for why the ruleset is versioned in code rather than a DB table.
+ * See ADR-0019 for why the ruleset is versioned in code rather than a DB table.
  */
 export const RULE_VERSION = '2026-08-15.1';
 
@@ -55,7 +55,7 @@ const EU_EEA = new Set([
  * Resolve a coarse jurisdiction bucket from optional geo hints.
  *
  * When no country is known the result is `UNKNOWN`, which maps to the strictest
- * (opt-in) policy — an unknown visitor is never treated as US-max. See ADR-0011.
+ * (opt-in) policy — an unknown visitor is never treated as US-max. See ADR-0019.
  * @param country - ISO 3166-1 alpha-2 country code, if known.
  * @param region - Subdivision code (e.g. `CA` for California), if known.
  * @returns The resolved jurisdiction bucket.

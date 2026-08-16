@@ -45,7 +45,7 @@ export type PurposeState = z.infer<typeof purposeStateSchema>;
 
 /**
  * Jurisdiction buckets the policy engine understands. Coarser than legal
- * reality by design — see ADR-0011. `UNKNOWN` triggers the strictest policy.
+ * reality by design — see ADR-0019. `UNKNOWN` triggers the strictest policy.
  */
 export const jurisdictionSchema = z.enum(['EU', 'UK', 'US_CA', 'US', 'UNKNOWN']);
 /**
@@ -157,7 +157,7 @@ export type WithdrawConsentInput = z.infer<typeof withdrawConsentInputSchema>;
 
 /**
  * Input for `POST /privacy/data-request` — a data-subject access/erasure
- * request. Handled as an audited stub (see ADR-0011).
+ * request. Handled as an audited stub (see ADR-0019).
  */
 export const dataSubjectRequestInputSchema = z.object({
   type: z.enum(['export', 'delete']),

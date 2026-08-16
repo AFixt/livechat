@@ -35,7 +35,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
     `privacy.data_request`).
   - Decisions covered by unit tests (EU/US/GPC/unknown) and the APIs by
     integration tests against real MySQL. See
-    [ADR-0011](docs/adr/0011-consent-model-and-jurisdiction-policy.md).
+    [ADR-0019](docs/adr/0019-consent-model-and-jurisdiction-policy.md).
 - **Use-case coverage for eleven previously undocumented interactions**
   ([#66]): widget invitation state (§5.1.2, open + dismiss), widget
   chat-ended / email-transcript state (§5.1.7, send + decline), operator

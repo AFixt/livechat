@@ -181,7 +181,7 @@ export function createConsentService(deps: ConsentServiceDeps) {
 
     /**
      * Record a data-subject request (export/delete) as an audited stub. The
-     * request is queued for out-of-band handling — see ADR-0011.
+     * request is queued for out-of-band handling — see ADR-0019.
      * @param params - Tenant, subject, and request type.
      * @returns A queued acknowledgement with a request id.
      */
