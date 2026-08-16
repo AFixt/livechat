@@ -9,6 +9,65 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Security
+
+- **Documented risk acceptance for JWT tokens in console `localStorage`**
+  ([#59], part of the security-baseline program). The support console persists
+  the access + refresh token to `localStorage`, which is XSS-exfiltratable. Per
+  the baseline's exception rules this is now an explicit, owner-approved,
+  time-limited acceptance: [ADR-0013] records the risk, the server-side
+  mitigations already in place (15-minute access TTL, refresh rotation, bcrypt-
+  hashed refresh storage, JTI blacklist, session teardown), the compensating
+  controls (no token logging, no `dangerouslySetInnerHTML`, CSP pending #61),
+  the rejected alternatives (httpOnly refresh cookie; BFF; `sessionStorage` —
+  evaluated and found to be no real improvement), and the conditions that force
+  a revisit. A companion note lives at `docs/security/browser-token-storage.md`,
+  and `ui/src/store/auth.test.ts` pins the accepted exception so it cannot drift
+  silently. No storage change — localStorage auth is intentionally left in
+  place per the issue.
+- **Swagger UI and the OpenAPI document are no longer served in production.**
+  `/api/docs` (and the raw spec at `/api/docs.json`) published the entire route
+  and schema inventory — including every admin surface — unauthenticated. Both
+  are now mounted only when `NODE_ENV !== 'production'` and return `404` in
+  production; developers read the spec from a local/staging run
+  (`docs/deploy.md`). ([#78])
+- **Security headers on the static-hosted console and widget.** Both nginx hosts
+  send a Content-Security-Policy (`default-src 'self'`, strict `script-src`, no
+  `'unsafe-eval'`; `style-src 'unsafe-inline'` only, for MUI/emotion), COOP
+  `same-origin`, and HSTS (2 years, `includeSubDomains; preload`). The console is
+  locked down (CORP `same-origin`, `X-Frame-Options: DENY` + `frame-ancestors
+  'none'`); the widget stays embeddable (CORP `cross-origin`, `frame-ancestors
+  *`, no `X-Frame-Options`). A new `security:headers` gate
+  (`scripts/check-headers.mjs`) config-lints both `nginx.conf` files and runs in
+  `check:all`. See ADR-0012. ([#61])
+- **TLS/HTTPS verification harness for deployed environments** ([#63]).
+  `scripts/check-tls.sh` (`npm run security:tls`) verifies a deployed target's
+  transport security via `testssl.sh` (fails on weak ciphers, an invalid chain,
+  or a still-offered TLS 1.0/1.1), an HTTP→HTTPS redirect, HSTS, and
+  `Secure`/`HttpOnly`/`SameSite` on every `Set-Cookie`. No-op without
+  `TLS_TARGET_URL`. Documented in `docs/security/tls-verification.md`.
+- **Security-baseline governance** ([#65]) — a governance layer over the
+  scanners (ADR-0011). `security/thresholds.yaml` centralizes what each gate
+  blocks vs warns on; `security/exceptions.yaml` catalogues every accepted
+  suppression with owner, reason, added date, and expiry;
+  `scripts/check-exceptions.sh` (`npm run security:exceptions`) fails on expired
+  exceptions and warns within 30 days; `scripts/security-report.sh` emits
+  machine-readable scanner output into a gitignored `security-reports/`.
+  Indexed in `docs/security/README.md`.
+- **Container, Dockerfile, and IaC scanning** ([#60]) — Hadolint (Dockerfile
+  lint), Trivy (Dockerfile + IaC misconfig via `trivy config`, and built-image
+  vulnerability scanning via `trivy image`), and Checkov (Dockerfile IaC). Each
+  has a `scripts/{hadolint,trivy,checkov}.sh` wrapper with a `security:hadolint`
+  / `security:trivy` / `security:trivy:image` / `security:checkov` npm script,
+  folded into the aggregate `security` script, plus a PR-time
+  `.github/workflows/container-iac-scan.yml` safety net that builds the api/ui/
+  widget images and scans them. `trivy config` covers `docker-compose.yml`,
+  `docker-compose.prod.yml`, and `.do/app.yaml`. Gate policy: CRITICAL fails,
+  HIGH warns (per #60). Accepted findings are documented with expiry dates in
+  `.hadolint.yaml`, `.trivyignore`, and `.checkov.yaml` and catalogued in
+  `security/exceptions.yaml`; a `HEALTHCHECK` was added to all three Dockerfiles.
+  (ADR-0011)
+
 ### Added
 
 - **Use-case coverage for eleven previously undocumented interactions**
@@ -19,6 +78,19 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   admin invitations list + revoke. Generated Playwright specs committed;
   `admin-view-invitations` and `support-toggle-alert-sound` join the
   runnable e2e projects.
+
+### Changed
+
+- **Use cases now carry `expected_result`, use `extends` for variants, and cover
+  more error paths** ([#85]). Every non-`extends` use case gained an
+  `expected_result` stating the observable outcome; the `support/login` and
+  `widget/chat-ended` variant pairs were converted from duplicated files to
+  `extends` + `steps_override`; three `type: negative` cases were added
+  (invalid allowed-origin, already-revoked invitation, invalid user role); and
+  `usecases/README.md` now documents the positive/negative/extension
+  distinction. (The `widget/invitation` pair is handled with #76, which makes
+  that state reachable.) `usecases:validate` passes (31 cases) and specs were
+  regenerated.
 
 ### Fixed
 
@@ -36,19 +108,16 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   force-exit fallback calls `process.exit()` instead of assigning
   `process.exitCode`, which does nothing while the event loop is busy ([#68]).
 
-### Security
-
-- Container, Dockerfile, and IaC scanning added (Hadolint, Trivy, Checkov) —
-  `scripts/{hadolint,trivy,checkov}.sh` wrappers with `security:hadolint` /
-  `security:trivy` / `security:checkov` npm scripts, folded into the aggregate
-  `security` script, and a PR-time `.github/workflows/container-iac-scan.yml`
-  safety net. Accepted findings are documented in `.hadolint.yaml`,
-  `.trivyignore`, and `.checkov.yaml`; a `HEALTHCHECK` was added to all three
-  Dockerfiles. (ADR-0011, [#60])
-
+[#59]: https://github.com/AFixt/livechat/issues/59
 [#60]: https://github.com/AFixt/livechat/issues/60
+[#61]: https://github.com/AFixt/livechat/issues/61
+[#63]: https://github.com/AFixt/livechat/issues/63
+[#65]: https://github.com/AFixt/livechat/issues/65
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#78]: https://github.com/AFixt/livechat/issues/78
+[#85]: https://github.com/AFixt/livechat/issues/85
+[ADR-0013]: docs/adr/0013-jwt-localstorage-risk-acceptance.md
 
 ## [0.2.0] - 2026-07-23
 

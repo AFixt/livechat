@@ -14,6 +14,10 @@ description: |
 
 start_location: "http://localhost:5174/"
 
+expected_result: >-
+  The selected chat opens showing its transcript and a labelled message
+  composer.
+
 preconditions:
   - A staff user is authenticated (see support-login.uc.yaml).
   - The operator has an active chat selected (established over sockets — see
