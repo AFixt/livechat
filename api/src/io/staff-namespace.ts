@@ -48,7 +48,9 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
       return;
     }
     try {
-      const decoded = jwt.verify(token, deps.env.JWT_ACCESS_SECRET) as JwtPayload;
+      const decoded = jwt.verify(token, deps.env.JWT_ACCESS_SECRET, {
+        algorithms: ['HS256'],
+      }) as JwtPayload;
       socket.data.userId = decoded.sub;
       socket.data.role = decoded.role;
       socket.data.tenantId = decoded.tenantId;

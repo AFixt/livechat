@@ -29,6 +29,10 @@ export default tseslint.config(
       // run directly with `node`, outside any tsconfig, so typed linting can't
       // resolve them.
       'scripts/*.mjs',
+      // Semgrep rule-test fixtures: intentionally-insecure snippets consumed by
+      // `semgrep --test`, deliberately outside every tsconfig, so the typed
+      // ESLint project service cannot resolve them.
+      '.semgrep/**',
     ],
   },
 
