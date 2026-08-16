@@ -20,9 +20,10 @@ jobs:
   zap-pr:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    # Least privilege: this job neither uploads SARIF (no security-events)
+    # nor opens issues (allow_issue_writing: false), so read is sufficient.
     permissions:
       contents: read
-      security-events: write
     steps:
       - uses: actions/checkout@v4
 
