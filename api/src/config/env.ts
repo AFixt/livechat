@@ -71,10 +71,14 @@ export type Env = Readonly<ReturnType<typeof loadEnv>>;
  *   helpful error and exits the process.
  */
 export function loadEnv(): ReturnType<typeof cleanEnv<typeof envSpec>> {
-  // Load a local `.env` outside production so a clean clone runs after
+  // Load a local `.env` in development so a clean clone runs after
   // `npm ci && docker compose up -d` (#81). dotenv never overrides variables
   // already set in the environment, so CI/production values always win, and
-  // production must not read a file at all.
-  if (process.env.NODE_ENV !== 'production') loadDotenv();
+  // production must not read a file at all. `test` is excluded too: the unit
+  // suite drives `process.env` directly, and reading whatever `.env` happens to
+  // sit in the cwd (which the README tells contributors to create) would leak
+  // values into tests and make them pass or fail based on an untracked file.
+  const nodeEnv = process.env.NODE_ENV;
+  if (nodeEnv !== 'production' && nodeEnv !== 'test') loadDotenv();
   return cleanEnv(process.env, envSpec);
 }

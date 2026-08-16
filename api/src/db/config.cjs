@@ -5,8 +5,10 @@
 
 // Load api/.env for local `npm run migrate`/`seed` so a clean clone works
 // (#81). dotenv never overrides already-set variables, so CI/production (which
-// supply env directly) are unaffected; production never reads the file.
-if (process.env.NODE_ENV !== 'production') {
+// supply env directly) are unaffected; production never reads the file. `test`
+// is excluded to match api/src/config/env.ts, so a stray cwd `.env` cannot leak
+// into any sequelize-cli invocation a test might trigger.
+if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
   try {
     require('dotenv').config();
   } catch {
