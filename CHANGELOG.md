@@ -18,7 +18,8 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   to supply real S3 credentials for a feature that did not exist. The table
   (via a reversible migration), model, and associations are removed, and the
   `S3_*` env vars are now optional. Typing indicators and the email-transcript
-  affordance (the other two parts of #80) are handled separately. ([#80])
+  affordance (the other two parts of #80) are handled separately. See
+  [ADR-0017]. ([#80])
 
 ### Added
 
@@ -50,6 +51,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
 [#80]: https://github.com/AFixt/livechat/issues/80
+[ADR-0017]: docs/adr/0017-defer-chat-attachments.md
 
 ## [0.2.0] - 2026-07-23
 
