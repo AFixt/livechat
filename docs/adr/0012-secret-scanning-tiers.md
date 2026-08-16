@@ -33,7 +33,7 @@ false-positive baseline.
   credentials).
 - **`.secrets.baseline`** (Yelp detect-secrets convention) records known
   candidate secrets at line granularity so the suspected tier surfaces only
-  *new* findings. **`scripts/detect-secrets.sh`** (`security:secrets:baseline`)
+  _new_ findings. **`scripts/detect-secrets.sh`** (`security:secrets:baseline`)
   re-scans against it and **warns** on drift, never blocks. detect-secrets runs
   via `pipx`/`pip`, never as an npm dependency — the axe-core-banned Node tree
   is untouched.
@@ -54,7 +54,7 @@ false positive. To add one: confirm it is not a live credential, then in the
 `detect-secrets audit .secrets.baseline`) and state **who / why** in the commit
 message. Remove the entry when the fixture goes away. The verified (blocking)
 tier is never suppressed by the baseline — only the warn tier is filtered — so a
-mistaken allow-list entry can never hide a *confirmed-live* secret.
+mistaken allow-list entry can never hide a _confirmed-live_ secret.
 
 ## Consequences
 

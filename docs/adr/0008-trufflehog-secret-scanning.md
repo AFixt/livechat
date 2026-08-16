@@ -53,7 +53,10 @@ because the latter is deprecated in trufflehog v3.95+; both express the same
   contents rather than the staged diff. Verified-only means an unverifiable but
   real secret (e.g. an internal token with no reachable verifier) can pass the
   gate — accepted, because the full-history scan plus semgrep's `p/secrets`
-  rules and `eslint-plugin-no-secrets` provide defense in depth.
+  rules and `eslint-plugin-no-secrets` provide defense in depth. This
+  verified-only trade-off is later revisited by the two-tier secret-scanning ADR
+  (`docs/adr/0012-secret-scanning-tiers.md`, issue #82), which adds a warn-only
+  suspected tier so unverifiable detector hits reach a human without blocking.
 - CI and contributors no longer need `gitleaks`; `bootstrap.sh` installs
   `trufflehog`. No `.gitleaks.toml` existed, so none was removed.
 - Supersedes the `gitleaks` choice in ADR-0001 (issue #1). Closes issue #3.
