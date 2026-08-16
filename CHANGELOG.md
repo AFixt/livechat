@@ -182,6 +182,13 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Fixed
 
+- **Integration tests no longer flake under load.** The suite's 10s
+  `testTimeout` had no headroom: tests doing several bcrypt-cost-12 hashes plus
+  real MySQL round-trips landed near 10s on a busy machine, so unrelated tests
+  timed out intermittently and adding any new integration test destabilised
+  existing ones. Test-environment bcrypt cost is now 4 (production/dev stay at
+  12, asserted by `bcrypt-cost.test.ts`), and the integration `testTimeout` is
+  raised to 30s. ([#71])
 - **`npm ci --omit=dev` no longer crashes on the `prepare` hook.** The root
   `prepare` script ran `husky` unconditionally, so any production install — the
   `api/Dockerfile` runtime image and the `.do/app.yaml` migrate job — failed with
@@ -218,6 +225,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#65]: https://github.com/AFixt/livechat/issues/65
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#71]: https://github.com/AFixt/livechat/issues/71
 [#78]: https://github.com/AFixt/livechat/issues/78
 [#82]: https://github.com/AFixt/livechat/issues/82
 [#83]: https://github.com/AFixt/livechat/issues/83
