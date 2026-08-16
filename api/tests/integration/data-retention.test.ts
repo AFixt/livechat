@@ -1,12 +1,47 @@
 import { pino } from 'pino';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-import { Tenant, VisitorSession } from '../../src/models/index.js';
+import { Chat, ChatMessage, Tenant, VisitorSession } from '../../src/models/index.js';
 import { createDataRetentionService } from '../../src/services/data-retention-service.js';
 
 import { probeHarness, type TestHarness } from './setup.js';
 
 const logger = pino({ level: 'silent' });
+
+/**
+ * Seed a chat + message under a visitor session so cascade and referential
+ * integrity are observable.
+ * @param tenantId - Owning tenant.
+ * @param visitorSessionId - Parent session.
+ * @param seededAt - Timestamp for the required non-null date columns.
+ * @returns The created chat and message ids.
+ */
+async function seedChatWithMessage(
+  tenantId: string,
+  visitorSessionId: string,
+  seededAt: Date,
+): Promise<{ chatId: string; messageId: string }> {
+  const chat = await Chat.create({
+    tenantId,
+    visitorSessionId,
+    assignedTo: null,
+    initiatedBy: 'customer',
+    status: 'active',
+    customerName: null,
+    customerEmail: null,
+    startedAt: seededAt,
+    endedAt: null,
+  });
+  const message = await ChatMessage.create({
+    chatId: chat.id,
+    senderKind: 'visitor',
+    senderUserId: null,
+    body: 'hello',
+    readAt: null,
+    deliveredAt: seededAt,
+  });
+  return { chatId: chat.id, messageId: message.id };
+}
 
 /**
  * Seed a visitor session with a specific `last_seen_at`, carrying PII so the
@@ -72,6 +107,13 @@ describe('data retention service', () => {
       `fresh-${Date.now().toString()}`,
       new Date('2026-08-10T00:00:00.000Z'), // 5 days old
     );
+    // An expired session with a linked chat + message: anonymize must strip the
+    // session PII but keep the transcript referentially intact.
+    const { chatId, messageId } = await seedChatWithMessage(
+      tenant.id,
+      oldId,
+      new Date('2026-01-01T00:00:00.000Z'),
+    );
 
     const retention = createDataRetentionService({ logger });
     const result = await retention.purgeExpiredVisitorData({
@@ -92,6 +134,10 @@ describe('data retention service', () => {
     expect(oldRow?.referrer).toBeNull();
     expect(oldRow?.country).toBeNull();
     expect(oldRow?.identityTokenSub).toBeNull();
+
+    // Referential integrity: the chat and its message survive anonymization.
+    expect(await Chat.findByPk(chatId)).not.toBeNull();
+    expect(await ChatMessage.findByPk(messageId)).not.toBeNull();
 
     expect(freshRow?.ipAddress).toBe('203.0.113.0');
     expect(freshRow?.currentUrl).toBe('https://client.example/pricing');
@@ -141,6 +187,13 @@ describe('data retention service', () => {
       `del-fresh-${Date.now().toString()}`,
       new Date('2026-08-14T00:00:00.000Z'),
     );
+    // Linked chat + message on the expired session: the hard delete must cascade
+    // and physically remove them, even though Chat/ChatMessage are paranoid.
+    const { chatId, messageId } = await seedChatWithMessage(
+      tenant.id,
+      oldId,
+      new Date('2026-01-01T00:00:00.000Z'),
+    );
 
     const retention = createDataRetentionService({ logger });
     const result = await retention.purgeExpiredVisitorData({
@@ -152,5 +205,9 @@ describe('data retention service', () => {
     expect(result.deleted).toBeGreaterThanOrEqual(1);
     expect(await VisitorSession.findByPk(oldId)).toBeNull();
     expect(await VisitorSession.findByPk(freshId)).not.toBeNull();
+    // `paranoid: false` proves physical removal (DB-level ON DELETE CASCADE),
+    // not just a soft delete the default scope would hide.
+    expect(await Chat.findByPk(chatId, { paranoid: false })).toBeNull();
+    expect(await ChatMessage.findByPk(messageId, { paranoid: false })).toBeNull();
   });
 });
