@@ -36,22 +36,43 @@ function truncateIpv4(value: string): string {
 }
 
 /**
+ * True when `value` is a single valid IPv6 hextet: one to four hex digits.
+ * @param value - Candidate group.
+ * @returns Whether the group is a syntactically valid 16-bit hextet.
+ */
+function isHextet(value: string): boolean {
+  return /^[0-9a-f]{1,4}$/i.test(value);
+}
+
+/**
+ * Split one side of a `::`-separated IPv6 address into its colon-separated
+ * groups; an empty side yields no groups.
+ * @param half - The head or tail substring (may be undefined/empty).
+ * @returns The group strings on that side.
+ */
+function splitHextetGroups(half: string | undefined): string[] {
+  const raw = half ?? '';
+  return raw === '' ? [] : raw.split(':');
+}
+
+/**
  * Expand an IPv6 address (including `::` compressed forms) into its eight
- * 16-bit hextet groups.
+ * 16-bit hextet groups. Rejects malformed input — a group that is not a valid
+ * hextet (non-hex characters, an over-long group, or an embedded IPv4 literal)
+ * yields null so the caller stores nothing rather than a bogus value.
  * @param value - Candidate IPv6 address, without a zone or embedded IPv4.
  * @returns Eight hextet strings, or null if the input is malformed.
  */
 function expandIpv6(value: string): string[] | null {
   const halves = value.split('::');
   if (halves.length > 2) return null;
-  const rawHead = halves[0] ?? '';
-  const rawTail = halves.length === 2 ? (halves[1] ?? '') : '';
-  const head = rawHead === '' ? [] : rawHead.split(':');
-  const tail = rawTail === '' ? [] : rawTail.split(':');
+  const head = splitHextetGroups(halves[0]);
+  const tail = splitHextetGroups(halves.length === 2 ? halves[1] : '');
+  if (![...head, ...tail].every(isHextet)) return null;
   if (halves.length === 1) return head.length === 8 ? head : null;
   const missing = 8 - head.length - tail.length;
-  if (missing < 0) return null;
-  return [...head, ...(Array.from({ length: missing }, () => '0')), ...tail];
+  if (missing < 1) return null;
+  return [...head, ...Array.from({ length: missing }, () => '0'), ...tail];
 }
 
 /**

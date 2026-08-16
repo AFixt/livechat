@@ -34,6 +34,18 @@ describe('truncateIp', () => {
     expect(truncateIp('not-an-ip')).toBeNull();
     expect(truncateIp('999.999.999.999')).toBeNull();
   });
+
+  it('returns null for colon-bearing garbage rather than storing it', () => {
+    // A colon is not enough to make a string an IPv6 address; each group must
+    // be a valid 1–4 digit hextet or nothing is stored.
+    expect(truncateIp('foo:bar:baz::')).toBeNull();
+    expect(truncateIp('zzzz:gggg::')).toBeNull();
+    expect(truncateIp('a:b:c:d:e:f:g:h')).toBeNull(); // g/h are not hex
+    expect(truncateIp('12345::')).toBeNull(); // hextet too long
+    expect(truncateIp(':::')).toBeNull(); // more than one '::'
+    expect(truncateIp('2001:db8::1.2.3.4')).toBeNull(); // embedded IPv4 literal
+    expect(truncateIp('1:2:3:4:5:6:7:8::')).toBeNull(); // trailing '::' with 8 groups
+  });
 });
 
 describe('coarsenGeo', () => {
