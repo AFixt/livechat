@@ -10,6 +10,8 @@ import { Router } from 'express';
 
 import { computeCsrfToken, csrfProtection } from '../middlewares/csrf.js';
 import { parsedBody, validate } from '../middlewares/validate.js';
+import { Tenant } from '../models/index.js';
+import { parseSupportHours } from '../services/support-hours.js';
 import { ApiError } from '../utils/api-error.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
@@ -23,6 +25,23 @@ interface VisitorRouterDeps {
   visitorSession: VisitorSessionService;
   chat: ChatService;
   presence: PresenceService;
+}
+
+/**
+ * Compute whether support is currently available for a tenant — at least one
+ * explicitly-available, reachable agent AND the tenant is within its
+ * configured support hours.
+ * @param presence - Presence service.
+ * @param tenantId - Tenant UUID.
+ * @returns Whether the widget should treat support as online.
+ */
+async function computeSupportAvailable(
+  presence: PresenceService,
+  tenantId: string,
+): Promise<boolean> {
+  const tenant = await Tenant.findByPk(tenantId, { attributes: ['settings'] });
+  const supportHours = parseSupportHours(tenant?.settings?.supportHours);
+  return presence.anyStaffAvailable(tenantId, { supportHours });
 }
 
 /**
@@ -108,7 +127,7 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
       const { chat, message } = await deps.chat.initiateByVisitor(initArgs);
       // The widget branches on availability: an active chat when support is
       // online, otherwise the offline (no_support) email-capture state.
-      const supportAvailable = await deps.presence.anyStaffAvailable();
+      const supportAvailable = await computeSupportAvailable(deps.presence, visitor.tenantId);
       res.status(201).json({ success: true, data: { chat, message, supportAvailable } });
     }),
   );

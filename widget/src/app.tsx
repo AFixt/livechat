@@ -1,8 +1,14 @@
-import { useEffect, useReducer, useRef } from 'preact/hooks';
+import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 
 import { LiveRegion } from './components/live-region.js';
+import { useDelayedFlag } from './hooks/use-delayed-flag.js';
 import { useFocusReturn } from './hooks/use-focus-return.js';
-import { fetchCurrentChat, initiateChat, initVisitorSession } from './services/api.js';
+import {
+  fetchCurrentChat,
+  fetchWidgetConfig,
+  initiateChat,
+  initVisitorSession,
+} from './services/api.js';
 import { playAlert } from './services/audio.js';
 import { consentStore } from './services/consent.js';
 import { announceLiveMessage } from './services/live-region.js';
@@ -23,12 +29,30 @@ interface AppProps {
   tenantKey: string;
 }
 
+/**
+ * How long support must stay available before the proactive invitation
+ * surfaces. §5.1.2 calls for the CTA "after a short period" — the widget shows
+ * its plain trigger first and only escalates to the invitation once support has
+ * been online continuously for this long.
+ */
+const INVITATION_DELAY_MS = 5000;
+
 interface SocketMessageEvent {
   chatId: string;
   messageId: string;
   senderKind: 'visitor' | 'user' | 'system';
   body: string;
   deliveredAt: string;
+}
+
+/**
+ * Optional support-hours props for the no-support state. Returns an empty
+ * object when unset so it is safe to spread under `exactOptionalPropertyTypes`.
+ * @param text - Configured support-hours display text, or undefined.
+ * @returns Props to spread onto `<NoSupportState>`.
+ */
+function noSupportProps(text: string | undefined): { supportHoursText?: string } {
+  return text === undefined ? {} : { supportHoursText: text };
 }
 
 /**
@@ -39,6 +63,11 @@ interface SocketMessageEvent {
  */
 export function App(props: AppProps): preact.JSX.Element {
   const [model, dispatch] = useReducer(reduce, initialModel());
+  const [supportHoursText, setSupportHoursText] = useState<string | undefined>(undefined);
+  // §5.1.2: the invitation appears "after a short period", not the instant
+  // support comes online. `supportAvailable` still drives the offline/online
+  // logic everywhere else; only the proactive flourish waits out this delay.
+  const showInvitation = useDelayedFlag(model.supportAvailable, INVITATION_DELAY_MS);
   useFocusReturn(model.open);
   const panelHeaderRef = useRef<HTMLHeadingElement>(null);
 
@@ -56,14 +85,35 @@ export function App(props: AppProps): preact.JSX.Element {
       announceLiveMessage('A support agent wants to chat');
       playAlert();
     };
+    // The /visitor namespace bridges staff availability to the widget, making
+    // the proactive invitation (§5.1.2) and no-support (§5.1.4) states
+    // reachable. Both true and false are dispatched.
+    const onAvailabilityChanged = (p: { available: boolean }): void => {
+      dispatch({ type: 'support_available', available: p.available });
+      if (p.available) announceLiveMessage('Support is now online');
+    };
+    // Public tenant config — support-hours text plus the current availability
+    // flag, so the invitation/no-support states are correct on first paint
+    // before any live socket event arrives. Best-effort: the widget still
+    // works if this fails.
+    const loadInitialConfig = async (): Promise<void> => {
+      try {
+        const config = await fetchWidgetConfig(props.tenantKey);
+        if (!live.current) return;
+        setSupportHoursText(config.supportHoursText ?? undefined);
+        dispatch({ type: 'support_available', available: config.supportAvailable });
+      } catch {
+        // ignore — config is optional
+      }
+    };
     void (async () => {
-      // CMP consent gate: when the host set `data-require-consent`, hold all
-      // presence/analytics capture (session init + socket) until the host CMP
-      // grants it via `window.AfixtLiveChat.setConsent({ analytics: true })`.
-      // Resolves immediately when consent isn't required. The existing
-      // `live.current` guards below still handle an unmount during the wait.
-      // (#54)
+      // CMP consent gate (#54): hold presence/analytics capture until the host
+      // CMP grants it; resolves immediately when consent isn't required.
       await consentStore.whenCaptureAllowed();
+      // `loadInitialConfig` self-guards on `live.current` after its fetch, and
+      // the resume/socket path below is guarded too, so an unmount during the
+      // consent wait is handled without an extra early return here.
+      await loadInitialConfig();
       // Reuse an existing session when the visitor already has one — a page
       // reload must not mint a fresh session, which would orphan a prior chat
       // and break the returning-visitor (restart) flow. Probing the resumable
@@ -84,6 +134,7 @@ export function App(props: AppProps): preact.JSX.Element {
       // A session now exists — connect the socket so this visitor shows up in
       // the console's presence list and can receive proactive support events.
       getVisitorSocket().on('support:initiated', onSupportInitiated);
+      getVisitorSocket().on('support:availability_changed', onAvailabilityChanged);
       // Returning visitor with an unfinished chat? Offer to resume it.
       if (resume !== null && resume.chat !== null) {
         dispatch({
@@ -97,6 +148,7 @@ export function App(props: AppProps): preact.JSX.Element {
     return () => {
       live.current = false;
       getVisitorSocket().off('support:initiated', onSupportInitiated);
+      getVisitorSocket().off('support:availability_changed', onAvailabilityChanged);
     };
   }, [props.tenantKey]);
 
@@ -220,7 +272,7 @@ export function App(props: AppProps): preact.JSX.Element {
             {model.state === 'no_support' && (
               <NoSupportState
                 onSubmit={() => Promise.resolve()}
-                supportHoursText="Mon–Fri, 9am–5pm"
+                {...noSupportProps(supportHoursText)}
               />
             )}
             {model.state === 'support_initiated' && (
@@ -253,7 +305,7 @@ export function App(props: AppProps): preact.JSX.Element {
             )}
           </div>
         </section>
-      ) : model.supportAvailable ? (
+      ) : showInvitation ? (
         <InvitationState
           onOpen={() => {
             dispatch({ type: 'open' });

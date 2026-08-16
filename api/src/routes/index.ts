@@ -72,6 +72,7 @@ export function buildRouter(deps: RouterDeps): Router {
     '/widget',
     originAllowed(),
     buildWidgetRouter({
+      presence: deps.services.presence,
       redis: deps.redis,
       ...(deps.skipRateLimit === true && { skipRateLimit: true }),
     }),

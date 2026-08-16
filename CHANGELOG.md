@@ -158,6 +158,25 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Added
 
+- **Explicit, per-user staff availability with support hours** ([#76]).
+  Availability is no longer a side effect of having a Socket.IO connection
+  open. Operators set an explicit `available` / `away` status from the console
+  Availability page; it is stored per-user in Redis, persists across
+  reconnects and reloads, and is unaffected by opening or closing extra tabs.
+  A connection grace window (refreshed by a periodic heartbeat) means a
+  dropped socket does not immediately mark an agent away. Tenants can
+  configure weekly support hours in `Tenant.settings.supportHours` (no
+  migration); `anyStaffAvailable` is true only when at least one agent is
+  explicitly available AND the tenant is within hours. The `/staff` namespace
+  now bridges `support:availability_changed` to the tenant's `/visitor` room,
+  so the widget dispatches `support_available` (both true and false) — making
+  the proactive-invitation state (§5.1.2) reachable and the no-support state
+  (§5.1.4) fire correctly. The widget reads configured support-hours text from
+  `/widget/config` instead of the hardcoded `"Mon–Fri, 9am–5pm"`. Status
+  changes are announced programmatically (aria-live), visibly, and audibly per
+  §3. New `support-set-availability` use case; the alert-sound mute moved to a
+  new Preferences page (and its use case). The widget invitation use cases are
+  no longer marked unreachable.
 - **Consent foundation for the geo-privacy program.** A real, extensible consent
   framework with documented defaults and an audit trail — the base the presence
   gate and GPC handling build on. ([#56])
@@ -349,6 +368,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#57]: https://github.com/AFixt/livechat/issues/57
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#76]: https://github.com/AFixt/livechat/issues/76
 [adr-0020]: docs/adr/0020-geo-retention-minimization.md
 
 [#56]: https://github.com/AFixt/livechat/issues/56

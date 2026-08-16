@@ -52,6 +52,34 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   return body;
 }
 
+interface WidgetConfigResponse {
+  tenantId: string;
+  tenantKey: string;
+  name: string;
+  primaryColor: string | null;
+  supportHoursText: string | null;
+  supportPhone: string | null;
+  /** Whether support is available *right now* (agents online + within hours). */
+  supportAvailable: boolean;
+}
+
+/**
+ * GET /api/v1/widget/config — public tenant configuration. Fetched at
+ * bootstrap for the tenant's support-hours text and the current
+ * support-availability flag (which seeds the invitation / no-support states
+ * before any live socket event arrives).
+ * @param tenantKey - Tenant slug from `data-tenant-key`.
+ * @returns The public tenant config.
+ */
+export async function fetchWidgetConfig(tenantKey: string): Promise<WidgetConfigResponse> {
+  const body = await apiFetch<WidgetConfigResponse>(
+    `/widget/config?tenantKey=${encodeURIComponent(tenantKey)}`,
+    { method: 'GET' },
+  );
+  if (body.data === undefined) throw new Error('No config returned');
+  return body.data;
+}
+
 interface InitSessionResponse {
   sessionId: string;
   tenantId: string;

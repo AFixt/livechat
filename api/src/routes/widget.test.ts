@@ -8,6 +8,7 @@ import { errorHandler } from '../middlewares/error-handler.js';
 
 import { buildWidgetRouter } from './widget.js';
 
+import type { PresenceService } from '../services/index.js';
 import type { Redis } from 'ioredis';
 
 interface Captured {
@@ -32,8 +33,16 @@ function buildTestApp(): { app: Express; logs: Captured[] } {
   const app = express();
   app.use(express.json({ limit: '1mb' }));
   app.use(pinoHttp({ logger }));
-  // `redis` is unused because skipRateLimit short-circuits the limiter.
-  app.use('/widget', buildWidgetRouter({ redis: {} as unknown as Redis, skipRateLimit: true }));
+  // `redis` is unused because skipRateLimit short-circuits the limiter, and
+  // `presence` is unused because these tests only exercise `/csp-report`.
+  app.use(
+    '/widget',
+    buildWidgetRouter({
+      presence: {} as unknown as PresenceService,
+      redis: {} as unknown as Redis,
+      skipRateLimit: true,
+    }),
+  );
   app.use(errorHandler(logger));
   return { app, logs };
 }
