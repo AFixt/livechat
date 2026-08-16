@@ -132,6 +132,9 @@ export function buildPrivacyRouter(deps: PrivacyRouterDeps): Router {
     validate({ query: readConsentQuerySchema }),
     asyncHandler(async (req, res) => {
       const q = readConsentQuerySchema.parse(req.query);
+      // Audit-side-effect-free: this GET writes no audit row and persists no
+      // consent record. It may still set a fresh subject cookie when the request
+      // carries none — session establishment, not tracking. See ADR-0019.
       const subjectKey = resolveSubject(deps, req, res);
       const state = await deps.consent.resolveState({
         subjectKey,

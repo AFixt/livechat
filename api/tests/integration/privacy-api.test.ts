@@ -59,7 +59,8 @@ describe('privacy API (integration)', () => {
     expect(res.body.data.purposes.functional).toBe('granted');
     expect(res.body.data.purposes.presence).toBe('denied');
     expect(res.body.data.requiresOptIn).toEqual(['presence', 'analytics']);
-    // A read must not mint an audit row.
+    // A read is audit-side-effect-free, but it does establish a subject session
+    // by setting a fresh signed cookie when the request carries none.
     expect(cookiesOf(res).join()).toContain('livechat_visitor');
   });
 

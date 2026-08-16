@@ -89,8 +89,10 @@ supersede this section, not a rewrite of the engine.
 
 ### 4. Privacy APIs under `/api/v1/privacy`
 
-- `GET /privacy/consent` — read effective state (side-effect free; no audit row)
-  so the widget can gate itself.
+- `GET /privacy/consent` — read effective state so the widget can gate itself.
+  Audit-side-effect-free: it writes no audit row and persists no consent record.
+  It is not fully side-effect-free — a fresh signed subject cookie is set on the
+  response when the request carries none (session establishment, not tracking).
 - `POST /privacy/consent` — record a banner grant/deny.
 - `POST /privacy/consent/withdraw` — deny all non-essential purposes.
 - `POST /privacy/data-request` — data-subject export/delete. **Documented
