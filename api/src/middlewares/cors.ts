@@ -12,7 +12,30 @@ const WIDGET_FACING_PREFIXES = ['/api/v1/visitor', '/api/v1/widget', '/v1/visito
 /** How long a resolved origin decision is cached, to avoid a DB hit per request. */
 const ORIGIN_CACHE_TTL_MS = 60_000;
 
+/**
+ * Hard cap on distinct cached origins. The cache key is the request `Origin`
+ * header, which an attacker can vary without bound; without a cap a flood of
+ * unique origins would grow the map unboundedly (each entry lingers until its
+ * TTL is checked on a later read). When the cap is hit the oldest entry is
+ * evicted (insertion-ordered `Map`), keeping memory bounded.
+ */
+const ORIGIN_CACHE_MAX_ENTRIES = 10_000;
+
 const originCache = new Map<string, { allowed: boolean; expiresAt: number }>();
+
+/**
+ * Record an origin decision, evicting the oldest entry when the cache is full.
+ * @param origin - The `Origin` header value used as the cache key.
+ * @param allowed - Whether any active tenant authorizes the origin.
+ * @param now - Current epoch millis (the TTL base).
+ */
+function cacheOriginDecision(origin: string, allowed: boolean, now: number): void {
+  if (!originCache.has(origin) && originCache.size >= ORIGIN_CACHE_MAX_ENTRIES) {
+    const oldest = originCache.keys().next().value;
+    if (oldest !== undefined) originCache.delete(oldest);
+  }
+  originCache.set(origin, { allowed, expiresAt: now + ORIGIN_CACHE_TTL_MS });
+}
 
 /**
  * True when the request targets a widget-facing route that arbitrary customer
@@ -50,7 +73,7 @@ export async function isKnownWidgetOrigin(origin: string): Promise<boolean> {
     },
   });
   const allowed = count > 0;
-  originCache.set(origin, { allowed, expiresAt: now + ORIGIN_CACHE_TTL_MS });
+  cacheOriginDecision(origin, allowed, now);
   return allowed;
 }
 
