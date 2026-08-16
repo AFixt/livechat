@@ -1,3 +1,4 @@
+import { availabilityStatusSchema } from '@livechat/shared';
 import jwt from 'jsonwebtoken';
 
 import { GLOBAL_STAFF_TENANT } from '../services/presence-service.js';
@@ -174,11 +175,18 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
 
     socket.on('availability:set', (payload) => {
       if (!isStaff) return;
+      // Validate at runtime: the payload is untrusted socket input (a client
+      // can emit anything, including no payload), so a malformed status must
+      // not be persisted or echoed back to the client.
+      const raw = payload as { status?: unknown } | null | undefined;
+      const parsed = availabilityStatusSchema.safeParse(raw?.status);
+      if (!parsed.success) return;
+      const status = parsed.data;
       detach(deps.logger, 'staff availability:set failed', async () => {
-        await deps.services.presence.setAvailability(userId, availabilityTenant, payload.status);
+        await deps.services.presence.setAvailability(userId, availabilityTenant, status);
         // Echo to every tab of this user so the console reflects the change
         // and multi-tab stays in sync (availability is per-user, not per-tab).
-        nsp.to(`user:${userId}`).emit('availability:self', { status: payload.status });
+        nsp.to(`user:${userId}`).emit('availability:self', { status });
         if (tenantId !== null) {
           await broadcastTenantAvailability({
             io: deps.io,
