@@ -35,6 +35,11 @@ interface VisitorRouterDeps {
 export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
   const router = Router();
 
+  // Bootstrap endpoint: intentionally NOT CSRF-protected. A CSRF token is
+  // derived from the visitor cookie, which does not exist yet on the first
+  // call, so there is nothing to verify. It mints a fresh anonymous session and
+  // exposes no cross-origin-readable data (restrictive CORS), so the only
+  // cross-site effect is minting a throwaway session — no privileged action.
   router.post(
     '/session',
     validate({ body: initVisitorSessionInputSchema }),

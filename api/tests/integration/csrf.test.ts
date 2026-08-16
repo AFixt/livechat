@@ -94,4 +94,29 @@ describe('CSRF protection on visitor write routes (#77)', () => {
 
     expect(res.status).toBe(201);
   });
+
+  test('the heartbeat route is protected too — no token is rejected (403)', async () => {
+    if (harness === null) return;
+    const { cookie } = await bootstrapVisitor(harness.app, 'csrf-t');
+
+    const res = await request(harness.app)
+      .post('/api/v1/visitor/heartbeat')
+      .set('cookie', `livechat_visitor=${cookie}`)
+      .send({ currentUrl: 'https://example.com/no-token' });
+
+    expect(res.status).toBe(403);
+  });
+
+  test('the heartbeat route accepts the matching token (200)', async () => {
+    if (harness === null) return;
+    const { cookie, csrfToken } = await bootstrapVisitor(harness.app, 'csrf-t');
+
+    const res = await request(harness.app)
+      .post('/api/v1/visitor/heartbeat')
+      .set('cookie', `livechat_visitor=${cookie}`)
+      .set('X-XSRF-TOKEN', csrfToken)
+      .send({ currentUrl: 'https://example.com/with-token' });
+
+    expect(res.status).toBe(200);
+  });
 });
