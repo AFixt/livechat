@@ -144,6 +144,32 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Added
 
+- **Consent foundation for the geo-privacy program.** A real, extensible consent
+  framework with documented defaults and an audit trail — the base the presence
+  gate and GPC handling build on. ([#56])
+  - New `consent_records` table + Sequelize model: one durable row per
+    tracking decision/consent change, keyed by an anonymous `subject_key` (HMAC
+    of the visitor cookie, so it lines up with a tracked session without
+    requiring one). IP is minimized to an HMAC (`ip_hash`); the raw address is
+    never stored.
+  - A **jurisdiction rules engine** (`consent-policy.ts`): a small, versioned,
+    data-driven table (`RULE_VERSION`). EU/EEA/UK → opt-in; US/US-CA → opt-out
+    (honoring explicit opt-out and GPC); unknown location → strict opt-in (never
+    US-max). `functional` is strictly necessary and always granted;
+    `presence`/`analytics` are the gated non-essential purposes.
+  - **Privacy APIs** under `/api/v1/privacy`: `GET /consent` (side-effect-free
+    effective-state read for the widget to gate on), `POST /consent`,
+    `POST /consent/withdraw`, and `POST /data-request` (an audited, queued stub).
+  - **Tracking-decision audit trail**: every decision emits the §19 event
+    vocabulary to `audit_logs` (`privacy.location_resolved` /
+    `privacy.location_unknown` / `privacy.geolocation_default_applied`,
+    `privacy.rule_applied`, `privacy.gpc_detected` / `privacy.gpc_applied`,
+    `privacy.consent_recorded` / `privacy.consent_withdrawn` /
+    `privacy.data_request`).
+  - Decisions covered by unit tests (EU/US/GPC/unknown) and the APIs by
+    integration tests against real MySQL. See
+    [ADR-0019](docs/adr/0019-consent-model-and-jurisdiction-policy.md).
+
 - **The widget can work on third-party sites: CORS is now per-tenant.** The API
   reflected only the console origin (`APP_URL`), so every credentialed
   cross-origin widget request was blocked by the browser. Widget-facing routes
@@ -305,6 +331,8 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   `400 Malformed request body` / `413 Request payload too large` /
   `415 Unsupported media type` with a fixed, non-leaking message (the offending
   payload slice body-parser puts in `err.message` is never echoed).
+
+[#56]: https://github.com/AFixt/livechat/issues/56
 
 [#64]: https://github.com/AFixt/livechat/issues/64
 [#50]: https://github.com/AFixt/livechat/issues/50

@@ -6,6 +6,7 @@ import { buildAuthRouter } from './auth.js';
 import { buildChatsRouter } from './chats.js';
 import healthRouter from './health.js';
 import { buildInvitationsRouter } from './invitations.js';
+import { buildPrivacyRouter } from './privacy.js';
 import { buildTenantsRouter } from './tenants.js';
 import { buildUsersRouter } from './users.js';
 import { buildVisitorRouter } from './visitor.js';
@@ -73,6 +74,15 @@ export function buildRouter(deps: RouterDeps): Router {
     buildWidgetRouter({
       redis: deps.redis,
       ...(deps.skipRateLimit === true && { skipRateLimit: true }),
+    }),
+  );
+  router.use(
+    '/privacy',
+    originAllowed(),
+    buildPrivacyRouter({
+      env: deps.env,
+      consent: deps.services.consent,
+      visitorSession: deps.services.visitorSession,
     }),
   );
   router.use(
