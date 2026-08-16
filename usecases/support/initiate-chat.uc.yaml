@@ -15,6 +15,10 @@ description: |
 
 start_location: "http://localhost:5174/"
 
+expected_result: >-
+  A chat is started with the selected visitor and opens in the console with a
+  focusable message composer.
+
 preconditions:
   - A staff user is authenticated (see support-login.uc.yaml).
   - At least one visitor is present on the site (established over sockets — see

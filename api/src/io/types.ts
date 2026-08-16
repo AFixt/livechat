@@ -41,6 +41,12 @@ export interface ServerToClientEvents {
   /** Chat has ended. */
   'chat:ended': (payload: { chatId: string; endedBy: 'customer' | 'support' }) => void;
   /**
+   * A client event was rejected — authorization (wrong tenant/visitor) or
+   * validation. Sent only to the socket that triggered it so the caller can
+   * surface the failure instead of silently hanging (issue #72).
+   */
+  'chat:error': (payload: { event: string; message: string }) => void;
+  /**
    * Aggregate tenant support availability flipped. Emitted to the tenant's
    * visitor room (drives the widget's invitation / no-support states) and to
    * the staff room. Reflects whether *any* agent is explicitly available and

@@ -7,6 +7,21 @@ interface JsonEnvelope<T> {
 }
 
 /**
+ * CSRF token for cookie-authenticated writes (#77). Held in memory only —
+ * never a cookie — so a cross-site attacker carrying the ambient visitor
+ * cookie cannot read or forge it. Seeded from the bootstrap responses.
+ */
+let csrfToken: string | null = null;
+
+/**
+ * Record the CSRF token returned by a bootstrap endpoint.
+ * @param token - The token to send on subsequent write requests.
+ */
+export function setCsrfToken(token: string): void {
+  csrfToken = token;
+}
+
+/**
  * Minimal fetch wrapper — cookie-authed, credentials: 'include' so the
  * signed visitor cookie is sent on every request. No axios dependency
  * keeps the widget bundle small.
@@ -19,6 +34,11 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const headers = new Headers(init.headers);
   if (!headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
+  }
+  // Echo the CSRF token on cookie-authenticated writes (#77). Harmless on
+  // reads; the server only checks it on state-changing routes.
+  if (csrfToken !== null && !headers.has('X-XSRF-TOKEN')) {
+    headers.set('X-XSRF-TOKEN', csrfToken);
   }
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -63,6 +83,7 @@ export async function fetchWidgetConfig(tenantKey: string): Promise<WidgetConfig
 interface InitSessionResponse {
   sessionId: string;
   tenantId: string;
+  csrfToken: string;
 }
 
 /**
@@ -81,6 +102,7 @@ export async function initVisitorSession(tenantKey: string): Promise<InitSession
     }),
   });
   if (body.data === undefined) throw new Error('No session returned');
+  setCsrfToken(body.data.csrfToken);
   return body.data;
 }
 
@@ -125,6 +147,8 @@ interface CurrentChatMessage {
 interface CurrentChat {
   chat: { id: string; status: string; customerName: string | null } | null;
   messages: CurrentChatMessage[];
+  /** Present for a returning visitor who never re-calls /session (#77). */
+  csrfToken?: string;
 }
 
 /**
@@ -134,5 +158,6 @@ interface CurrentChat {
  */
 export async function fetchCurrentChat(): Promise<CurrentChat> {
   const body = await apiFetch<CurrentChat>('/visitor/chats/current', { method: 'GET' });
+  if (body.data?.csrfToken !== undefined) setCsrfToken(body.data.csrfToken);
   return body.data ?? { chat: null, messages: [] };
 }

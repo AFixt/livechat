@@ -1,0 +1,26 @@
+id: admin-revoke-invitation--already-revoked
+title: "A revoked invitation cannot be revoked again"
+extends: admin-revoke-invitation
+type: negative
+description: |
+  Revoking flips an invitation to "revoked" and the Revoke control must then
+  disable, so the already-revoked error path is unreachable through the UI —
+  the control is not actionable a second time. This asserts that guard
+  (rather than relying on the API 4xx alone).
+
+  A negative variant of admin-revoke-invitation: it reuses the revoke action
+  and then asserts the control is disabled instead of revoking again.
+
+preconditions:
+  - An admin or super_admin user is authenticated.
+  - At least one invitation with status "pending" is listed.
+
+data: {}
+
+# Reuse parent steps 1–4 (locate the table, revoke once), then assert the
+# revoked state persists and the Revoke control is no longer actionable.
+steps_override:
+  from_step: 5
+  steps:
+    - 'verify: text "revoked"'
+    - 'verify: disabled button "Revoke"'

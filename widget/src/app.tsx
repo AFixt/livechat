@@ -10,6 +10,7 @@ import {
   initVisitorSession,
 } from './services/api.js';
 import { playAlert } from './services/audio.js';
+import { consentStore } from './services/consent.js';
 import { announceLiveMessage } from './services/live-region.js';
 import { disconnectVisitorSocket, getVisitorSocket } from './services/socket.js';
 import { initialModel, reduce } from './state-machine.js';
@@ -106,6 +107,12 @@ export function App(props: AppProps): preact.JSX.Element {
       }
     };
     void (async () => {
+      // CMP consent gate (#54): hold presence/analytics capture until the host
+      // CMP grants it; resolves immediately when consent isn't required.
+      await consentStore.whenCaptureAllowed();
+      // `loadInitialConfig` self-guards on `live.current` after its fetch, and
+      // the resume/socket path below is guarded too, so an unmount during the
+      // consent wait is handled without an extra early return here.
       await loadInitialConfig();
       // Reuse an existing session when the visitor already has one — a page
       // reload must not mint a fresh session, which would orphan a prior chat
