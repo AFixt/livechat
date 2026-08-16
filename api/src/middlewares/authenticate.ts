@@ -51,7 +51,7 @@ function parseBearer(req: { header(name: string): string | undefined }): string 
  */
 function verifyAccess(token: string, secret: string): AccessTokenPayload {
   try {
-    return jwt.verify(token, secret) as AccessTokenPayload;
+    return jwt.verify(token, secret, { algorithms: ['HS256'] }) as AccessTokenPayload;
   } catch {
     throw ApiError.unauthorized('Invalid or expired token');
   }
