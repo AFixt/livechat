@@ -9,16 +9,13 @@ import {
 import { Router } from 'express';
 
 import { authenticate } from '../middlewares/authenticate.js';
-import {
-  assertTenantAccess,
-  requireStaffOrAdmin,
-  resolveTenantFilter,
-} from '../middlewares/authorize.js';
+import { requireStaffOrAdmin, resolveTenantFilter } from '../middlewares/authorize.js';
 import { parsedBody, validate } from '../middlewares/validate.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
 import type { Env } from '../config/env.js';
-import type { ChatService } from '../services/index.js';
+import type { ChatCaller, ChatService } from '../services/index.js';
+import type { Request } from 'express';
 import type { Redis } from 'ioredis';
 
 interface ChatsRouterDeps {
@@ -36,6 +33,17 @@ function parseStatusQuery(q: unknown): ChatStatus | undefined {
   if (typeof q !== 'string') return undefined;
   const parsed = chatStatusSchema.safeParse(q);
   return parsed.success ? parsed.data : undefined;
+}
+
+/**
+ * Derive the chat-access scope for the authenticated staff caller so the
+ * service can confine every lookup to their tenant. An untenanted AFixt
+ * operator (`tenantId === null`) spans every tenant (#72).
+ * @param req - The authenticated request (guaranteed a user by `authenticate`).
+ * @returns The staff caller scope.
+ */
+function staffCaller(req: Request): ChatCaller {
+  return { kind: 'staff', tenantId: req.user?.tenantId ?? null };
 }
 
 /**
@@ -66,8 +74,9 @@ export function buildChatsRouter(deps: ChatsRouterDeps): Router {
     asyncHandler(async (req, res) => {
       const id = req.params.id;
       if (typeof id !== 'string') return;
-      const chat = await deps.chat.getById(id);
-      assertTenantAccess(req, chat.tenantId);
+      // The service scopes the lookup to the caller's tenant, so the HTTP and
+      // socket paths share one enforcement point (#72).
+      const chat = await deps.chat.getById(id, staffCaller(req));
       res.json({ success: true, data: chat });
     }),
   );
@@ -77,9 +86,9 @@ export function buildChatsRouter(deps: ChatsRouterDeps): Router {
     asyncHandler(async (req, res) => {
       const id = req.params.id;
       if (typeof id !== 'string') return;
-      // Resolve the chat first so its owning tenant can gate the transcript.
-      const chat = await deps.chat.getById(id);
-      assertTenantAccess(req, chat.tenantId);
+      // Resolve the chat (tenant-scoped) first so its owning tenant gates the
+      // transcript before any message rows are read.
+      await deps.chat.getById(id, staffCaller(req));
       const messages = await deps.chat.listMessages(id);
       res.json({ success: true, data: messages });
     }),
@@ -91,15 +100,16 @@ export function buildChatsRouter(deps: ChatsRouterDeps): Router {
     asyncHandler(async (req, res) => {
       const id = req.params.id;
       if (typeof id !== 'string' || req.user === undefined) return;
-      const target = await deps.chat.getById(id);
-      assertTenantAccess(req, target.tenantId);
       const body = parsedBody(req, sendMessageInputSchema) satisfies SendMessageInput;
-      const message = await deps.chat.sendMessage({
-        chatId: id,
-        senderKind: 'user',
-        senderUserId: req.user.id,
-        body: body.body,
-      });
+      const message = await deps.chat.sendMessage(
+        {
+          chatId: id,
+          senderKind: 'user',
+          senderUserId: req.user.id,
+          body: body.body,
+        },
+        staffCaller(req),
+      );
       res.status(201).json({ success: true, data: message });
     }),
   );
@@ -109,9 +119,7 @@ export function buildChatsRouter(deps: ChatsRouterDeps): Router {
     asyncHandler(async (req, res) => {
       const id = req.params.id;
       if (typeof id !== 'string' || req.user === undefined) return;
-      const target = await deps.chat.getById(id);
-      assertTenantAccess(req, target.tenantId);
-      const chat = await deps.chat.assign(id, req.user.id);
+      const chat = await deps.chat.assign(id, req.user.id, staffCaller(req));
       res.json({ success: true, data: chat });
     }),
   );
@@ -122,10 +130,8 @@ export function buildChatsRouter(deps: ChatsRouterDeps): Router {
     asyncHandler(async (req, res) => {
       const id = req.params.id;
       if (typeof id !== 'string') return;
-      const target = await deps.chat.getById(id);
-      assertTenantAccess(req, target.tenantId);
       const body = parsedBody(req, endChatInputSchema) satisfies EndChatInput;
-      const chat = await deps.chat.endChat({ chatId: id, endedBy: body.endedBy });
+      const chat = await deps.chat.endChat({ chatId: id, endedBy: body.endedBy }, staffCaller(req));
       res.json({ success: true, data: chat });
     }),
   );
