@@ -29,7 +29,17 @@ const app = createApp({
   ...(env.NODE_ENV === 'test' && { skipRateLimit: true }),
 });
 const server = createServer(app);
-const io = attachIo(server, { env, logger, services });
+const io = attachIo(server, { env, logger, redis, services });
+
+// A port clash otherwise surfaces as an unhandled EADDRINUSE stack trace (#81).
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    logger.fatal(`port ${String(env.PORT)} is already in use — stop the other process or set PORT`);
+  } else {
+    logger.fatal({ err }, 'HTTP server error');
+  }
+  process.exitCode = 1;
+});
 
 /**
  * Bring up database + redis + HTTP server. Sets `process.exitCode` on failure

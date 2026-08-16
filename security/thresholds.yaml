@@ -1,0 +1,154 @@
+# Central security-gate thresholds — the single source of truth for what each
+# scanner blocks on versus warns on.
+#
+# This file is DOCUMENTATION-AS-CONFIG: it records the policy that the existing
+# gate scripts already encode (scripts/npm-audit.sh, scripts/semgrep.sh, the
+# `security:*` npm scripts, osv-scanner.toml). Changing a number here is a
+# decision to change the corresponding gate — update the script/config in the
+# same PR so the two never drift. docs/security/README.md references this file.
+#
+# Legend
+#   blocks_at  the lowest severity that FAILS the gate (non-zero exit / red CI).
+#   warns_at   severities that are surfaced but do NOT fail the gate.
+#   gated      whether this runs in the aggregate `npm run security` /
+#              `check:all` (local + CI), or is scheduled/deployed-only.
+
+version: 1
+
+# Ordered high→low; used as the shared vocabulary below.
+severity_scale: [critical, high, medium, moderate, low, info]
+
+gates:
+  npm-audit:
+    script: scripts/npm-audit.sh
+    npm: security:audit
+    blocks_at: high # high + critical fail; moderate/low are informational
+    warns_at: [moderate, low]
+    allowlist: scripts/npm-audit.sh (ALLOW) — mirrored in osv-scanner.toml
+    gated: true
+
+  osv-scanner:
+    config: osv-scanner.toml
+    npm: security:osv
+    blocks_at: any # any advisory not in IgnoredVulns fails
+    allowlist: osv-scanner.toml (IgnoredVulns, each with ignoreUntil)
+    gated: true
+
+  semgrep:
+    script: scripts/semgrep.sh
+    npm: security:semgrep
+    blocks_at: error # `--error`: ERROR-severity findings fail; WARN/INFO do not
+    warns_at: [warning, info]
+    allowlist: scripts/semgrep.sh (--exclude-rule entries)
+    gated: true
+
+  trufflehog:
+    script: scripts/secret-scan.sh
+    npm: security:secrets # verified tier — the blocking gate
+    blocks_at: verified # only VERIFIED (confirmed-live) secrets fail
+    warns_at: [unverified, unknown] # surfaced by the suspected tier below
+    # Two tiers wired by scripts/secret-scan.sh (ADR 0012-secret-scanning-tiers,
+    # #82). The verified tier is unchanged and blocking; the suspected tier is a
+    # non-blocking warn surface for detector hits verification can't confirm.
+    tiers:
+      verified:
+        npm: security:secrets
+        results: verified # `--results=verified --fail` (exit 183 on live secret)
+        behaviour: blocking
+      suspected:
+        npm: security:secrets:suspected
+        results: unverified,unknown # `--results=unverified,unknown`, no --fail
+        behaviour: warn # always exits 0; PR-time secret-scan.yml (continue-on-error)
+    allowlist: >-
+      .trufflehog-exclude.txt (native path allow-list) + .secrets.baseline
+      (detect-secrets line-level baseline, security:secrets:baseline). Catalogued
+      in security/exceptions.yaml. The verified/blocking tier is never suppressed
+      by the baseline — only the suspected/warn tier is filtered.
+    gated: true # verified tier only; suspected runs in secret-scan.yml, non-blocking
+
+  tls:
+    script: scripts/check-tls.sh
+    npm: security:tls
+    blocks_at: high # testssl HIGH/CRITICAL, plus any failed redirect/HSTS/cookie check
+    allowlist: none
+    gated: deployed-only # no-op with exit 0 when TLS_TARGET_URL is unset (added in #63)
+
+  license-check:
+    npm: license:check
+    blocks_at: any # any production dep outside the SPDX allowlist fails
+    allowlist: onlyAllow list in package.json (license:check)
+    gated: true
+
+  codeql:
+    workflow: .github/workflows/security.yml
+    blocks_at: high # security-extended query pack; GitHub code-scanning alerts
+    gated: scheduled # weekly + workflow_dispatch, not in the local gate
+
+  # --- container / IaC scanning (issue #60, ADR-0016) ---------------------
+  # NOTE ON THE #60 DEVIATION: issue #60 sets "fail CRITICAL, warn HIGH". That
+  # split is applied to VULNERABILITY scanning (trivy-image), where HIGH base-
+  # image CVEs are often transitive/unpatchable noise. For MISCONFIGURATION
+  # scanning (hadolint / trivy config / checkov / kics) HIGH is fail-closed:
+  # misconfigs are directly-fixable config defects, and the IaC tools emit
+  # few/no CRITICALs (KICS's DockerCompose set tops out at HIGH), so a
+  # CRITICAL-only gate would never fire. This deviation is intentional.
+  hadolint:
+    script: scripts/hadolint.sh
+    npm: security:hadolint
+    config: .hadolint.yaml
+    blocks_at: warning # failure-threshold: warning — warnings+errors fail
+    allowlist: .hadolint.yaml (ignored) — catalogue in security/exceptions.yaml
+    gated: true
+
+  trivy-config:
+    script: scripts/trivy.sh
+    npm: security:trivy
+    config: trivy.yaml
+    blocks_at: high # HIGH+CRITICAL Dockerfile misconfig fail (see deviation note)
+    warns_at: [medium, low]
+    allowlist: .trivyignore (exp dates; catalogue in security/exceptions.yaml)
+    gated: true
+
+  trivy-image:
+    script: scripts/trivy-image.sh
+    npm: security:trivy:image
+    blocks_at: critical # #60 policy: CRITICAL image vulns fail, HIGH warns
+    warns_at: [high, medium, low]
+    allowlist: .trivyignore (exp dates; catalogue in security/exceptions.yaml)
+    gated: ci-only # builds api/ui/widget images; runs in container-iac-scan.yml,
+    # available locally via `npm run security:trivy:image` (needs docker+trivy)
+
+  checkov:
+    script: scripts/checkov.sh
+    npm: security:checkov
+    config: .checkov.yaml
+    blocks_at: high # HIGH+ Dockerfile IaC misconfig fail (see deviation note)
+    allowlist: .checkov.yaml (skip-check) — catalogue in security/exceptions.yaml
+    gated: true
+
+  kics:
+    script: scripts/kics.sh
+    npm: security:kics
+    blocks_at: high # HIGH+CRITICAL docker-compose misconfig fail (fail-on high,critical)
+    warns_at: [medium, low, info]
+    allowlist: scripts/kics.sh (--exclude-queries) — catalogue in security/exceptions.yaml
+    gated: true
+
+  # --- pending: introduced by sibling security-baseline PRs (#82-84) ------
+  owasp-zap:
+    workflow: .github/workflows/zap.yml
+    status: pending
+    blocks_at: high # proposed: baseline HIGH alerts fail
+    gated: scheduled
+
+policy:
+  # What "blocks" means in practice.
+  blocking: >-
+    A blocking finding fails the gate: the script exits non-zero, the aggregate
+    `npm run security` fails, and (via check:all) pre-push and CI go red. The
+    only way past a blocking finding is to fix it or add a justified, time-boxed
+    exception to security/exceptions.yaml AND the tool's own config.
+  warning: >-
+    A warning is surfaced in output but does not fail the gate. Warnings are
+    reviewed opportunistically, not blocked on.
+  exceptions: security/exceptions.yaml

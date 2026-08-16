@@ -42,6 +42,40 @@ if ! command -v lychee >/dev/null 2>&1; then
   }
 fi
 
+# Container / Dockerfile / IaC scanners (ADR-0016, issue #60). Optional locally:
+# scripts/{hadolint,trivy,checkov}.sh skip cleanly when these are absent, and CI
+# installs them. Best-effort here — a failed install only warns, never aborts
+# bootstrap, unlike the required tools above. (KICS — scripts/kics.sh — needs no
+# install: it runs via its pinned Docker image, or a `kics` binary if present.
+# scripts/trivy-image.sh reuses the trivy install below plus docker.)
+if ! command -v hadolint >/dev/null 2>&1; then
+  echo "Installing hadolint (optional)..."
+  brew install hadolint 2>/dev/null \
+    || echo "warn: install hadolint from https://github.com/hadolint/hadolint/releases"
+fi
+
+if ! command -v trivy >/dev/null 2>&1; then
+  echo "Installing trivy (optional)..."
+  brew install trivy 2>/dev/null \
+    || echo "warn: install trivy from https://github.com/aquasecurity/trivy/releases"
+fi
+
+if ! command -v checkov >/dev/null 2>&1; then
+  echo "Installing checkov (optional)..."
+  pipx install checkov 2>/dev/null || pip install --user checkov 2>/dev/null \
+    || echo "warn: install checkov via 'pipx install checkov'"
+fi
+
+# detect-secrets (issue #82, ADR-0015) — powers the suspected-tier baseline
+# (.secrets.baseline) via scripts/detect-secrets.sh. Optional locally: the
+# script skips cleanly when it is absent, and CI installs it. Best-effort here —
+# a failed install only warns, never aborts bootstrap.
+if ! command -v detect-secrets >/dev/null 2>&1; then
+  echo "Installing detect-secrets (optional)..."
+  pipx install detect-secrets 2>/dev/null || pip install --user detect-secrets 2>/dev/null \
+    || echo "warn: install detect-secrets via 'pipx install detect-secrets'"
+fi
+
 echo ""
 echo "Installing npm dependencies..."
 npm ci

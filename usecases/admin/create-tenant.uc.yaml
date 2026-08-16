@@ -8,6 +8,10 @@ description: |
 
 start_location: "http://localhost:5174/admin/tenants"
 
+expected_result: >-
+  The tenant is created and appears in the tenants list; the create form
+  confirms success accessibly.
+
 preconditions:
   - A super_admin user is authenticated.
 
