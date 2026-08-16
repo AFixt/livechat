@@ -12,7 +12,12 @@ function captureCookieWrite(): { lastWrite: () => string; restore: () => void } 
   const spy = vi.spyOn(document, 'cookie', 'set').mockImplementation((v: string) => {
     written = v;
   });
-  return { lastWrite: () => written, restore: () => { spy.mockRestore(); } };
+  return {
+    lastWrite: () => written,
+    restore: () => {
+      spy.mockRestore();
+    },
+  };
 }
 
 /**
