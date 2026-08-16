@@ -39,6 +39,8 @@ export function testEnv(): Env {
     JWT_ACCESS_EXPIRES_IN: '15m',
     JWT_REFRESH_EXPIRES_IN: '7d',
     COOKIE_SECRET: 'test-cookie-secret-' + Math.random().toString(36).slice(2),
+    VISITOR_SESSION_ABSOLUTE_TTL_HOURS: 720,
+    VISITOR_SESSION_IDLE_TTL_HOURS: 72,
     APP_URL: 'http://localhost:25174',
     API_URL: 'http://localhost:23001',
     WIDGET_URL: 'http://localhost:25175',
