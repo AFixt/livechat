@@ -8,7 +8,7 @@ test.describe('Login rejects wrong password with an accessible alert', () => {
 
   test('support-login--invalid-credentials: Login rejects wrong password with an accessible alert (negative)', async ({ page }) => {
     // Preconditions:
-    //   - A staff user exists with the username below; the password below is NOT theirs.
+    //   - A staff user exists with the email below; the password below is NOT theirs.
 
     // Step 1: Access start location
     await page.goto('http://localhost:5174/login');
@@ -16,19 +16,35 @@ test.describe('Login rejects wrong password with an accessible alert', () => {
     // Step 2: Locate heading "Sign in" (login--invalid-credentials.uc.yaml:1)
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
 
-    // Step 3: Enter field "Email address" value "staff@acme.example" (login--invalid-credentials.uc.yaml:2)
+    // Step 3: Locate field "Email address" (login--invalid-credentials.uc.yaml:2)
+    await expect(page.getByLabel('Email address')).toBeVisible();
+
+    // Step 4: Focus field "Email address" (login--invalid-credentials.uc.yaml:3)
+    const step4_el = page.getByLabel('Email address');
+    await step4_el.focus();
+    await expect(step4_el).toBeFocused();
+
+    // Step 5: Enter field "Email address" value "staff@acme.example" (login--invalid-credentials.uc.yaml:4)
     await page.getByLabel('Email address').fill('staff@acme.example');
 
-    // Step 4: Enter field "Password" value "definitely-wrong-pass" (login--invalid-credentials.uc.yaml:3)
+    // Step 6: Locate field "Password" (login--invalid-credentials.uc.yaml:5)
+    await expect(page.getByLabel('Password')).toBeVisible();
+
+    // Step 7: Focus field "Password" (login--invalid-credentials.uc.yaml:6)
+    const step7_el = page.getByLabel('Password');
+    await step7_el.focus();
+    await expect(step7_el).toBeFocused();
+
+    // Step 8: Enter field "Password" value "definitely-wrong-pass" (login--invalid-credentials.uc.yaml:1)
     await page.getByLabel('Password').fill('definitely-wrong-pass');
 
-    // Step 5: Activate button "Sign in" (login--invalid-credentials.uc.yaml:4)
+    // Step 9: Activate button "Sign in" (login--invalid-credentials.uc.yaml:2)
     await page.getByRole('button', { name: 'Sign in' }).click();
 
-    // Step 6: Verify alert "Invalid email or password" (login--invalid-credentials.uc.yaml:5)
+    // Step 10: Verify alert "Invalid email or password" (login--invalid-credentials.uc.yaml:3)
     await expect(page.getByRole('alert').filter({ hasText: 'Invalid email or password' })).toBeVisible();
 
-    // Step 7: Verify url "http://localhost:5174/login" (login--invalid-credentials.uc.yaml:6)
+    // Step 11: Verify url "http://localhost:5174/login" (login--invalid-credentials.uc.yaml:4)
     await expect(page).toHaveURL('http://localhost:5174/login');
 
   });

@@ -8,6 +8,10 @@ description: |
 
 start_location: "http://localhost:5174/admin/users"
 
+expected_result: >-
+  The users list renders and the tenant filter narrows it; results stay
+  reachable by role and label.
+
 preconditions:
   - An admin or super_admin is authenticated.
 

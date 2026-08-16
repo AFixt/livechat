@@ -9,6 +9,10 @@ description: |
 
 start_location: "http://localhost:5174/login"
 
+expected_result: >-
+  The staff user is authenticated and lands on the dashboard (url "/",
+  heading "Dashboard").
+
 preconditions:
   - A staff user exists in the database with the credentials below.
 
