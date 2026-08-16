@@ -20,6 +20,19 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   `admin-view-invitations` and `support-toggle-alert-sound` join the
   runnable e2e projects.
 
+### Changed
+
+- **Use cases now carry `expected_result`, use `extends` for variants, and cover
+  more error paths** ([#85]). Every non-`extends` use case gained an
+  `expected_result` stating the observable outcome; the `support/login` and
+  `widget/chat-ended` variant pairs were converted from duplicated files to
+  `extends` + `steps_override`; three `type: negative` cases were added
+  (invalid allowed-origin, already-revoked invitation, invalid user role); and
+  `usecases/README.md` now documents the positive/negative/extension
+  distinction. (The `widget/invitation` pair is handled with #76, which makes
+  that state reachable.) `usecases:validate` passes (31 cases) and specs were
+  regenerated.
+
 ### Fixed
 
 - The admin "Allowed origins" textarea had no accessible name — the section
@@ -41,16 +54,33 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 - **TLS/HTTPS verification harness for deployed environments** ([#63]).
   `scripts/check-tls.sh` (npm: `npm run security:tls`) verifies a deployed
   target's transport security: a deep TLS audit via `testssl.sh` (invoked when
-  present, skipped with an install hint otherwise — not vendored), a permanent
+  present, skipped with an install hint otherwise — not vendored) that fails on
+  weak ciphers, an invalid chain, or a still-offered TLS 1.0/1.1, a permanent
   HTTP→HTTPS redirect (301/308), HSTS with a sane `max-age` +
   `includeSubDomains`, and `Secure`/`HttpOnly`/`SameSite` on every `Set-Cookie`.
   It is deployed-only: with no `TLS_TARGET_URL` configured it is a clear no-op
   that exits 0, so local/PR runs never fail spuriously; it exits non-zero on any
   failed check so CI can gate it. Documented in `docs/security/tls-verification.md`.
 
+- **Security-baseline governance** ([#65]) — a governance layer over the
+  scanners (ADR-0011). `security/thresholds.yaml` centralizes what each gate
+  blocks vs warns on; `security/exceptions.yaml` catalogues every accepted
+  suppression across the tooling (semgrep `--exclude-rule`, the npm-audit/osv
+  advisory allow-list, the dependency-check placeholder, plus reserved rows for
+  the trivy/checkov/ZAP PRs) with owner, reason, added date, and expiry.
+  `scripts/check-exceptions.sh` (`npm run security:exceptions`, wired into the
+  aggregate `npm run security`) fails the gate on any expired exception and
+  warns on those expiring within 30 days. `scripts/security-report.sh`
+  (`npm run security:report`) emits machine-readable scanner output into a
+  gitignored `security-reports/` directory. Indexed in
+  `docs/security/README.md`. Suppressions are catalogued, not removed — the
+  registry is updated as sibling PRs land theirs.
+
 [#63]: https://github.com/AFixt/livechat/issues/63
+[#65]: https://github.com/AFixt/livechat/issues/65
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
+[#85]: https://github.com/AFixt/livechat/issues/85
 
 ## [0.2.0] - 2026-07-23
 
