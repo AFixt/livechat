@@ -11,6 +11,11 @@ failure-threshold: warning
 # ("always tag the version") and DL3007 ("do not use latest") are satisfied and
 # are NOT ignored — a future untagged FROM will still turn this red.
 
+# Hadolint has no native expiry field, so each ignored rule carries a `revisit:`
+# date in its comment and a matching, owner-tracked entry in
+# security/exceptions.yaml (the forcing function is `npm run security:exceptions`,
+# which goes red once that date passes).
+
 ignored:
   # DL3002 — "Last USER should not be root."
   # Fires on ui/Dockerfile and widget/Dockerfile: both are nginx images that
@@ -21,6 +26,7 @@ ignored:
   # api/Dockerfile already drops to `USER node`. Deferred for the two nginx
   # images; also expressed as Checkov CKV_DOCKER_3 in .checkov.yaml and Trivy
   # AVD-DS-0002 in .trivyignore so all three tools agree.
+  # Catalogued as `hadolint-nginx-root`; revisit: 2027-02-16.
   - DL3002
 
   # DL3018 — "Pin versions in apk add."
@@ -30,4 +36,5 @@ ignored:
   # bump for no security benefit — the pin would float or 404 rather than lock.
   # --no-cache already prevents a stale package index. Revisit if we move to a
   # pinned Alpine repository mirror.
+  # Catalogued as `hadolint-apk-nopin`; revisit: 2027-02-16.
   - DL3018

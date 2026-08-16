@@ -67,21 +67,57 @@ gates:
     blocks_at: high # security-extended query pack; GitHub code-scanning alerts
     gated: scheduled # weekly + workflow_dispatch, not in the local gate
 
-  # --- pending: introduced by sibling security-baseline PRs (#82-84) ------
-  # Recorded here so the threshold policy is complete; wire the real numbers
-  # when each tool lands.
-  trivy:
-    status: pending
-    blocks_at: high # proposed: HIGH/CRITICAL image/fs vulns fail
-    allowlist: .trivyignore (catalogue entries in security/exceptions.yaml)
-    gated: pending
+  # --- container / IaC scanning (issue #60, ADR-0011) ---------------------
+  # NOTE ON THE #60 DEVIATION: issue #60 sets "fail CRITICAL, warn HIGH". That
+  # split is applied to VULNERABILITY scanning (trivy-image), where HIGH base-
+  # image CVEs are often transitive/unpatchable noise. For MISCONFIGURATION
+  # scanning (hadolint / trivy config / checkov / kics) HIGH is fail-closed:
+  # misconfigs are directly-fixable config defects, and the IaC tools emit
+  # few/no CRITICALs (KICS's DockerCompose set tops out at HIGH), so a
+  # CRITICAL-only gate would never fire. This deviation is intentional.
+  hadolint:
+    script: scripts/hadolint.sh
+    npm: security:hadolint
+    config: .hadolint.yaml
+    blocks_at: warning # failure-threshold: warning — warnings+errors fail
+    allowlist: .hadolint.yaml (ignored) — catalogue in security/exceptions.yaml
+    gated: true
+
+  trivy-config:
+    script: scripts/trivy.sh
+    npm: security:trivy
+    config: trivy.yaml
+    blocks_at: high # HIGH+CRITICAL Dockerfile misconfig fail (see deviation note)
+    warns_at: [medium, low]
+    allowlist: .trivyignore (exp dates; catalogue in security/exceptions.yaml)
+    gated: true
+
+  trivy-image:
+    script: scripts/trivy-image.sh
+    npm: security:trivy:image
+    blocks_at: critical # #60 policy: CRITICAL image vulns fail, HIGH warns
+    warns_at: [high, medium, low]
+    allowlist: .trivyignore (exp dates; catalogue in security/exceptions.yaml)
+    gated: ci-only # builds api/ui/widget images; runs in container-iac-scan.yml,
+    # available locally via `npm run security:trivy:image` (needs docker+trivy)
 
   checkov:
-    status: pending
-    blocks_at: high # proposed: HIGH+ IaC misconfigurations fail
-    allowlist: inline `# checkov:skip=...` (catalogue in security/exceptions.yaml)
-    gated: pending
+    script: scripts/checkov.sh
+    npm: security:checkov
+    config: .checkov.yaml
+    blocks_at: high # HIGH+ Dockerfile IaC misconfig fail (see deviation note)
+    allowlist: .checkov.yaml (skip-check) — catalogue in security/exceptions.yaml
+    gated: true
 
+  kics:
+    script: scripts/kics.sh
+    npm: security:kics
+    blocks_at: high # HIGH+CRITICAL docker-compose misconfig fail (fail-on high,critical)
+    warns_at: [medium, low, info]
+    allowlist: scripts/kics.sh (--exclude-queries) — catalogue in security/exceptions.yaml
+    gated: true
+
+  # --- pending: introduced by sibling security-baseline PRs (#82-84) ------
   owasp-zap:
     workflow: .github/workflows/zap.yml
     status: pending
