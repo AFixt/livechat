@@ -355,11 +355,12 @@ describe('chat flow (integration)', () => {
     await seedTenantAndStaff('sa-a', 'sa-a-staff@example.com');
     await seedTenantAndStaff('sa-b', 'sa-b-staff@example.com');
     const staffAToken = await loginAs(baseUrl, 'sa-a-staff@example.com', 'Staff!Password1');
-    const { cookie: bVisitorCookie } = await initVisitor(baseUrl, 'sa-b');
+    const { cookie: bVisitorCookie, csrfToken: bCsrf } = await initVisitor(baseUrl, 'sa-b');
 
     const initRes = await request(baseUrl)
       .post('/api/v1/visitor/chats')
       .set('cookie', `livechat_visitor=${bVisitorCookie}`)
+      .set('X-XSRF-TOKEN', bCsrf)
       .send({ customerName: 'B Visitor', body: 'from tenant B' });
     expect(initRes.status).toBe(201);
     const betaChatId = initRes.body.data.chat.id as string;
@@ -399,11 +400,12 @@ describe('chat flow (integration)', () => {
     const { baseUrl } = harness;
     await seedTenantAndStaff('sv', 'sv-staff@example.com');
     const { cookie: aCookie } = await initVisitor(baseUrl, 'sv');
-    const { cookie: bCookie } = await initVisitor(baseUrl, 'sv');
+    const { cookie: bCookie, csrfToken: bCsrf } = await initVisitor(baseUrl, 'sv');
 
     const bInit = await request(baseUrl)
       .post('/api/v1/visitor/chats')
       .set('cookie', `livechat_visitor=${bCookie}`)
+      .set('X-XSRF-TOKEN', bCsrf)
       .send({ customerName: 'B Visitor', body: 'b chat' });
     expect(bInit.status).toBe(201);
     const bChatId = bInit.body.data.chat.id as string;
@@ -472,11 +474,12 @@ describe('chat flow (integration)', () => {
       preferences: null,
     });
     const globalToken = await loginAs(baseUrl, 'ua-global@afixt.example', 'Staff!Password1');
-    const { cookie: visitorCookie } = await initVisitor(baseUrl, 'ua');
+    const { cookie: visitorCookie, csrfToken } = await initVisitor(baseUrl, 'ua');
 
     const initRes = await request(baseUrl)
       .post('/api/v1/visitor/chats')
       .set('cookie', `livechat_visitor=${visitorCookie}`)
+      .set('X-XSRF-TOKEN', csrfToken)
       .send({ customerName: 'UA Visitor', body: 'need help' });
     expect(initRes.status).toBe(201);
     const chatId = initRes.body.data.chat.id as string;
