@@ -66,7 +66,10 @@ function fakeAwsAccessKeyId(): string {
 
 /** A random, high-entropy 40-char AWS-secret-shaped string — not a real secret. */
 function fakeAwsSecret(): string {
-  return randomBytes(30).toString('base64').replace(/[^A-Za-z0-9]/g, 'A').slice(0, 40);
+  return randomBytes(30)
+    .toString('base64')
+    .replace(/[^A-Za-z0-9]/g, 'A')
+    .slice(0, 40);
 }
 
 const scratchDirs: string[] = [];
@@ -75,14 +78,37 @@ const scratchDirs: string[] = [];
  * Build a throwaway git repo containing `files`, drop in the real script, run
  * the given tier, and return the combined output + exit status.
  */
-function runTierAgainst(files: Record<string, string>, tier: string): { output: string; status: number | null } {
+function runTierAgainst(
+  files: Record<string, string>,
+  tier: string,
+): { output: string; status: number | null } {
   const dir = mkdtempSync(join(tmpdir(), 'secret-scan-'));
   scratchDirs.push(dir);
   mkdirSync(join(dir, 'scripts'), { recursive: true });
   copyFileSync(SCRIPT, join(dir, 'scripts', 'secret-scan.sh'));
   for (const [name, contents] of Object.entries(files)) writeFileSync(join(dir, name), contents);
 
-  const gitEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+  // Git exports GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE (and friends) to any
+  // process it spawns from a hook. Inheriting them would point these fixture
+  // commands at the *real* repository instead of the throwaway one below —
+  // running this suite from a pre-push hook then rewrites the developer's
+  // branch. Rebuild the env without them so `cwd` alone decides which repo
+  // git touches.
+  const GIT_ENV_KEYS = new Set([
+    'GIT_DIR',
+    'GIT_WORK_TREE',
+    'GIT_INDEX_FILE',
+    'GIT_COMMON_DIR',
+    'GIT_OBJECT_DIRECTORY',
+    'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+    'GIT_NAMESPACE',
+    'GIT_CEILING_DIRECTORIES',
+  ]);
+  const gitEnv: NodeJS.ProcessEnv = {
+    ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !GIT_ENV_KEYS.has(k))),
+    GIT_TERMINAL_PROMPT: '0',
+  };
+
   const git = (args: string[]): void => {
     execFileSync('git', args, { cwd: dir, env: gitEnv, stdio: 'ignore' });
   };
@@ -92,9 +118,12 @@ function runTierAgainst(files: Record<string, string>, tier: string): { output: 
   git(['add', '-A']);
   git(['commit', '-q', '-m', 'fixture']);
 
+  // Same reasoning as `gitEnv` above: the script shells out to git/trufflehog,
+  // so it must not inherit the outer repository's git environment either.
   const run = spawnSync('bash', [join(dir, 'scripts', 'secret-scan.sh'), tier], {
     cwd: dir,
     encoding: 'utf8',
+    env: gitEnv,
   });
   return { output: [run.stdout, run.stderr].join(''), status: run.status };
 }
@@ -112,7 +141,9 @@ describe.skipIf(skip)('secret-scan.sh suspected tier', () => {
   it('surfaces an unverified fake secret and still exits 0 (warn, not fail)', () => {
     const accessKey = fakeAwsAccessKeyId();
     const { output, status } = runTierAgainst(
-      { 'config.txt': `aws_access_key_id = ${accessKey}\naws_secret_access_key = ${fakeAwsSecret()}\n` },
+      {
+        'config.txt': `aws_access_key_id = ${accessKey}\naws_secret_access_key = ${fakeAwsSecret()}\n`,
+      },
       'suspected',
     );
     // Warn tier must never block, even when it finds something.
