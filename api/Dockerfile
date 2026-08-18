@@ -4,7 +4,13 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY api/package.json api/
 COPY shared/package.json shared/
-RUN npm ci --workspaces --include-workspace-root --omit=dev --engine-strict=false
+RUN npm ci --workspaces --include-workspace-root --omit=dev --engine-strict=false \
+    # npm hoists workspace dependencies to the root `node_modules`, so a
+    # workspace may legitimately end up with no `node_modules` of its own.
+    # The runtime stage copies these paths unconditionally, and `COPY` fails
+    # on a missing source — create them so the build does not depend on
+    # which packages happened to hoist.
+    && mkdir -p shared/node_modules api/node_modules
 
 FROM node:22-alpine AS runtime
 WORKDIR /app
