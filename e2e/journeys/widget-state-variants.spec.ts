@@ -11,8 +11,8 @@ import { openAgent, openVisitor } from '../support/actors.js';
 
 test('visitor ends the chat and sees the ended state', async ({ browser }) => {
   // Support must be online for the chat to reach the active state, from which
-  // the visitor can end it.
-  const agent = await openAgent(browser);
+  // the visitor can end it. Availability is explicit since #76/#101.
+  const agent = await openAgent(browser, { available: true });
   await expect(agent.page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   await agent.page.waitForTimeout(1000);
 
@@ -81,8 +81,9 @@ test('support-initiated chat shows the invitation state', async ({ browser }) =>
 });
 
 test('a returning visitor sees the restart state', async ({ browser }) => {
-  // Agent online so the chat reaches the active state deterministically.
-  const agent = await openAgent(browser);
+  // Agent online and explicitly available (#76/#101) so the chat reaches the
+  // active state deterministically.
+  const agent = await openAgent(browser, { available: true });
   await expect(agent.page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   await agent.page.waitForTimeout(1000);
 
