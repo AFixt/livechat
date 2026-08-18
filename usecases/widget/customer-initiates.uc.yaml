@@ -8,6 +8,10 @@ description: |
 
 start_location: "http://localhost:5175/"
 
+expected_result: >-
+  The widget opens, the visitor submits their details, and an active chat
+  with a focusable composer is shown.
+
 preconditions:
   - The API stack is running with an "acme" tenant.
   - At least one support agent is available (the widget harness seeds this),

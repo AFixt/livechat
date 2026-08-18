@@ -2,14 +2,20 @@ import jwt from 'jsonwebtoken';
 
 import { VisitorSession } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
+import { coarsenGeo, truncateIp } from '../utils/pii-minimize.js';
 
 import { hashSessionId, mintVisitorCookie, verifyVisitorCookie } from './visitor-cookie.js';
 
 import type { Env } from '../config/env.js';
 
 interface VisitorSessionDeps {
-  env: Pick<Env, 'COOKIE_SECRET'>;
+  env: Pick<
+    Env,
+    'COOKIE_SECRET' | 'VISITOR_SESSION_ABSOLUTE_TTL_HOURS' | 'VISITOR_SESSION_IDLE_TTL_HOURS'
+  >;
 }
+
+const MS_PER_HOUR = 60 * 60 * 1000;
 
 interface IdentityTokenPayload {
   sub: string;
@@ -66,6 +72,37 @@ export function verifyIdentityToken(token: string | undefined, secret: string): 
  * @returns Visitor session methods.
  */
 export function createVisitorSessionService(deps: VisitorSessionDeps) {
+  /**
+   * Derive the durable subject key (hex HMAC of the cookie's session id) from a
+   * signed visitor cookie. Single source of truth for the cookie -> subject-key
+   * derivation used by every lookup below.
+   * @param cookieValue - Raw cookie value from the widget.
+   * @returns The subject key.
+   * @throws 401 if the cookie signature is invalid.
+   */
+  function subjectKeyOf(cookieValue: string): string {
+    const sessionId = verifyVisitorCookie(cookieValue, deps.env.COOKIE_SECRET);
+    return hashSessionId(sessionId, deps.env.COOKIE_SECRET);
+  }
+
+  /**
+   * Load the tracked row for a subject key, without any expiry gate.
+   * @param subjectKey - The durable subject key.
+   * @returns The row, or null when the subject has no tracked session.
+   */
+  async function findBySubject(subjectKey: string): Promise<VisitorSession | null> {
+    return VisitorSession.findOne({ where: { sessionCookieHash: subjectKey } });
+  }
+
+  /**
+   * Hard-delete a subject's tracked row, if present. Idempotent.
+   * @param subjectKey - The durable subject key.
+   */
+  async function forgetSubject(subjectKey: string): Promise<void> {
+    const session = await findBySubject(subjectKey);
+    if (session !== null) await session.destroy({ force: true });
+  }
+
   return {
     /**
      * Mint a signed visitor cookie **without** creating any `visitor_sessions`
@@ -89,8 +126,7 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
      * @throws 401 if the cookie is missing/invalid.
      */
     subjectKeyFromCookie(cookieValue: string): string {
-      const sessionId = verifyVisitorCookie(cookieValue, deps.env.COOKIE_SECRET);
-      return hashSessionId(sessionId, deps.env.COOKIE_SECRET);
+      return subjectKeyOf(cookieValue);
     },
 
     /**
@@ -102,14 +138,19 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
      */
     async createTracked(params: CreateTrackedParams): Promise<VisitorSession> {
       const now = new Date();
+      // Data minimization at the point of capture: the IP is truncated (last
+      // IPv4 octet / last 80 IPv6 bits zeroed) and geolocation is coarsened to
+      // country level before it is ever persisted. See pii-minimize.ts and
+      // docs/adr/0020-geo-retention-minimization.md.
+      const geo = coarsenGeo({ country: params.country ?? null, city: params.city ?? null });
       return VisitorSession.create({
         tenantId: params.tenantId,
         sessionCookieHash: params.subjectKey,
         identityTokenSub: params.identityTokenSub ?? null,
         userAgent: params.userAgent ?? null,
-        ipAddress: params.ipAddress ?? null,
-        country: params.country ?? null,
-        city: params.city ?? null,
+        ipAddress: truncateIp(params.ipAddress ?? undefined),
+        country: geo.country,
+        city: geo.city,
         language: params.language ?? null,
         currentUrl: params.currentUrl ?? null,
         referrer: params.referrer ?? null,
@@ -125,20 +166,62 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
      * @returns The session, or null if none has been created (gated visitor).
      */
     async findBySubjectKey(subjectKey: string): Promise<VisitorSession | null> {
-      return VisitorSession.findOne({ where: { sessionCookieHash: subjectKey } });
+      return findBySubject(subjectKey);
     },
 
     /**
-     * Look up a VisitorSession by its signed cookie value.
+     * Look up a VisitorSession by its signed cookie value, enforcing absolute
+     * and idle expiry server-side (#79). The cookie `maxAge` is only a
+     * client-side hint and is trivially replayable, so the real bound lives
+     * here — and, because the socket handshake also calls this, it covers the
+     * `/visitor` namespace too.
      * @param cookieValue - Raw cookie value from the widget.
-     * @returns The matching session.
-     * @throws 401 if the cookie is missing/invalid or the session has been removed.
+     * @returns The matching, non-expired session.
+     * @throws 401 if the cookie is invalid, the session is gone, or it has
+     *   passed its absolute or idle lifetime.
      */
     async findByCookie(cookieValue: string): Promise<VisitorSession> {
-      const subjectKey = this.subjectKeyFromCookie(cookieValue);
-      const session = await this.findBySubjectKey(subjectKey);
+      const session = await findBySubject(subjectKeyOf(cookieValue));
+      // A revoked ("forget me") session is hard-deleted, so a missing row is
+      // also the revoked case.
       if (session === null) throw ApiError.unauthorized('Visitor session not found');
+
+      const now = Date.now();
+      const absoluteMs = deps.env.VISITOR_SESSION_ABSOLUTE_TTL_HOURS * MS_PER_HOUR;
+      const idleMs = deps.env.VISITOR_SESSION_IDLE_TTL_HOURS * MS_PER_HOUR;
+      if (now - new Date(session.firstSeenAt).getTime() > absoluteMs) {
+        throw ApiError.unauthorized('Visitor session expired');
+      }
+      if (now - new Date(session.lastSeenAt).getTime() > idleMs) {
+        throw ApiError.unauthorized('Visitor session expired');
+      }
       return session;
+    },
+
+    /**
+     * Revoke a visitor session by its cookie — the "forget me" path (#79).
+     * Resolves the row from the signed cookie **without** applying the expiry
+     * gate in {@link findByCookie}, then hard-deletes it, so the visitor's PII
+     * and chat linkage are gone even when the session has already gone
+     * absolutely/idle-expired. This is what serves the geo-privacy deletion
+     * requirement; any replay of the cookie afterwards 401s. Idempotent: an
+     * unknown or already-forgotten cookie is a no-op.
+     * @param cookieValue - Raw cookie value from the widget.
+     * @throws 401 if the cookie signature is invalid (nothing to forget).
+     */
+    async forgetByCookie(cookieValue: string): Promise<void> {
+      await forgetSubject(subjectKeyOf(cookieValue));
+    },
+
+    /**
+     * Hard-delete the tracked row for a subject key, if any. Used both by the
+     * "forget me" path and by the consent gate when presence tracking stops
+     * being permitted (withdrawal / GPC), so a revoked visitor's behavioral row
+     * does not linger. Idempotent.
+     * @param subjectKey - The durable subject key.
+     */
+    async forgetBySubjectKey(subjectKey: string): Promise<void> {
+      await forgetSubject(subjectKey);
     },
 
     /**

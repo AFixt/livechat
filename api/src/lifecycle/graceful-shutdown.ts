@@ -21,6 +21,13 @@ export interface ShutdownDeps {
   sequelize: Pick<Sequelize, 'close'>;
   /** Redis client to quit. */
   redis: Pick<Redis, 'quit'>;
+  /**
+   * Close the Socket.IO Redis adapter's pub/sub connections, if installed
+   * (#73). They are separate ioredis connections and would otherwise keep the
+   * event loop alive past `io.close()`, so they must be quit alongside the
+   * shared client.
+   */
+  closeAdapter?: () => Promise<unknown>;
   /** Structured logger. */
   logger: Logger;
   /** Milliseconds to wait before forcing exit. Defaults to {@link SHUTDOWN_TIMEOUT_MS}. */
@@ -84,7 +91,11 @@ export function createShutdownHandler(deps: ShutdownDeps): (signal: NodeJS.Signa
       // `allSettled` so a failing redis quit still lets the database close.
       // It never rejects, so the failures have to be read out of the results
       // rather than caught — a `.catch` here would be dead code.
-      void Promise.allSettled([deps.sequelize.close(), deps.redis.quit()]).then((results) => {
+      void Promise.allSettled([
+        deps.sequelize.close(),
+        deps.redis.quit(),
+        deps.closeAdapter?.() ?? Promise.resolve(),
+      ]).then((results) => {
         clearTimeout(forceTimer);
         const failures = results.filter((r) => r.status === 'rejected');
         if (failures.length > 0) {

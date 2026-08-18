@@ -17,6 +17,7 @@ import { AvailabilityPage } from './pages/availability.js';
 import { DashboardPage } from './pages/dashboard.js';
 import { ForgotPasswordPage } from './pages/forgot-password.js';
 import { LoginPage } from './pages/login.js';
+import { PreferencesPage } from './pages/preferences.js';
 import { ResetPasswordPage } from './pages/reset-password.js';
 import { VerifyEmailPage } from './pages/verify-email.js';
 import { buildQueryClient } from './services/query-client.js';
@@ -54,6 +55,7 @@ export function App(): React.JSX.Element {
               >
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/settings/availability" element={<AvailabilityPage />} />
+                <Route path="/settings/preferences" element={<PreferencesPage />} />
                 <Route path="/admin/tenants" element={<AdminTenantsPage />} />
                 <Route path="/admin/users" element={<AdminUsersPage />} />
                 <Route path="/admin/invitations" element={<AdminInvitationsPage />} />

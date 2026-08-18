@@ -7,6 +7,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "availability": "Availability",
+    "preferences": "Preferences",
     "admin": {
       "tenants": "Tenants",
       "users": "Users",
@@ -30,6 +31,10 @@
   },
   "dashboard": {
     "heading": "Dashboard",
+    "connection": {
+      "reconnecting": "Connection lost. Reconnecting to live updates…",
+      "reconnected": "Reconnected to live updates."
+    },
     "visitors": {
       "heading": "Visitors on site",
       "empty": "No visitors are currently on the site.",
@@ -46,6 +51,14 @@
       "messageLabel": "Message",
       "typing": "{{name}} is typing…"
     }
+  },
+  "availability": {
+    "intro": "Set whether customers can reach you right now. Your status is saved and stays in effect across reloads and reconnects until you change it.",
+    "available": "Available",
+    "nowAvailable": "You are now available. Customers can start a chat.",
+    "nowAway": "You are now away. Customers will see the offline message.",
+    "statusAvailable": "You are available.",
+    "statusAway": "You are away."
   },
   "alerts": {
     "newMessage": "New message in chat with {{name}}",

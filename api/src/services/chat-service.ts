@@ -4,6 +4,39 @@ import { ApiError } from '../utils/api-error.js';
 import type { ChatStatus, MessageSenderKind } from '@livechat/shared';
 
 const ERR_CHAT_NOT_FOUND = 'Chat not found';
+const ERR_CHAT_FORBIDDEN = 'Access denied to this chat';
+
+/**
+ * Identifies who is trying to touch a chat, so every lookup can be scoped to
+ * what that caller actually owns. Enforced inside the service — never left to
+ * callers — so the HTTP and Socket.IO paths cannot drift out of sync and
+ * re-open the cross-tenant hole (issue #72).
+ *
+ * - `staff` carries the caller's tenant. `tenantId: null` is an untenanted
+ *   AFixt operator who legitimately serves every tenant; that span is granted
+ *   by role (a null tenant on a verified token), never by omitting the check.
+ * - `visitor` carries the signed visitor-session id and may only reach chats
+ *   that belong to that session.
+ */
+export type ChatCaller =
+  | { readonly kind: 'staff'; readonly tenantId: string | null }
+  | { readonly kind: 'visitor'; readonly visitorSessionId: string };
+
+/**
+ * Throw unless `caller` is allowed to act on `chat`.
+ * @param chat - The resolved chat row.
+ * @param caller - Who is attempting the action.
+ * @throws {ApiError} 403 when the chat belongs to another tenant or visitor.
+ */
+function assertChatAccess(chat: Chat, caller: ChatCaller): void {
+  if (caller.kind === 'staff') {
+    if (caller.tenantId === null) return;
+    if (chat.tenantId === caller.tenantId) return;
+  } else if (chat.visitorSessionId === caller.visitorSessionId) {
+    return;
+  }
+  throw ApiError.forbidden(ERR_CHAT_FORBIDDEN);
+}
 
 interface VisitorInitiateParams {
   visitorSession: VisitorSession;
@@ -96,11 +129,13 @@ export function createChatService() {
      * Append a message to an active chat. Also activates a pending chat when
      * the first reply arrives.
      * @param params - Send-message params.
+     * @param caller - Who is sending, used to scope the chat lookup (#72).
      * @returns The new message.
      */
-    async sendMessage(params: SendMessageParams): Promise<ChatMessage> {
+    async sendMessage(params: SendMessageParams, caller: ChatCaller): Promise<ChatMessage> {
       const chat = await Chat.findByPk(params.chatId);
       if (chat === null) throw ApiError.notFound(ERR_CHAT_NOT_FOUND);
+      assertChatAccess(chat, caller);
       if (chat.endedAt !== null) throw ApiError.badRequest('Chat has ended');
 
       const now = new Date();
@@ -126,11 +161,13 @@ export function createChatService() {
     /**
      * End a chat. Sets status + ended_at.
      * @param params - End-chat params.
+     * @param caller - Who is ending it, used to scope the chat lookup (#72).
      * @returns The updated chat.
      */
-    async endChat(params: EndChatParams): Promise<Chat> {
+    async endChat(params: EndChatParams, caller: ChatCaller): Promise<Chat> {
       const chat = await Chat.findByPk(params.chatId);
       if (chat === null) throw ApiError.notFound(ERR_CHAT_NOT_FOUND);
+      assertChatAccess(chat, caller);
       if (chat.endedAt !== null) return chat;
       const nextStatus: ChatStatus =
         params.endedBy === 'customer' ? 'ended_by_customer' : 'ended_by_support';
@@ -144,11 +181,13 @@ export function createChatService() {
      * Assign a chat to a support user (accept).
      * @param chatId - Chat id.
      * @param userId - Support user id.
+     * @param caller - Who is accepting, used to scope the chat lookup (#72).
      * @returns The updated chat.
      */
-    async assign(chatId: string, userId: string): Promise<Chat> {
+    async assign(chatId: string, userId: string, caller: ChatCaller): Promise<Chat> {
       const chat = await Chat.findByPk(chatId);
       if (chat === null) throw ApiError.notFound(ERR_CHAT_NOT_FOUND);
+      assertChatAccess(chat, caller);
       chat.assignedTo = userId;
       if (chat.status === 'pending') chat.status = 'active';
       await chat.save();
@@ -180,13 +219,15 @@ export function createChatService() {
     },
 
     /**
-     * Fetch a chat by id.
+     * Fetch a chat by id, scoped to what the caller may see.
      * @param id - Chat id.
+     * @param caller - Who is fetching, used to scope the lookup (#72).
      * @returns The chat.
      */
-    async getById(id: string): Promise<Chat> {
+    async getById(id: string, caller: ChatCaller): Promise<Chat> {
       const chat = await Chat.findByPk(id);
       if (chat === null) throw ApiError.notFound(ERR_CHAT_NOT_FOUND);
+      assertChatAccess(chat, caller);
       return chat;
     },
 

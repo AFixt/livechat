@@ -8,11 +8,23 @@ import {
 } from 'sequelize';
 
 import type {
+  ConsentPurpose,
   ConsentSource,
   Jurisdiction,
   LegalBasis,
+  PurposeDecision,
   PurposeState,
 } from '@livechat/shared';
+
+/**
+ * The visitor's raw explicit per-purpose choices, kept separate from the
+ * effective {@link ConsentRecord.purposes}. Only purposes the visitor actually
+ * set via a banner action appear here — jurisdiction defaults never do. This is
+ * what makes a later cross-jurisdiction re-evaluation correct: a purpose that
+ * was merely granted-by-default under an opt-out regime must not be read back as
+ * an explicit grant under an opt-in regime. See ADR-0019.
+ */
+type ExplicitPurposes = Partial<Record<ConsentPurpose, PurposeDecision>>;
 
 /**
  * ConsentRecord — the durable tracking-decision + consent record for a single
@@ -41,7 +53,16 @@ export class ConsentRecord extends Model<
   declare gpc: CreationOptional<boolean>;
   declare ruleVersion: string;
   declare purposes: PurposeState;
+  /** The raw explicit choices behind {@link purposes}; see {@link ExplicitPurposes}. */
+  declare explicitPurposes: CreationOptional<ExplicitPurposes | null>;
   declare ipHash: string | null;
+  /**
+   * The visitor's User-Agent, stored raw (≤500 chars). This is the one
+   * non-minimized identifying field on an otherwise minimized table, kept
+   * deliberately: it is needed for security/abuse triage of a consent decision
+   * and mirrors what `visitor_sessions` already retains for the same subject, so
+   * it exposes nothing not already held elsewhere. Nullable — never required.
+   */
   declare userAgent: string | null;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
@@ -85,6 +106,7 @@ export function initConsentRecordModel(sequelize: Sequelize): void {
       gpc: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
       ruleVersion: { type: DataTypes.STRING(32), allowNull: false, field: 'rule_version' },
       purposes: { type: DataTypes.JSON, allowNull: false },
+      explicitPurposes: { type: DataTypes.JSON, allowNull: true, field: 'explicit_purposes' },
       ipHash: { type: DataTypes.STRING(128), allowNull: true, field: 'ip_hash' },
       userAgent: { type: DataTypes.STRING(500), allowNull: true, field: 'user_agent' },
       createdAt: { type: DataTypes.DATE, field: 'created_at' },
