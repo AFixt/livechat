@@ -32,10 +32,14 @@ test('visitor ends the chat and sees the ended state', async ({ browser }) => {
 });
 
 test('no-support-available shows the offline state', async ({ browser }) => {
-  // No agent is brought online, so support is unavailable. Give any agent from
-  // a prior test time to fully disconnect before the visitor initiates.
+  // Support being offline has to be *asserted*, not waited for. Availability is
+  // an explicit, persisted per-user status since #76/#101: the server never
+  // flips an agent away on disconnect, and the connection grace window is 120s,
+  // so an earlier test's agent closing its context cannot make support offline
+  // within a run — the previous 1s wait could never have achieved it. Mark the
+  // agent explicitly away instead.
+  const agent = await openAgent(browser, { available: false });
   const visitor = await openVisitor(browser);
-  await visitor.page.waitForTimeout(1000);
 
   await visitor.page.getByRole('button', { name: 'Chat with support' }).click();
   await visitor.page.getByLabel('Your name').fill('Rae Visitor');
@@ -49,6 +53,7 @@ test('no-support-available shows the offline state', async ({ browser }) => {
   await expect(visitor.page.getByRole('log', { name: 'Chat transcript' })).toHaveCount(0);
 
   await visitor.close();
+  await agent.close();
 });
 
 test('support-initiated chat shows the invitation state', async ({ browser }) => {

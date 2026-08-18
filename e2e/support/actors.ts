@@ -1,8 +1,14 @@
 import { expect } from '@playwright/test';
 
-import { CONSOLE_URL, STORAGE_STATE, WIDGET_URL } from './config.js';
+import { API_URL, CONSOLE_URL, STORAGE_STATE, WIDGET_URL } from './config.js';
 
 import type { Browser, Page } from '@playwright/test';
+
+/**
+ * The seeded tenant both the widget dev host and the support agent belong to.
+ * Used to ask the api whether support currently reads as available.
+ */
+const AGENT_TENANT_KEY = 'acme';
 
 /** A test actor: an isolated browser context plus its page. */
 export interface Actor {
@@ -27,30 +33,67 @@ export async function openVisitor(browser: Browser): Promise<Actor> {
 /** Options for {@link openAgent}. */
 export interface AgentOptions {
   /**
-   * Mark the operator explicitly available before returning to the dashboard.
+   * Set the operator's explicit availability before returning to the dashboard.
    *
    * Since #76/#101 availability is an explicit per-user status rather than an
    * implication of having a socket connected: `anyStaffAvailable` only counts
-   * agents who are in the `presence:staff:available` set. A journey that just
+   * agents in the `presence:staff:available:<tenantId>` set. A journey that just
    * opens the console therefore has support *offline*, and a visitor starting a
    * chat correctly lands in the no-support state instead of the transcript.
-   * Journeys that need a live conversation must opt in.
+   *
+   * The status is *persisted* server-side and deliberately survives disconnect
+   * (the connection grace window is 120s), so it also leaks forward to every
+   * later test in the run. Both directions therefore have to be stated, not
+   * assumed: pass `true` for journeys that need a live conversation and `false`
+   * for journeys that need support offline. Omit it only when the journey does
+   * not depend on availability at all.
    */
   available?: boolean;
 }
 
 /**
- * Set the operator's availability switch on and wait for it to take effect.
+ * Set the operator's availability and wait until the *server* agrees.
+ *
+ * Driving this control is racy in a way that `check()` / `setChecked()` cannot
+ * survive, so neither is used here:
+ *
+ * - The store starts at `unknown`, which renders identically to `away`, so the
+ *   switch's initial visual state is not the server's state.
+ * - `handleToggle` updates the store optimistically, then the server's
+ *   `availability:self` echo (sent on connect by `restoreOnConnect`) arrives and
+ *   overwrites it. When that echo lands just after the click, the switch snaps
+ *   back and `check()`/`setChecked()` throw "Clicking the checkbox did not
+ *   change its state".
+ *
+ * So: click only when the rendered state differs from the target, then confirm
+ * against the *server*, retrying the whole cycle until it agrees. That converges
+ * from any starting state (a later pass reads a settled, echo-populated switch)
+ * and needs no wall-clock guesses.
+ *
+ * The confirmation deliberately does not read the console's own status text.
+ * `unknown` renders identically to `away`, so that text cannot distinguish "the
+ * server says away" from "the echo has not arrived yet" — asserting on it passes
+ * vacuously in the `away` direction, on the pre-echo render. `/widget/config`
+ * reports `supportAvailable` from the same `anyStaffAvailable` predicate the
+ * journeys actually depend on, so it both discriminates and is exactly on point.
+ * It is public and unauthenticated, and `originAllowed` passes a request that
+ * sends no `Origin`.
  * @param page - The agent's authenticated console page.
+ * @param available - Target availability.
  */
-async function setAvailable(page: Page): Promise<void> {
+async function setAvailability(page: Page, available: boolean): Promise<void> {
   await page.goto(`${CONSOLE_URL}/settings/availability`);
-  const toggle = page.getByRole('checkbox', { name: 'Available' });
-  await expect(toggle).toBeVisible();
-  await toggle.check();
-  // The server echoes `availability:self`; this text confirms the round trip,
-  // so the visitor cannot race ahead of the agent actually being available.
-  await expect(page.getByText('You are available.')).toBeVisible();
+  await expect(async () => {
+    const toggle = page.getByRole('checkbox', { name: 'Available' });
+    await expect(toggle).toBeVisible();
+    if ((await toggle.isChecked()) !== available) await toggle.click();
+    const res = await page.request.get(
+      `${API_URL}/api/v1/widget/config?tenantKey=${AGENT_TENANT_KEY}`,
+    );
+    expect(res.ok()).toBe(true);
+    const body = (await res.json()) as { data?: { supportAvailable?: boolean } };
+    expect(body.data?.supportAvailable).toBe(available);
+  }).toPass({ timeout: 30_000 });
   await page.goto(`${CONSOLE_URL}/`);
 }
 
@@ -66,7 +109,7 @@ export async function openAgent(browser: Browser, options: AgentOptions = {}): P
   const context = await browser.newContext({ storageState: STORAGE_STATE.agent });
   const page = await context.newPage();
   await page.goto(`${CONSOLE_URL}/`);
-  if (options.available === true) await setAvailable(page);
+  if (options.available !== undefined) await setAvailability(page, options.available);
   return { page, close: () => context.close() };
 }
 
