@@ -94,19 +94,17 @@ export const effectiveConsentStateSchema = z.object({
 export type EffectiveConsentState = z.infer<typeof effectiveConsentStateSchema>;
 
 /**
- * Fields common to every privacy request: the tenant the visitor belongs to,
- * optional geo hints (ISO 3166-1 alpha-2 country + region), and an optional
- * client-detected GPC flag (`navigator.globalPrivacyControl`). GPC is also
- * detected server-side from the `Sec-GPC` header; either source counts.
+ * Fields common to every privacy request: the tenant the visitor belongs to and
+ * an optional client-detected GPC flag (`navigator.globalPrivacyControl`). GPC
+ * is also detected server-side from the `Sec-GPC` header; either source counts.
+ *
+ * Jurisdiction is deliberately absent: it is resolved server-side from a trusted
+ * edge header (`GEO_COUNTRY_HEADER`), never from a body the embedding page
+ * controls, because it decides whether tracking is opt-in or opt-out. GPC stays
+ * client-supplied because it can only ever *deny*.
  */
 const privacyCommonShape = {
   tenantKey: z.string().min(1).max(255),
-  country: z
-    .string()
-    .length(2)
-    .regex(/^[A-Za-z]{2}$/)
-    .optional(),
-  region: z.string().max(8).optional(),
   gpc: z.boolean().optional(),
 };
 

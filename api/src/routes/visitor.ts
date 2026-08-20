@@ -18,6 +18,7 @@ import { ApiError } from '../utils/api-error.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
 import { detectGpc, resolveSubject } from './consent-request.js';
+import { resolveGeo } from './geo-resolve.js';
 import { VISITOR_COOKIE_NAME } from './visitor-cookie-options.js';
 
 import type { Env } from '../config/env.js';
@@ -66,6 +67,8 @@ async function ensureSessionForInit(
     subjectKey: string;
     presenceGranted: boolean;
     identityTokenSub: string | null;
+    /** Trusted-source country for the stored row (see `geo-resolve.ts`). */
+    country: string | null;
     body: InitVisitorSessionInput;
     req: Request;
   },
@@ -85,7 +88,7 @@ async function ensureSessionForInit(
     language: ctx.body.language ?? null,
     currentUrl: ctx.body.currentUrl ?? null,
     referrer: ctx.body.referrer ?? null,
-    country: ctx.body.country ?? null,
+    country: ctx.country,
   });
 }
 
@@ -140,8 +143,8 @@ async function runSessionInit(
   // tracking decision).
   const identityTokenSub = verifyIdentityToken(body.identityToken, tenant.embedSecret);
   const gpc = detectGpc(req, body.gpc);
-  const country = body.country ?? null;
-  const region = body.region ?? null;
+  // Trusted edge header only — never the body. See `geo-resolve.ts`.
+  const { country, region } = resolveGeo(deps.env, req);
   const ip = req.ip ?? null;
   const userAgent = req.header('user-agent') ?? null;
   const { subjectKey, cookieValue } = resolveSubject(deps, req, res);
@@ -151,6 +154,7 @@ async function runSessionInit(
     subjectKey,
     presenceGranted: decision.purposes.presence === 'granted',
     identityTokenSub,
+    country,
     body,
     req,
   });

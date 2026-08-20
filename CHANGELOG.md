@@ -10,6 +10,21 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 ## [Unreleased]
 
 ### Security
+
+- **Jurisdiction is now resolved server-side from a trusted edge header, not the
+  request body.** The consent gate decided opt-in vs opt-out from a `country` /
+  `region` the client sent, but the widget runs on the client's own site — so an
+  embedding page could have declared `US` for an EU visitor and turned an opt-in
+  jurisdiction into an opt-out one. Those fields are gone from
+  `POST /visitor/session` and from the `/privacy/*` bodies and query; the value
+  now comes only from the header named by `GEO_COUNTRY_HEADER` /
+  `GEO_REGION_HEADER`, which the CDN or load balancer injects and must strip
+  from client input. GPC stays client-readable on purpose — a signal that can
+  only ever *deny* tracking is safe to accept, one that could *grant* it is not.
+  With no header configured every visitor resolves to Unknown Location Mode,
+  which denies presence: the fail-safe, and the honest description of what the
+  gate could already determine, since the widget never sent a country. ([#53])
+
 - **The api image no longer ships a package manager, clearing a CRITICAL CVE.**
   `trivy image` was failing the gate on `CVE-2026-59873` (node-tar DoS via a
   crafted gzip bomb) plus seven HIGHs in `brace-expansion`, `ip-address`,

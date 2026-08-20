@@ -17,10 +17,13 @@ async function bootstrapVisitor(
   app: NonNullable<Harness>['app'],
   tenantKey: string,
 ): Promise<{ cookie: string; csrfToken: string }> {
-  // country US -> opt-out jurisdiction, so the consent gate creates a tracked
+  // x-geo-country: US (trusted edge header) -> opt-out jurisdiction, so the consent gate creates a tracked
   // session. These tests are about CSRF, not the gate: the heartbeat route
   // needs a real session behind the cookie to reach its 200 path at all.
-  const res = await request(app).post('/api/v1/visitor/session').send({ tenantKey, country: 'US' });
+  const res = await request(app)
+    .post('/api/v1/visitor/session')
+    .set('x-geo-country', 'US')
+    .send({ tenantKey });
   expect(res.status).toBe(201);
   const setCookie = res.headers['set-cookie'] as unknown as string[] | string | undefined;
   const cookies = Array.isArray(setCookie) ? setCookie : setCookie === undefined ? [] : [setCookie];
