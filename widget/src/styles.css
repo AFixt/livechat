@@ -10,6 +10,11 @@
      #767676 clears 4.5:1 on both white and dark system canvases. */
   --afixt-field-border: #767676;
   --afixt-danger: #b91c1c;
+
+  /* Reconnect banner (#69) — warning tones that clear 4.5:1 on the banner fill. */
+  --afixt-warn-bg: #fff4e5;
+  --afixt-warn-text: #663c00;
+  --afixt-warn-border: #ffb74d;
   --afixt-radius: 8px;
   --afixt-z: 2147483000;
   --afixt-font: system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -200,4 +205,15 @@ ol.transcript li.from-user {
     animation: none !important;
   }
   /* stylelint-enable declaration-no-important */
+}
+
+/* Reconnect banner (#69) — visible cue while the socket is down; the spoken
+   announcement is handled by the global live region. */
+.reconnecting-banner {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--afixt-warn-text);
+  background: var(--afixt-warn-bg);
+  border-bottom: 1px solid var(--afixt-warn-border);
 }

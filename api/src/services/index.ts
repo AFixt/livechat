@@ -11,7 +11,7 @@ import { createVisitorSessionService } from './visitor-session-service.js';
 
 import type { AuditService } from './audit-service.js';
 import type { AuthService } from './auth-service.js';
-import type { ChatService } from './chat-service.js';
+import type { ChatCaller, ChatService } from './chat-service.js';
 import type { ConsentService } from './consent-service.js';
 import type { EmailService } from './email-service.js';
 import type { InvitationService } from './invitation-service.js';
@@ -26,6 +26,7 @@ import type { Logger } from 'pino';
 export type {
   AuditService,
   AuthService,
+  ChatCaller,
   ChatService,
   ConsentService,
   EmailService,

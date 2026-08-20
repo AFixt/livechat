@@ -68,6 +68,12 @@ export type InitVisitorSessionInput = z.infer<typeof initVisitorSessionInputSche
 export const initVisitorSessionResultSchema = z.object({
   sessionId: z.uuid().nullable(),
   tenantId: z.uuid(),
+  /**
+   * Per-cookie CSRF token (#77). Issued regardless of the tracking decision —
+   * a consent-gated visitor can still start a chat, which is a CSRF-protected
+   * write, so the widget always needs this.
+   */
+  csrfToken: z.string(),
   jurisdiction: z.string(),
   gpc: z.boolean(),
   tracking: z.object({

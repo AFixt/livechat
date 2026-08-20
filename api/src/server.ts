@@ -5,6 +5,7 @@ import { loadEnv } from './config/env.js';
 import { createLogger } from './config/logger.js';
 import { createSequelize } from './config/mysql.js';
 import { createRedis } from './config/redis.js';
+import { createSocketRedisAdapter, type AdapterHealth } from './io/adapter.js';
 import { attachIo } from './io/index.js';
 import { createShutdownHandler } from './lifecycle/graceful-shutdown.js';
 import { initModels } from './models/index.js';
@@ -18,6 +19,11 @@ const redis = createRedis(env, logger);
 initModels(sequelize);
 const services = createServices({ env, logger, redis });
 
+// Socket.IO Redis adapter so rooms span instances behind the load balancer
+// (#73). Its readiness is shared into the app so `/health` reports it.
+const socketAdapterHealth: AdapterHealth = { ready: false };
+const socketAdapter = createSocketRedisAdapter({ redis, logger, health: socketAdapterHealth });
+
 // In test (e2e) the auth limiter's `max: 5` would trip across repeated
 // logins and CI retries; NODE_ENV is only ever 'test' for the e2e stack,
 // never a deployed server, so this is safe.
@@ -26,10 +32,21 @@ const app = createApp({
   logger,
   redis,
   services,
+  socketAdapterHealth,
   ...(env.NODE_ENV === 'test' && { skipRateLimit: true }),
 });
 const server = createServer(app);
-const io = attachIo(server, { env, logger, services });
+const io = attachIo(server, { env, logger, redis, services, adapter: socketAdapter.adapter });
+
+// A port clash otherwise surfaces as an unhandled EADDRINUSE stack trace (#81).
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    logger.fatal(`port ${String(env.PORT)} is already in use — stop the other process or set PORT`);
+  } else {
+    logger.fatal({ err }, 'HTTP server error');
+  }
+  process.exitCode = 1;
+});
 
 /**
  * Bring up database + redis + HTTP server. Sets `process.exitCode` on failure
@@ -62,6 +79,7 @@ const shutdown = createShutdownHandler({
   httpServer: server,
   sequelize,
   redis,
+  closeAdapter: socketAdapter.close,
   logger,
 });
 

@@ -137,12 +137,99 @@ describe('visitor consent gate (integration)', () => {
     expect(gated.body.data.sessionId).toBeNull();
     expect(await sessionCount(tenant.id)).toBe(0);
 
+    // Starting a chat is a CSRF-protected write (#77): the gate must issue a
+    // token even when it suppressed tracking, or a gated visitor could never
+    // open a chat at all.
+    const csrfToken = gated.body.data.csrfToken as string;
+    expect(csrfToken).toBeTruthy();
     const chat = await agent
       .post('/api/v1/visitor/chats')
+      .set('X-XSRF-TOKEN', csrfToken)
       .send({ customerName: 'Ada', body: 'Hello, I need help.' });
     expect(chat.status).toBe(201);
     expect(chat.body.data.chat.id).toBeTruthy();
     // Opening a chat is strictly necessary — the session row is created now.
     expect(await sessionCount(tenant.id)).toBe(1);
+  });
+  test('withdrawing consent stops presence tracking, not just records it', async () => {
+    if (harness === null) return;
+    const { app } = harness;
+    const agent = request.agent(app);
+    const tenant = await seedTenant(`withdraw-${Math.random().toString(36).slice(2, 8)}`);
+
+    // A US visitor is tracked by default (opt-out regime).
+    const tracked = await agent
+      .post('/api/v1/visitor/session')
+      .send({ tenantKey: tenant.slug, country: 'US', currentUrl: 'https://us.example/a' });
+    expect(tracked.body.data.sessionId).not.toBeNull();
+    expect(await sessionCount(tenant.id)).toBe(1);
+
+    // Withdrawing must actually delete the behavioral row. Recording the
+    // withdrawal while leaving the row in place would keep retaining (and
+    // heartbeating) the visitor's IP/UA/current URL after they opted out.
+    const withdrawn = await agent
+      .post('/api/v1/privacy/consent/withdraw')
+      .send({ tenantKey: tenant.slug, country: 'US' });
+    expect(withdrawn.status).toBe(200);
+    expect(withdrawn.body.data.purposes.presence).toBe('denied');
+    expect(await sessionCount(tenant.id)).toBe(0);
+
+    // And a later page load must not silently resume tracking.
+    const after = await agent
+      .post('/api/v1/visitor/session')
+      .send({ tenantKey: tenant.slug, country: 'US', currentUrl: 'https://us.example/b' });
+    expect(after.body.data.sessionId).toBeNull();
+    expect(await sessionCount(tenant.id)).toBe(0);
+  });
+
+  test('an unchanged page load does not append consent or audit rows', async () => {
+    if (harness === null) return;
+    const { app } = harness;
+    const agent = request.agent(app);
+    const tenant = await seedTenant(`repeat-${Math.random().toString(36).slice(2, 8)}`);
+
+    const first = await agent
+      .post('/api/v1/visitor/session')
+      .send({ tenantKey: tenant.slug, country: 'US', currentUrl: 'https://us.example/1' });
+    expect(first.status).toBe(201);
+    const afterFirst = await ConsentRecord.count({ where: { tenantId: tenant.id } });
+    expect(afterFirst).toBe(1);
+
+    // Two more page views with an identical decision. The consent trail records
+    // decisions and changes, not impressions — otherwise every visitor would
+    // append a record plus a batch of audit rows on every page they open.
+    for (const url of ['https://us.example/2', 'https://us.example/3']) {
+      const again = await agent
+        .post('/api/v1/visitor/session')
+        .send({ tenantKey: tenant.slug, country: 'US', currentUrl: url });
+      expect(again.status).toBe(201);
+      expect(again.body.data.tracking.presence).toBe('granted');
+    }
+    expect(await ConsentRecord.count({ where: { tenantId: tenant.id } })).toBe(afterFirst);
+
+    // A real change (GPC appearing) is still recorded, and still enforced.
+    const gpc = await agent
+      .post('/api/v1/visitor/session')
+      .set('Sec-GPC', '1')
+      .send({ tenantKey: tenant.slug, country: 'US' });
+    expect(gpc.body.data.tracking.presence).toBe('denied');
+    expect(await ConsentRecord.count({ where: { tenantId: tenant.id } })).toBe(afterFirst + 1);
+  });
+
+  test('the gate issues a CSRF token on every page load', async () => {
+    if (harness === null) return;
+    const { app } = harness;
+    const tenant = await seedTenant(`csrf-${Math.random().toString(36).slice(2, 8)}`);
+
+    // Gated (untracked) and tracked visitors alike need the token, since both
+    // can perform CSRF-protected writes.
+    for (const country of ['DE', 'US']) {
+      const res = await request(app)
+        .post('/api/v1/visitor/session')
+        .send({ tenantKey: tenant.slug, country });
+      expect(res.status).toBe(201);
+      expect(typeof res.body.data.csrfToken).toBe('string');
+      expect((res.body.data.csrfToken as string).length).toBeGreaterThan(0);
+    }
   });
 });

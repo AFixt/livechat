@@ -26,6 +26,7 @@ module.exports = {
       gpc: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
       rule_version: { type: Sequelize.STRING(32), allowNull: false },
       purposes: { type: Sequelize.JSON, allowNull: false },
+      explicit_purposes: { type: Sequelize.JSON, allowNull: true },
       ip_hash: { type: Sequelize.STRING(128), allowNull: true },
       user_agent: { type: Sequelize.STRING(500), allowNull: true },
       created_at: { type: Sequelize.DATE, allowNull: false },

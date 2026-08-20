@@ -1,4 +1,4 @@
-# ADR-0011: Consent records + jurisdiction policy engine
+# ADR-0019: Consent records + jurisdiction policy engine
 
 - **Status:** Accepted
 - **Date:** 2026-08-15
@@ -54,13 +54,13 @@ non-essential and are what the rules govern.
 `api/src/services/consent-policy.ts` holds a data-driven table plus a
 `RULE_VERSION` stamp recorded on every decision:
 
-| Jurisdiction  | functional | presence | analytics | GPC honored |
-| ------------- | ---------- | -------- | --------- | ----------- |
-| EU / EEA      | always     | opt-in   | opt-in    | yes         |
-| UK            | always     | opt-in   | opt-in    | yes         |
-| US-CA         | always     | opt-out  | opt-out   | yes         |
-| US (other)    | always     | opt-out  | opt-out   | yes         |
-| **UNKNOWN**   | always     | opt-in   | opt-in    | yes         |
+| Jurisdiction | functional | presence | analytics | GPC honored |
+| ------------ | ---------- | -------- | --------- | ----------- |
+| EU / EEA     | always     | opt-in   | opt-in    | yes         |
+| UK           | always     | opt-in   | opt-in    | yes         |
+| US-CA        | always     | opt-out  | opt-out   | yes         |
+| US (other)   | always     | opt-out  | opt-out   | yes         |
+| **UNKNOWN**  | always     | opt-in   | opt-in    | yes         |
 
 Defaults chosen:
 
@@ -70,11 +70,11 @@ Defaults chosen:
   or a GPC signal (CCPA/CPRA posture). California is labelled distinctly for the
   audit trail; behaviour matches other US states today.
 - **Unknown location → strict (opt-in), _not_ US-max.** When geo is unresolved
-  the fail-safe is the stricter regime. The `visitor_sessions.country` column
-  is not yet populated (no geo lookup exists), so **today every visitor resolves
-  to UNKNOWN** unless an edge proxy supplies a country hint — the framework
-  reads an optional `country`/`region` hint so a future geo source drops in
-  without touching the engine.
+  the fail-safe is the stricter regime. The `visitor_sessions.country` column is
+  not yet populated (no geo lookup exists), so **today every visitor resolves to
+  UNKNOWN** unless an edge proxy supplies a country hint — the framework reads
+  an optional `country`/`region` hint so a future geo source drops in without
+  touching the engine.
 - **GPC is honored universally.** A detected signal suppresses every
   non-essential purpose in every jurisdiction, unless the visitor later
   explicitly re-grants. Honoring GPC where it is not strictly mandated is the
@@ -89,8 +89,10 @@ supersede this section, not a rewrite of the engine.
 
 ### 4. Privacy APIs under `/api/v1/privacy`
 
-- `GET /privacy/consent` — read effective state (side-effect free; no audit row)
-  so the widget can gate itself.
+- `GET /privacy/consent` — read effective state so the widget can gate itself.
+  Audit-side-effect-free: it writes no audit row and persists no consent record.
+  It is not fully side-effect-free — a fresh signed subject cookie is set on the
+  response when the request carries none (session establishment, not tracking).
 - `POST /privacy/consent` — record a banner grant/deny.
 - `POST /privacy/consent/withdraw` — deny all non-essential purposes.
 - `POST /privacy/data-request` — data-subject export/delete. **Documented
@@ -103,11 +105,11 @@ supersede this section, not a rewrite of the engine.
 Every decision emits the §19 event vocabulary as discrete audit rows —
 `privacy.location_resolved` / `privacy.location_unknown` /
 `privacy.geolocation_default_applied`, `privacy.rule_applied`,
-`privacy.gpc_detected` / `privacy.gpc_applied`, and
-`privacy.consent_recorded` / `privacy.consent_withdrawn` /
-`privacy.data_request` — carrying jurisdiction, source, GPC, rule version, the
-resulting purposes, and a subject-key prefix. Actor is the anonymous visitor
-(no `user_id`); the raw IP is not copied into the audit metadata.
+`privacy.gpc_detected` / `privacy.gpc_applied`, and `privacy.consent_recorded` /
+`privacy.consent_withdrawn` / `privacy.data_request` — carrying jurisdiction,
+source, GPC, rule version, the resulting purposes, and a subject-key prefix.
+Actor is the anonymous visitor (no `user_id`); the raw IP is not copied into the
+audit metadata.
 
 ## Consequences
 
