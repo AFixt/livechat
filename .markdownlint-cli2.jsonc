@@ -34,6 +34,10 @@
     "**/playwright-report/**",
     "**/reports/**",
     "**/a11y-reports/**",
+    // lychee-action writes its run summary to lychee/out.md inside the
+    // workspace before `check:all` runs, so CI lints a file whose format lychee
+    // controls, not us. Same failure shape as the Playwright contexts above.
+    "**/lychee/**",
     // Claude Code agent worktrees: full checkouts of this repo living inside
     // it, so their Markdown is a duplicate of files already linted here.
     "**/.claude/**",
