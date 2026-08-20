@@ -17,19 +17,26 @@
     "MD050": { "style": "asterisk" },
     "MD053": true,
   },
+  // These globs are matched against *file* paths, so a directory pattern has
+  // to end in `/**`. A bare trailing slash ("dist/", "**/test-results/")
+  // matches no file and therefore ignores nothing — every entry here used that
+  // form and silently did nothing, which is why a failing e2e run still blocked
+  // the push exactly as the note below says it should not.
   "ignores": [
-    "node_modules/",
-    "**/node_modules/",
-    "dist/",
-    "build/",
-    "coverage/",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
     // Generated artifacts. Playwright writes Markdown failure contexts into
     // test-results/, so without these a failing e2e run also fails the
     // markdownlint gate and blocks the push.
-    "**/test-results/",
-    "**/playwright-report/",
-    "reports/",
-    "a11y-reports/",
+    "**/test-results/**",
+    "**/playwright-report/**",
+    "**/reports/**",
+    "**/a11y-reports/**",
+    // Claude Code agent worktrees: full checkouts of this repo living inside
+    // it, so their Markdown is a duplicate of files already linted here.
+    "**/.claude/**",
     "CHANGELOG.md",
     ".github/PULL_REQUEST_TEMPLATE.md",
   ],
