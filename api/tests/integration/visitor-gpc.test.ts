@@ -66,7 +66,8 @@ describe('GPC universal opt-out (integration)', () => {
     const res = await request(app)
       .post('/api/v1/visitor/session')
       .set('Sec-GPC', '1')
-      .send({ tenantKey: tenant.slug, country: 'US', currentUrl: 'https://us.example/x' });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug, currentUrl: 'https://us.example/x' });
     expect(res.status).toBe(201);
     expect(res.body.data.gpc).toBe(true);
     expect(res.body.data.sessionId).toBeNull();
@@ -83,7 +84,8 @@ describe('GPC universal opt-out (integration)', () => {
 
     const res = await request(app)
       .post('/api/v1/visitor/session')
-      .send({ tenantKey: tenant.slug, country: 'US', gpc: true });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug, gpc: true });
     expect(res.status).toBe(201);
     expect(res.body.data.gpc).toBe(true);
     expect(res.body.data.sessionId).toBeNull();
@@ -101,7 +103,8 @@ describe('GPC universal opt-out (integration)', () => {
     // First visit without GPC in an opt-out jurisdiction → tracked.
     const tracked = await agent
       .post('/api/v1/visitor/session')
-      .send({ tenantKey: tenant.slug, country: 'US' });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug });
     expect(tracked.body.data.sessionId).not.toBeNull();
     expect(await VisitorSession.count({ where: { tenantId: tenant.id } })).toBe(1);
 
@@ -109,7 +112,8 @@ describe('GPC universal opt-out (integration)', () => {
     const gpc = await agent
       .post('/api/v1/visitor/session')
       .set('Sec-GPC', '1')
-      .send({ tenantKey: tenant.slug, country: 'US' });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug });
     expect(gpc.body.data.sessionId).toBeNull();
     expect(gpc.body.data.tracking.presence).toBe('denied');
     await expectHonoredGpc(tenant.id);
