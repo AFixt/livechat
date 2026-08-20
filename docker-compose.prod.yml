@@ -50,7 +50,9 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
-    command: ["npm", "--workspace", "@livechat/api", "run", "migrate"]
+    # No package manager in the image (#132); WORKDIR is /app/api, which is
+    # what api/.sequelizerc resolves against.
+    command: ["/app/node_modules/.bin/sequelize-cli", "db:migrate"]
 
   api:
     build:

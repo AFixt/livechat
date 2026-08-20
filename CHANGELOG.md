@@ -9,6 +9,27 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ## [Unreleased]
 
+### Security
+- **The api image no longer ships a package manager, clearing a CRITICAL CVE.**
+  `trivy image` was failing the gate on `CVE-2026-59873` (node-tar DoS via a
+  crafted gzip bomb) plus seven HIGHs in `brace-expansion`, `ip-address`,
+  `picomatch` and `sigstore`. None of them were ours — `tar` does not appear in
+  `package-lock.json` at all; every one came from the dependency tree vendored
+  inside the npm that ships in `node:22-alpine`, so no dependency bump in this
+  repo could have fixed them and Dependabot would never have seen them. npm,
+  npx, corepack and yarn are now removed from the runtime stage, and the things
+  that actually ran through them are invoked from `node_modules/.bin` directly:
+  `CMD` execs `tsx` instead of `npm run start` (one fewer process in the
+  container), and the migrate/seed jobs in `.do/app.yaml` and the migrate
+  service in `docker-compose.prod.yml` call `sequelize-cli` / `tsx` by path.
+  `WORKDIR` is now `/app/api` so cwd-relative config still resolves as it did
+  under `npm --workspace` — notably `api/.sequelizerc`. Deleting rather than
+  upgrading npm removes the whole class of finding instead of resetting its
+  clock. Verified: image builds, container reaches `healthy` and serves
+  `/api/v1/health`, `sequelize-cli db:migrate` applies all 13 tables from the
+  image, and `trivy image --severity CRITICAL --exit-code 1` now exits 0 with no
+  HIGH or CRITICAL findings at all. ([#132])
+
 ### Fixed
 - **The local quality gate can be run again.** `npm run check:all` — the
   pre-push gate — failed for reasons unrelated to any code under review, so
@@ -433,6 +454,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#57]: https://github.com/AFixt/livechat/issues/57
 [#53]: https://github.com/AFixt/livechat/issues/53
 [#56]: https://github.com/AFixt/livechat/issues/56
+[#132]: https://github.com/AFixt/livechat/issues/132
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
 [#69]: https://github.com/AFixt/livechat/issues/69
