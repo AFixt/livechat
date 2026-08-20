@@ -2,6 +2,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { createApp } from '../../src/app.js';
+import { computeCsrfToken } from '../../src/middlewares/csrf.js';
 import { Tenant } from '../../src/models/index.js';
 
 import { probeHarness, type TestHarness } from './setup.js';
@@ -209,9 +210,13 @@ describe('security regression: input validation + storage (integration)', () => 
       expect(value).toContain('.');
 
       // Positive control: the genuine cookie authenticates the heartbeat.
+      // The heartbeat is a CSRF-protected write (#77), so the token issued
+      // alongside the cookie has to be echoed — this asserts cookie validity,
+      // not CSRF behavior, which `csrf.test.ts` covers.
       const ok = await request(harness.app)
         .post('/api/v1/visitor/heartbeat')
         .set('Cookie', rawCookie)
+        .set('X-XSRF-TOKEN', created.body.data.csrfToken as string)
         .send({});
       expect(ok.status).toBe(200);
 
@@ -219,9 +224,17 @@ describe('security regression: input validation + storage (integration)', () => 
       const [sessionId, sig] = value.split('.');
       const forgedSig = (sig ?? '').replace(/./g, '0');
       const forged = `livechat_visitor=${sessionId ?? ''}.${forgedSig}`;
+      // Give the forged cookie its own matching CSRF token so the CSRF layer
+      // passes and the cookie-signature check is what actually answers. Without
+      // this the request is rejected at the CSRF layer (403) and the test would
+      // no longer be exercising signature verification at all.
       const bad = await request(harness.app)
         .post('/api/v1/visitor/heartbeat')
         .set('Cookie', forged)
+        .set(
+          'X-XSRF-TOKEN',
+          computeCsrfToken(forged.replace('livechat_visitor=', ''), harness.env.COOKIE_SECRET),
+        )
         .send({});
       expect(bad.status).toBe(401);
       expectNoLeak(bad.body);

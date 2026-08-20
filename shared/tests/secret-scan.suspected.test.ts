@@ -88,7 +88,27 @@ function runTierAgainst(
   copyFileSync(SCRIPT, join(dir, 'scripts', 'secret-scan.sh'));
   for (const [name, contents] of Object.entries(files)) writeFileSync(join(dir, name), contents);
 
-  const gitEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+  // Git exports GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE (and friends) to any
+  // process it spawns from a hook. Inheriting them would point these fixture
+  // commands at the *real* repository instead of the throwaway one below —
+  // running this suite from a pre-push hook then rewrites the developer's
+  // branch. Rebuild the env without them so `cwd` alone decides which repo
+  // git touches.
+  const GIT_ENV_KEYS = new Set([
+    'GIT_DIR',
+    'GIT_WORK_TREE',
+    'GIT_INDEX_FILE',
+    'GIT_COMMON_DIR',
+    'GIT_OBJECT_DIRECTORY',
+    'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+    'GIT_NAMESPACE',
+    'GIT_CEILING_DIRECTORIES',
+  ]);
+  const gitEnv: NodeJS.ProcessEnv = {
+    ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !GIT_ENV_KEYS.has(k))),
+    GIT_TERMINAL_PROMPT: '0',
+  };
+
   const git = (args: string[]): void => {
     execFileSync('git', args, { cwd: dir, env: gitEnv, stdio: 'ignore' });
   };
@@ -98,9 +118,12 @@ function runTierAgainst(
   git(['add', '-A']);
   git(['commit', '-q', '-m', 'fixture']);
 
+  // Same reasoning as `gitEnv` above: the script shells out to git/trufflehog,
+  // so it must not inherit the outer repository's git environment either.
   const run = spawnSync('bash', [join(dir, 'scripts', 'secret-scan.sh'), tier], {
     cwd: dir,
     encoding: 'utf8',
+    env: gitEnv,
   });
   return { output: [run.stdout, run.stderr].join(''), status: run.status };
 }
