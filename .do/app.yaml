@@ -106,7 +106,10 @@ jobs:
     kind: PRE_DEPLOY
     dockerfile_path: api/Dockerfile
     source_dir: /
-    run_command: npm --workspace @livechat/api run migrate
+    # Invoked from node_modules/.bin rather than via npm: the image no longer
+    # ships a package manager (#132). WORKDIR is /app/api, which is what
+    # api/.sequelizerc resolves its paths against.
+    run_command: /app/node_modules/.bin/sequelize-cli db:migrate
     envs:
       - { key: DB_HOST, value: "${db.HOSTNAME}" }
       - { key: DB_PORT, value: "${db.PORT}" }
@@ -120,7 +123,8 @@ jobs:
     kind: POST_DEPLOY
     dockerfile_path: api/Dockerfile
     source_dir: /
-    run_command: npx tsx api/src/scripts/seed-first-tenant.ts
+    # Absolute paths — no npx in the image (#132).
+    run_command: /app/node_modules/.bin/tsx /app/api/src/scripts/seed-first-tenant.ts
     instance_count: 0
     envs:
       - { key: DB_HOST, value: "${db.HOSTNAME}" }
