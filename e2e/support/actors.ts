@@ -27,6 +27,26 @@ export async function openVisitor(browser: Browser): Promise<Actor> {
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto(WIDGET_URL);
+  // Wait for the widget's bootstrap to establish the signed visitor cookie
+  // before handing the page over.
+  //
+  // The trigger button and the entire start-chat form render immediately, but
+  // the session only exists at the end of an async chain: the CMP consent gate,
+  // then `/widget/config`, then `/visitor/chats/current` (401 for a new
+  // visitor), and only then `POST /visitor/session`. Playwright completes the
+  // form in ~70ms, so it can submit before that chain finishes — `POST
+  // /visitor/chats` then 401s and the widget renders its *error* state, which
+  // matches neither the active-transcript nor the no-support assertion. That is
+  // why the resulting failures looked like an availability problem in both
+  // directions.
+  //
+  // Polling the cookie waits on the actual precondition rather than a
+  // wall-clock guess, so it neither flakes nor slows the suite down.
+  await expect
+    .poll(async () => (await context.cookies()).some((c) => c.name === 'livechat_visitor'), {
+      timeout: 15_000,
+    })
+    .toBe(true);
   return { page, close: () => context.close() };
 }
 
