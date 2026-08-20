@@ -10,6 +10,25 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 ## [Unreleased]
 
 ### Fixed
+- **The local quality gate can be run again.** `npm run check:all` — the
+  pre-push gate — failed for reasons unrelated to any code under review, so
+  changes were going out under `--no-verify` with CI as the only check. Two
+  causes, both silent. Every *directory* entry in `.markdownlint-cli2.jsonc`
+  used a bare trailing slash (`dist/`, `**/test-results/`); markdownlint-cli2
+  matches those globs against *file* paths, so they matched nothing and ignored
+  nothing — including the entry whose own comment said it existed so a failing
+  e2e run would not block the push. And nothing excluded `.claude/`, where
+  Claude Code keeps agent worktrees: full checkouts of this repo living inside
+  it, which made ESLint report every finding once per worktree (379 errors, all
+  from copies) and `jscpd` measure the tree against six near-copies of itself
+  (78.55% duplication against a 1% threshold). `jscpd`'s own `"gitignore": true`
+  did not cover it either, so the exclusion is explicit. `lychee/out.md`, which
+  `lychee-action` writes into the workspace before the gate runs, is excluded
+  for the same reason as the Playwright contexts. `shared/tests/gate-ignores.test.ts`
+  now pins all of it: a non-compliant file is dropped into each ignored location
+  and the gate must stay quiet, while an un-ignored one must still be reported —
+  so the ignores cannot silently go inert again.
+
 
 - **Chat is no longer silently dead after a socket reconnect** ([#69]). Two
   compounding faults: (1) `getStaffSocket()`/`getVisitorSocket()` called

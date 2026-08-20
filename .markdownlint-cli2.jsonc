@@ -17,11 +17,16 @@
     "MD050": { "style": "asterisk" },
     "MD053": true,
   },
-  // These globs are matched against *file* paths, so a directory pattern has
-  // to end in `/**`. A bare trailing slash ("dist/", "**/test-results/")
-  // matches no file and therefore ignores nothing — every entry here used that
+  // These globs are matched against *file* paths, so a directory pattern has to
+  // end in `/**`. A bare trailing slash ("dist/", "**/test-results/") matches no
+  // file and therefore ignores nothing — every *directory* entry here used that
   // form and silently did nothing, which is why a failing e2e run still blocked
-  // the push exactly as the note below says it should not.
+  // the push exactly as the note below says it should not. (The two file entries
+  // at the end were always fine; a plain path needs no `/**`.)
+  //
+  // `shared/tests/gate-ignores.test.ts` pins this: it drops a non-compliant file
+  // into each directory below and fails if markdownlint reports it — and fails
+  // if it stops reporting an un-ignored one, so it cannot pass vacuously.
   "ignores": [
     "**/node_modules/**",
     "**/dist/**",

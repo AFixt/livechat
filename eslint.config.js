@@ -26,10 +26,11 @@ export default tseslint.config(
       'reports/**',
       '**/.vite/**',
       // Claude Code agent worktrees: full checkouts of this repo living inside
-      // it. Without this, `npm run lint` type-checks every file six times over
-      // and reports the same findings once per worktree, which made the
-      // pre-push gate unrunnable for anyone using them.
-      '**/.claude/**',
+      // it. Without this, `npm run lint` type-checks every file once per
+      // worktree and reports the same findings that many times over, which made
+      // the pre-push gate unrunnable for anyone using them. Pinned by
+      // `shared/tests/gate-ignores.test.ts`.
+      '.claude/**',
       // Standalone Node tooling scripts (siblings of the existing *.sh gates);
       // run directly with `node`, outside any tsconfig, so typed linting can't
       // resolve them.
