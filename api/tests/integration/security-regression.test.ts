@@ -203,12 +203,13 @@ describe('security regression: input validation + storage (integration)', () => 
       if (harness === null) return;
       const created = await request(harness.app)
         .post('/api/v1/visitor/session')
-        // country US → opt-out jurisdiction → the consent gate permits presence
+        // x-geo-country: US (trusted edge header) → opt-out jurisdiction → the consent gate permits presence
         // and a tracked `visitor_sessions` row is created (#53). The heartbeat
         // positive control below resolves the cookie to that row, so without a
         // geo hint the jurisdiction resolves to UNKNOWN, no row exists, and the
         // control 401s for a reason that has nothing to do with cookie forgery.
-        .send({ tenantKey: TENANT_SLUG, country: 'US' });
+        .set('x-geo-country', 'US')
+        .send({ tenantKey: TENANT_SLUG });
       expect(created.status).toBe(201);
       const rawCookie = visitorSetCookie(created)?.split(';')[0] ?? '';
       const value = rawCookie.replace('livechat_visitor=', '');

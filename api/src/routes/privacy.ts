@@ -13,6 +13,7 @@ import { parsedBody, validate } from '../middlewares/validate.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
 import { detectGpc, resolveSubject } from './consent-request.js';
+import { resolveGeo } from './geo-resolve.js';
 import { resolveActiveTenantId } from './tenant-resolve.js';
 
 import type { Env } from '../config/env.js';
@@ -61,8 +62,7 @@ async function recordBannerDecision(args: BannerDecisionArgs): Promise<Effective
   const { state } = await deps.consent.decideAndRecord({
     tenantId,
     subjectKey,
-    country: body.country ?? null,
-    region: body.region ?? null,
+    ...resolveGeo(deps.env, req),
     gpc: detectGpc(req, body.gpc),
     source: 'banner',
     ip: req.ip ?? null,
@@ -101,8 +101,7 @@ export function buildPrivacyRouter(deps: PrivacyRouterDeps): Router {
       const { subjectKey } = resolveSubject(deps, req, res);
       const state = await deps.consent.resolveState({
         subjectKey,
-        country: q.country ?? null,
-        region: q.region ?? null,
+        ...resolveGeo(deps.env, req),
         gpc: detectGpc(req, q.gpc),
       });
       res.json({ success: true, data: state });

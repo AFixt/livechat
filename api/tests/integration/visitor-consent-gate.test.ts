@@ -51,7 +51,8 @@ describe('visitor consent gate (integration)', () => {
 
     const res = await request(app)
       .post('/api/v1/visitor/session')
-      .send({ tenantKey: tenant.slug, country: 'DE', currentUrl: 'https://shop.example/p/1' });
+      .set('x-geo-country', 'DE')
+      .send({ tenantKey: tenant.slug, currentUrl: 'https://shop.example/p/1' });
     expect(res.status).toBe(201);
     expect(res.body.data.sessionId).toBeNull();
     expect(res.body.data.jurisdiction).toBe('EU');
@@ -70,20 +71,23 @@ describe('visitor consent gate (integration)', () => {
 
     const gated = await agent
       .post('/api/v1/visitor/session')
-      .send({ tenantKey: tenant.slug, country: 'DE' });
+      .set('x-geo-country', 'DE')
+      .send({ tenantKey: tenant.slug });
     expect(gated.body.data.sessionId).toBeNull();
     expect(await sessionCount(tenant.id)).toBe(0);
 
     // Visitor grants presence via the banner API (same cookie via the agent).
     const consent = await agent
       .post('/api/v1/privacy/consent')
-      .send({ tenantKey: tenant.slug, country: 'DE', purposes: { presence: 'granted' } });
+      .set('x-geo-country', 'DE')
+      .send({ tenantKey: tenant.slug, purposes: { presence: 'granted' } });
     expect(consent.body.data.purposes.presence).toBe('granted');
 
     // Re-running the gate now creates the tracked session.
     const tracked = await agent
       .post('/api/v1/visitor/session')
-      .send({ tenantKey: tenant.slug, country: 'DE' });
+      .set('x-geo-country', 'DE')
+      .send({ tenantKey: tenant.slug });
     expect(tracked.body.data.sessionId).not.toBeNull();
     expect(tracked.body.data.tracking.presence).toBe('granted');
     expect(await sessionCount(tenant.id)).toBe(1);
@@ -96,7 +100,8 @@ describe('visitor consent gate (integration)', () => {
 
     const res = await request(app)
       .post('/api/v1/visitor/session')
-      .send({ tenantKey: tenant.slug, country: 'US', currentUrl: 'https://us.example/home' });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug, currentUrl: 'https://us.example/home' });
     expect(res.status).toBe(201);
     expect(res.body.data.sessionId).not.toBeNull();
     expect(res.body.data.jurisdiction).toBe('US');
@@ -115,12 +120,14 @@ describe('visitor consent gate (integration)', () => {
 
     const opt = await agent
       .post('/api/v1/privacy/consent')
-      .send({ tenantKey: tenant.slug, country: 'US', purposes: { presence: 'denied' } });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug, purposes: { presence: 'denied' } });
     expect(opt.body.data.purposes.presence).toBe('denied');
 
     const res = await agent
       .post('/api/v1/visitor/session')
-      .send({ tenantKey: tenant.slug, country: 'US' });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug });
     expect(res.body.data.sessionId).toBeNull();
     expect(await sessionCount(tenant.id)).toBe(0);
   });
@@ -133,7 +140,8 @@ describe('visitor consent gate (integration)', () => {
 
     const gated = await agent
       .post('/api/v1/visitor/session')
-      .send({ tenantKey: tenant.slug, country: 'DE' });
+      .set('x-geo-country', 'DE')
+      .send({ tenantKey: tenant.slug });
     expect(gated.body.data.sessionId).toBeNull();
     expect(await sessionCount(tenant.id)).toBe(0);
 
@@ -160,7 +168,8 @@ describe('visitor consent gate (integration)', () => {
     // A US visitor is tracked by default (opt-out regime).
     const tracked = await agent
       .post('/api/v1/visitor/session')
-      .send({ tenantKey: tenant.slug, country: 'US', currentUrl: 'https://us.example/a' });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug, currentUrl: 'https://us.example/a' });
     expect(tracked.body.data.sessionId).not.toBeNull();
     expect(await sessionCount(tenant.id)).toBe(1);
 
@@ -169,7 +178,8 @@ describe('visitor consent gate (integration)', () => {
     // heartbeating) the visitor's IP/UA/current URL after they opted out.
     const withdrawn = await agent
       .post('/api/v1/privacy/consent/withdraw')
-      .send({ tenantKey: tenant.slug, country: 'US' });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug });
     expect(withdrawn.status).toBe(200);
     expect(withdrawn.body.data.purposes.presence).toBe('denied');
     expect(await sessionCount(tenant.id)).toBe(0);
@@ -177,7 +187,8 @@ describe('visitor consent gate (integration)', () => {
     // And a later page load must not silently resume tracking.
     const after = await agent
       .post('/api/v1/visitor/session')
-      .send({ tenantKey: tenant.slug, country: 'US', currentUrl: 'https://us.example/b' });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug, currentUrl: 'https://us.example/b' });
     expect(after.body.data.sessionId).toBeNull();
     expect(await sessionCount(tenant.id)).toBe(0);
   });
@@ -190,7 +201,8 @@ describe('visitor consent gate (integration)', () => {
 
     const first = await agent
       .post('/api/v1/visitor/session')
-      .send({ tenantKey: tenant.slug, country: 'US', currentUrl: 'https://us.example/1' });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug, currentUrl: 'https://us.example/1' });
     expect(first.status).toBe(201);
     const afterFirst = await ConsentRecord.count({ where: { tenantId: tenant.id } });
     expect(afterFirst).toBe(1);
@@ -201,7 +213,8 @@ describe('visitor consent gate (integration)', () => {
     for (const url of ['https://us.example/2', 'https://us.example/3']) {
       const again = await agent
         .post('/api/v1/visitor/session')
-        .send({ tenantKey: tenant.slug, country: 'US', currentUrl: url });
+        .set('x-geo-country', 'US')
+        .send({ tenantKey: tenant.slug, currentUrl: url });
       expect(again.status).toBe(201);
       expect(again.body.data.tracking.presence).toBe('granted');
     }
@@ -211,9 +224,40 @@ describe('visitor consent gate (integration)', () => {
     const gpc = await agent
       .post('/api/v1/visitor/session')
       .set('Sec-GPC', '1')
-      .send({ tenantKey: tenant.slug, country: 'US' });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug });
     expect(gpc.body.data.tracking.presence).toBe('denied');
     expect(await ConsentRecord.count({ where: { tenantId: tenant.id } })).toBe(afterFirst + 1);
+  });
+
+  test('a country in the request body cannot widen the jurisdiction', async () => {
+    if (harness === null) return;
+    const { app } = harness;
+    const tenant = await seedTenant(`spoof-${Math.random().toString(36).slice(2, 8)}`);
+
+    // The widget runs on the client's own site, so anything in the body is
+    // attacker- or misconfiguration-controlled. Claiming `US` must not turn an
+    // opt-in jurisdiction into an opt-out one: with no trusted edge header the
+    // visitor stays UNKNOWN, which denies presence.
+    const spoofed = await request(app)
+      .post('/api/v1/visitor/session')
+      .send({ tenantKey: tenant.slug, country: 'US', region: 'CA' });
+    expect(spoofed.status).toBe(201);
+    expect(spoofed.body.data.jurisdiction).toBe('UNKNOWN');
+    expect(spoofed.body.data.tracking.presence).toBe('denied');
+    expect(spoofed.body.data.sessionId).toBeNull();
+    expect(await sessionCount(tenant.id)).toBe(0);
+
+    // Control: the same value from the trusted edge header *is* honored, so
+    // this test fails if jurisdiction resolution stops working altogether
+    // rather than merely ignoring the body.
+    const trusted = await request(app)
+      .post('/api/v1/visitor/session')
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug });
+    expect(trusted.body.data.jurisdiction).toBe('US');
+    expect(trusted.body.data.tracking.presence).toBe('granted');
+    expect(trusted.body.data.sessionId).not.toBeNull();
   });
 
   test('the gate issues a CSRF token on every page load', async () => {
@@ -226,7 +270,8 @@ describe('visitor consent gate (integration)', () => {
     for (const country of ['DE', 'US']) {
       const res = await request(app)
         .post('/api/v1/visitor/session')
-        .send({ tenantKey: tenant.slug, country });
+        .set('x-geo-country', country)
+        .send({ tenantKey: tenant.slug });
       expect(res.status).toBe(201);
       expect(typeof res.body.data.csrfToken).toBe('string');
       expect((res.body.data.csrfToken as string).length).toBeGreaterThan(0);

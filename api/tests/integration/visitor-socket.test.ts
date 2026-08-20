@@ -64,9 +64,10 @@ async function loginAs(baseUrl: string, email: string, password: string): Promis
 
 /**
  * Init a *tracked* visitor session over HTTP and return the raw cookie value +
- * session id. Sends `country: 'US'` so the consent gate (opt-out jurisdiction,
- * no GPC) permits presence tracking and a `visitor_sessions` row is created —
- * the precondition for the presence/typing/page-change events under test.
+ * session id. Sends the trusted `x-geo-country: US` edge header so the consent
+ * gate resolves an opt-out jurisdiction and (with no GPC) permits presence
+ * tracking, creating the `visitor_sessions` row these presence/typing/
+ * page-change events depend on. Jurisdiction is never taken from the body.
  * @param baseUrl - Live harness base URL.
  * @param tenantSlug - Tenant to attach the session to.
  * @returns The raw `livechat_visitor` cookie value plus the session id.
@@ -77,7 +78,8 @@ async function initVisitor(
 ): Promise<{ cookie: string; sessionId: string; csrfToken: string }> {
   const res = await request(baseUrl)
     .post('/api/v1/visitor/session')
-    .send({ tenantKey: tenantSlug, country: 'US' });
+    .set('x-geo-country', 'US')
+    .send({ tenantKey: tenantSlug });
   expect(res.status).toBe(201);
   const setCookie = res.headers['set-cookie'] as string | string[] | undefined;
   const cookies: string[] = Array.isArray(setCookie)
@@ -346,13 +348,15 @@ describe('visitor namespace + visitor routes (integration)', () => {
     if (harness === null) return;
     const { baseUrl } = harness;
     await seedTenantAndStaff('optfields', 'staff@optfields.example');
-    const res = await request(baseUrl).post('/api/v1/visitor/session').send({
-      tenantKey: 'optfields',
-      country: 'US',
-      language: 'en-US',
-      currentUrl: 'https://example.com/landing',
-      referrer: 'https://google.com/search',
-    });
+    const res = await request(baseUrl)
+      .post('/api/v1/visitor/session')
+      .set('x-geo-country', 'US')
+      .send({
+        tenantKey: 'optfields',
+        language: 'en-US',
+        currentUrl: 'https://example.com/landing',
+        referrer: 'https://google.com/search',
+      });
     expect(res.status).toBe(201);
 
     const { VisitorSession } = await import('../../src/models/index.js');

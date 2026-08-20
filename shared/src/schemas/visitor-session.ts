@@ -36,10 +36,12 @@ export type VisitorSessionSafe = z.infer<typeof visitorSessionSafeSchema>;
 /**
  * Input schema for `POST /visitor/session` — widget init call.
  *
- * `country`/`region` are optional geo hints and `gpc` is the widget's
- * `navigator.globalPrivacyControl` reading; all three feed the consent gate,
- * which decides whether a tracked session (with the ambient fields below) is
- * created at all.
+ * `gpc` is the widget's `navigator.globalPrivacyControl` reading, which feeds
+ * the consent gate. There is deliberately no `country`/`region` here:
+ * jurisdiction decides whether tracking is opt-in or opt-out, so it is resolved
+ * server-side from a trusted edge header (`GEO_COUNTRY_HEADER`), never from a
+ * body the embedding page controls. A client signal that can only *deny*
+ * tracking (GPC) is safe to accept; one that could *grant* it is not.
  */
 export const initVisitorSessionInputSchema = z.object({
   tenantKey: z.string().min(1).max(255),
@@ -47,12 +49,6 @@ export const initVisitorSessionInputSchema = z.object({
   currentUrl: z.string().max(2048).optional(),
   referrer: z.string().max(2048).optional(),
   language: z.string().max(16).optional(),
-  country: z
-    .string()
-    .length(2)
-    .regex(/^[A-Za-z]{2}$/)
-    .optional(),
-  region: z.string().max(8).optional(),
   gpc: z.boolean().optional(),
 });
 /**

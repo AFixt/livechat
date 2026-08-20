@@ -90,13 +90,14 @@ async function seedGlobalStaff(email: string): Promise<{ userId: string }> {
  * @returns The connected visitor socket.
  */
 async function connectVisitor(baseUrl: string, tenantKey: string): Promise<Socket> {
-  // country US -> opt-out jurisdiction, so the consent gate creates a tracked
+  // x-geo-country: US (trusted edge header) -> opt-out jurisdiction, so the consent gate creates a tracked
   // session. The visitor socket handshake resolves a real session from the
   // cookie, so a gated (untracked) visitor has no socket to connect — these
   // tests model an engaged, tracked visitor.
   const initRes = await request(baseUrl)
     .post('/api/v1/visitor/session')
-    .send({ tenantKey, country: 'US' });
+    .set('x-geo-country', 'US')
+    .send({ tenantKey });
   expect(initRes.status).toBe(201);
   const setCookie = initRes.headers['set-cookie'] as string[] | string | undefined;
   const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
@@ -265,7 +266,8 @@ describe('staff availability (integration)', () => {
     // A visitor session joins the tenant's visitor room on connect.
     const initRes = await request(baseUrl)
       .post('/api/v1/visitor/session')
-      .send({ tenantKey: 'avail-bridge', country: 'US' });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: 'avail-bridge' });
     expect(initRes.status).toBe(201);
     const setCookie = initRes.headers['set-cookie'] as string[] | string | undefined;
     const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
