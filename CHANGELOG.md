@@ -10,6 +10,26 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 ## [Unreleased]
 
 ### Security
+
+- **The ui and widget images are scanned for vulnerabilities for the first
+  time.** `trivy image` builds api → ui → widget, and the ui build had never
+  succeeded: it installs workspace devDependencies (the Vite build needs
+  `vite`/`typescript`), which include private `@afixt/*` packages, and the job
+  had no registry auth — so `npm ci` 404'd. Worse, `scripts/trivy-image.sh`
+  runs under `set -euo pipefail` with an unguarded `docker build`, so that one
+  failure aborted the script and denied **widget** a scan too. The lockfile
+  carries seven private `@afixt/*` packages, several transitive
+  (`@afixt/a11y-assert` is a direct ui devDependency and pulls
+  `@afixt/test-utils`), so keeping them out of the build was not an option —
+  the build genuinely needs credentials. The npmrc is now mounted into the ui
+  and widget builds as a **BuildKit secret**, never a build arg, so the token
+  cannot persist in an image layer or in `docker history`; `required=false`
+  keeps the builds usable without one. The script no longer lets one
+  unbuildable image suppress the others: each failure is recorded, the run
+  continues, and the images that went unscanned are named explicitly at the end
+  so a red run can never be mistaken for a clean one. ([#130])
+
+### Security
 - **The api image no longer ships a package manager, clearing a CRITICAL CVE.**
   `trivy image` was failing the gate on `CVE-2026-59873` (node-tar DoS via a
   crafted gzip bomb) plus seven HIGHs in `brace-expansion`, `ip-address`,
@@ -435,6 +455,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   payload slice body-parser puts in `err.message` is never echoed).
 
 [#57]: https://github.com/AFixt/livechat/issues/57
+[#130]: https://github.com/AFixt/livechat/issues/130
 [#132]: https://github.com/AFixt/livechat/issues/132
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68

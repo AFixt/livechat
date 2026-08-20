@@ -1,10 +1,21 @@
+# syntax=docker/dockerfile:1
 FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
 COPY widget/package.json widget/
 COPY shared/package.json shared/
-RUN npm ci --workspaces --include-workspace-root --engine-strict=false
+# The workspace devDependencies this build needs (vite, typescript) sit
+# alongside private `@afixt/*` packages — `@afixt/a11y-assert` is a direct
+# devDependency of the ui workspace, and it pulls `@afixt/test-utils` — so
+# `npm ci` has to authenticate (#130). The token is mounted as a BuildKit
+# secret rather than passed as a build arg, so it never lands in a layer or in
+# `docker history`. `required=false` keeps the build usable without one: it
+# then fails on the 404 exactly as before rather than erroring on a missing
+# secret. scripts/trivy-image.sh passes --secret; see also the trivy-image job
+# in .github/workflows/container-iac-scan.yml.
+RUN --mount=type=secret,id=npmrc,target=/root/.npmrc,required=false \
+    npm ci --workspaces --include-workspace-root --engine-strict=false
 
 COPY tsconfig.base.json ./
 COPY shared ./shared
