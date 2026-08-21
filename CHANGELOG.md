@@ -31,6 +31,24 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   HIGH or CRITICAL findings at all. ([#132])
 
 ### Fixed
+- **Availability live-push now reaches visitors on every node, not just the one
+  the agent happens to be connected to.** `broadcastGlobalStaffAvailability`
+  (#101) bounded its fan-out to tenants with a connected visitor by reading the
+  `/visitor` namespace's `tenant:{id}` room membership. `adapter.rooms` only
+  ever describes the **local** node, so once #73's Redis adapter spread visitors
+  across processes, a tenant whose visitors were all on other nodes was never
+  enumerated and never received the push — it silently fell back to picking the
+  change up on the next `/widget/config` fetch. The tenant set now comes from
+  Redis-backed presence instead: `markVisitorPresent` maintains a
+  `presence:visitor-tenants` index, and `presence.tenantsWithVisitors()` reads
+  it, pruning members whose presence hash has expired so the set cannot
+  accumulate tenants nobody is watching and widen the fan-out it exists to
+  bound. Both narrowings are kept, so a toggle that changes nothing observable
+  still emits nothing. Proved with two presence services on separate Redis
+  connections standing in for two nodes — and the same test demonstrates the old
+  source failing, with a room joined on one Socket.IO server invisible to the
+  other. ([#125])
+### Fixed
 - **The local quality gate can be run again.** `npm run check:all` — the
   pre-push gate — failed for reasons unrelated to any code under review, so
   changes were going out under `--no-verify` with CI as the only check. Two
@@ -435,6 +453,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   payload slice body-parser puts in `err.message` is never echoed).
 
 [#57]: https://github.com/AFixt/livechat/issues/57
+[#125]: https://github.com/AFixt/livechat/issues/125
 [#132]: https://github.com/AFixt/livechat/issues/132
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68
