@@ -14,6 +14,7 @@ import { Tenant } from '../models/index.js';
 import { parseSupportHours } from '../services/support-hours.js';
 import { ApiError } from '../utils/api-error.js';
 import { asyncHandler } from '../utils/async-handler.js';
+import { resolveRequestGeo } from '../utils/geo-headers.js';
 
 import { VISITOR_COOKIE_NAME, visitorCookieOptions } from './visitor-cookie-options.js';
 
@@ -73,6 +74,12 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
       if (body.currentUrl !== undefined) initArgs.currentUrl = body.currentUrl;
       if (body.referrer !== undefined) initArgs.referrer = body.referrer;
       if (body.identityToken !== undefined) initArgs.identityToken = body.identityToken;
+      // Edge-supplied country, when the deployment trusts one (#120). Null
+      // otherwise, which is what the row already stored.
+      initArgs.country = resolveRequestGeo(req, {
+        countryHeader: deps.env.GEO_COUNTRY_HEADER,
+        regionHeader: deps.env.GEO_REGION_HEADER,
+      }).country;
 
       const { session, cookieValue } = await deps.visitorSession.init(initArgs);
       res.cookie(VISITOR_COOKIE_NAME, cookieValue, visitorCookieOptions(deps.env));

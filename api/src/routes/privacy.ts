@@ -13,6 +13,7 @@ import { parsedBody, validate } from '../middlewares/validate.js';
 import { Tenant } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
 import { asyncHandler } from '../utils/async-handler.js';
+import { resolveRequestGeo } from '../utils/geo-headers.js';
 
 import { VISITOR_COOKIE_NAME, visitorCookieOptions } from './visitor-cookie-options.js';
 
@@ -49,6 +50,34 @@ async function resolveTenantId(tenantKey: string): Promise<string> {
  */
 function detectGpc(req: Request, clientFlag: boolean | undefined): boolean {
   return req.header('sec-gpc') === '1' || clientFlag === true;
+}
+
+/**
+ * Resolve the jurisdiction inputs for a request, preferring the edge-supplied
+ * location over the widget's own hint (#120).
+ *
+ * Order matters and is not arbitrary. The client hint is a convenience for
+ * deployments with no geo header configured; where the edge does supply one it
+ * must win, because a visitor who can choose their own country can choose the
+ * laxest regime — sending `US` from the EU turns opt-in into opt-out. Trusting
+ * the client only where nothing better exists keeps that from being a downgrade
+ * path wherever geo is actually wired.
+ * @param deps - Router deps (for the configured header names).
+ * @param req - The incoming request.
+ * @param hint - Client-supplied country/region, if any.
+ * @returns The country and region to hand the policy engine.
+ */
+function resolveJurisdictionInputs(
+  deps: PrivacyRouterDeps,
+  req: Request,
+  hint: { country?: string | undefined; region?: string | undefined },
+): { country: string | null; region: string | null } {
+  const edge = resolveRequestGeo(req, {
+    countryHeader: deps.env.GEO_COUNTRY_HEADER,
+    regionHeader: deps.env.GEO_REGION_HEADER,
+  });
+  if (edge.country !== null) return edge;
+  return { country: hint.country ?? null, region: hint.region ?? null };
 }
 
 /**
@@ -103,11 +132,12 @@ async function recordBannerDecision(args: BannerDecisionArgs): Promise<Effective
   const { deps, req, res, body, explicitConsent, legalBasisOverride } = args;
   const tenantId = await resolveTenantId(body.tenantKey);
   const subjectKey = resolveSubject(deps, req, res);
+  const geo = resolveJurisdictionInputs(deps, req, body);
   const { state } = await deps.consent.decideAndRecord({
     tenantId,
     subjectKey,
-    country: body.country ?? null,
-    region: body.region ?? null,
+    country: geo.country,
+    region: geo.region,
     gpc: detectGpc(req, body.gpc),
     source: 'banner',
     ip: req.ip ?? null,
@@ -136,10 +166,11 @@ export function buildPrivacyRouter(deps: PrivacyRouterDeps): Router {
       // consent record. It may still set a fresh subject cookie when the request
       // carries none — session establishment, not tracking. See ADR-0019.
       const subjectKey = resolveSubject(deps, req, res);
+      const geo = resolveJurisdictionInputs(deps, req, q);
       const state = await deps.consent.resolveState({
         subjectKey,
-        country: q.country ?? null,
-        region: q.region ?? null,
+        country: geo.country,
+        region: geo.region,
         gpc: detectGpc(req, q.gpc),
       });
       res.json({ success: true, data: state });
@@ -153,7 +184,8 @@ export function buildPrivacyRouter(deps: PrivacyRouterDeps): Router {
       const body = parsedBody(req, recordConsentInputSchema);
       const explicitConsent: ExplicitConsent = {};
       if (body.purposes.presence !== undefined) explicitConsent.presence = body.purposes.presence;
-      if (body.purposes.analytics !== undefined) explicitConsent.analytics = body.purposes.analytics;
+      if (body.purposes.analytics !== undefined)
+        explicitConsent.analytics = body.purposes.analytics;
       const state = await recordBannerDecision({ deps, req, res, body, explicitConsent });
       res.status(201).json({ success: true, data: state });
     }),

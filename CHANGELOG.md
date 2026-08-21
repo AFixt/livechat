@@ -30,6 +30,26 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   image, and `trivy image --severity CRITICAL --exit-code 1` now exits 0 with no
   HIGH or CRITICAL findings at all. ([#132])
 
+### Added
+- **Consent jurisdiction now resolves from real geolocation instead of always
+  being `UNKNOWN`.** #56 built the jurisdiction engine, but nothing supplied a
+  country — `coarsenGeo` was called with a hardcoded `null` — so live traffic
+  fell through to `UNKNOWN`, which fail-safes to strict opt-in. Safe, but it
+  meant US opt-out visitors were treated as EU opt-in. The API now reads a
+  coarse country (and region, for US-CA) from an edge-supplied header and feeds
+  it to the policy engine and the visitor session row.
+  **The headers are opt-in by configuration and default to none.** A request
+  header is attacker-supplied unless a trusted proxy overwrites it, and the
+  failure mode is not theoretical: a visitor in the EU could send
+  `CF-IPCountry: US` and spoof their way *out* of the opt-in regime the engine
+  exists to apply. So only the header named in `GEO_COUNTRY_HEADER` /
+  `GEO_REGION_HEADER` is read, naming one asserts the edge sets it and strips
+  any client copy, and with nothing configured the behaviour is exactly as
+  before — `UNKNOWN`, strict. Where an edge header is configured it takes
+  precedence over the widget's own `country` hint for the same reason; the hint
+  remains a fallback only where no header is set. Values are validated as ISO
+  3166-1 alpha-2 and Cloudflare's `XX`/`T1` sentinels are treated as unknown.
+  Country-level only, per #57's minimization rules. ([#120])
 ### Fixed
 - **The local quality gate can be run again.** `npm run check:all` — the
   pre-push gate — failed for reasons unrelated to any code under review, so
@@ -435,6 +455,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   payload slice body-parser puts in `err.message` is never echoed).
 
 [#57]: https://github.com/AFixt/livechat/issues/57
+[#120]: https://github.com/AFixt/livechat/issues/120
 [#132]: https://github.com/AFixt/livechat/issues/132
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68

@@ -63,6 +63,14 @@ const envSpec = {
   // the cookie `maxAge` is only a client-side hint. Absolute: hard cap from
   // first contact. Idle: max gap since the last request/heartbeat. Defaults:
   // 30 days absolute, 3 days idle.
+  // Edge-supplied geolocation (#120). Empty by default and deliberately so:
+  // a request header is attacker-supplied unless a trusted proxy overwrites it,
+  // and a spoofed country would let a visitor downgrade themselves out of an
+  // opt-in regime. Naming a header asserts that the edge sets it and strips any
+  // client copy. Unset => jurisdiction resolves UNKNOWN => strict opt-in.
+  // Examples: `CF-IPCountry` (Cloudflare), `X-Vercel-IP-Country` (Vercel).
+  GEO_COUNTRY_HEADER: str({ default: '' }),
+  GEO_REGION_HEADER: str({ default: '' }),
   VISITOR_SESSION_ABSOLUTE_TTL_HOURS: positiveHours({ default: 720 }),
   VISITOR_SESSION_IDLE_TTL_HOURS: positiveHours({ default: 72 }),
 

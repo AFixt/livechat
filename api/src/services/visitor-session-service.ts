@@ -25,6 +25,13 @@ interface InitParams {
   currentUrl?: string;
   referrer?: string;
   /**
+   * Coarse ISO 3166-1 alpha-2 country from the edge, when the deployment has a
+   * trusted geo header configured (#120). Already country-level, so it passes
+   * through `coarsenGeo` unchanged; the minimization rules in #57 are what stop
+   * anything finer ever being persisted.
+   */
+  country?: string | null;
+  /**
    * Raw HS256 JWT minted by the client's backend with the tenant's
    * `embed_secret`. When present and valid, the decoded `sub` claim is
    * stored on the visitor session so staff can correlate the chat with
@@ -121,7 +128,7 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
       // IPv4 octet / last 80 IPv6 bits zeroed) and geolocation is coarsened to
       // country level before it is ever persisted. See pii-minimize.ts and
       // docs/adr/0020-geo-retention-minimization.md.
-      const geo = coarsenGeo({ country: null, city: null });
+      const geo = coarsenGeo({ country: params.country ?? null, city: null });
       const session = await VisitorSession.create({
         tenantId: tenant.id,
         sessionCookieHash: hash,
