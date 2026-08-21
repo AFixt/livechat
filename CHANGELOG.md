@@ -30,6 +30,26 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   image, and `trivy image --severity CRITICAL --exit-code 1` now exits 0 with no
   HIGH or CRITICAL findings at all. ([#132])
 
+### Added
+- **Staff can end a visitor's session from the console.** #79 (PR #94) delivered
+  server-side expiry and a visitor-initiated "forget me", but deferred the
+  issue's "at minimum, staff can end a session" clause, so an operator had no
+  way to revoke a specific visitor. `DELETE /api/v1/visitor-sessions/:id` now
+  does it, staff-authenticated and tenant-scoped — a tenanted operator is
+  confined to their own tenant, an untenanted AFixt operator spans all of them
+  (#19). It reuses #94's rejection path rather than adding a new one: the row is
+  hard-deleted, and because both the HTTP `/visitor/*` routes and the `/visitor`
+  socket handshake resolve through `findByCookie`, a missing row already 401s.
+  Any live socket is disconnected through the adapter so it reaches other nodes
+  (#73), presence is cleared so the console list drops the visitor, and the
+  action is audited. Deliberately skips the expiry gate — an already-expired
+  session must stay revocable, since the row and its PII outlive the window in
+  which the cookie works. In the console each visitor row now carries two
+  **sibling** controls (MUI `ListItem` + `secondaryAction`) rather than a button
+  nested inside a button, which would be invalid and unreachable by keyboard;
+  each is named for the visitor it acts on, and the outcome is announced in a
+  named live region, because a row silently vanishing is not perceivable to
+  someone focused on it. ([#123])
 ### Fixed
 - **The local quality gate can be run again.** `npm run check:all` — the
   pre-push gate — failed for reasons unrelated to any code under review, so
@@ -435,6 +455,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   payload slice body-parser puts in `err.message` is never echoed).
 
 [#57]: https://github.com/AFixt/livechat/issues/57
+[#123]: https://github.com/AFixt/livechat/issues/123
 [#132]: https://github.com/AFixt/livechat/issues/132
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68

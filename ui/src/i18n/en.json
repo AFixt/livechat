@@ -39,7 +39,12 @@
       "heading": "Visitors on site",
       "empty": "No visitors are currently on the site.",
       "page": "Current page",
-      "startChat": "Start a chat with visitor {{id}}"
+      "startChat": "Start a chat with visitor {{id}}",
+      "revoke": "End session",
+      "revokeLabel": "End the session for visitor {{id}}",
+      "revoked": "Session ended for visitor {{id}}",
+      "revokeFailed": "Could not end the session for visitor {{id}}",
+      "statusRegion": "Visitor session updates"
     },
     "chats": {
       "heading": "Your chats",
