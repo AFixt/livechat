@@ -18,8 +18,8 @@ const chatId = z.object({ id: z.uuid() });
  * cannot reach another tenant's chat by id (#72, #43).
  */
 const tenantScopedNote =
-  'Tenant-scoped: a chat belonging to another tenant is indistinguishable from ' +
-  'one that does not exist (404, never 403).';
+  'Tenant-scoped: a chat belonging to another tenant is refused with 403. An ' +
+  'untenanted AFixt operator spans every tenant (#19).';
 
 openApiRegistry.registerPath({
   method: 'get',

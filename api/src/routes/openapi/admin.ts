@@ -17,8 +17,10 @@ const byId = z.object({ id: z.uuid() });
 
 /**
  * Every operation here sits behind `authenticate` + `requireRole('super_admin',
- * 'admin')`. A tenant-scoped admin sees only their own tenant, so 404 rather
- * than 403 is the answer for anything outside their scope (#43).
+ * 'admin')`. A tenant-scoped admin sees only their own tenant; reaching outside
+ * that scope is refused with 403 (`assertTenantAccess`), and collection
+ * endpoints are pinned to the caller's tenant so omitting a filter can never
+ * widen the result set (#43).
  */
 const adminNote = 'Admin only. A tenant-scoped admin sees only their own tenant’s records.';
 const superAdminNote = 'Restricted further to `super_admin`.';
