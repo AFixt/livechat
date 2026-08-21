@@ -48,7 +48,7 @@ don't fail), or `FAIL`. The defaults are strict; the current set is:
 | Incomplete/No Cache-control      | 10015 | IGNORE | API JSON is non-cacheable by default; the static hosts set `Cache-Control` explicitly.                    |
 | Timestamp Disclosure             | 10096 | IGNORE | `created_at`/`expires_at`/numeric ids are intended API data, not secrets.                                 |
 | Suspicious Comments              | 10027 | IGNORE | Heuristic hits on minified bundles; no secrets ship in client JS (enforced by trufflehog + `no-secrets`). |
-| Site Isolation vs Spectre (COEP) | 90004 | WARN   | COEP is intentionally unset so the widget stays cross-origin embeddable (ADR-0011).                       |
+| Site Isolation vs Spectre (COEP) | 90004 | WARN   | Console sets `require-corp`; the widget must stay embeddable; the API has no browsing context (ADR-0012). |
 | Permissions-Policy Not Set       | 10063 | WARN   | API responses have no browsing context; the console sets `Permissions-Policy`.                            |
 
 When a genuinely new header or configuration lands, remove the corresponding
@@ -57,7 +57,21 @@ line only with a one-line justification, the same as the entries above.
 
 ## Relationship to the static-host header work
 
-Issue #61 (ADR-0011) added CSP/COOP/CORP/HSTS to the console and widget nginx
+Issue #61 (ADR-0012) added CSP/COOP/CORP/HSTS to the console and widget nginx
 hosts and a config-lint (`npm run security:headers`) that checks the header
 _declarations_. ZAP is the complementary runtime check: it confirms the headers
-actually reach the browser on a live deployment, where the config-lint cannot.
+actually reach the browser, where the config-lint cannot.
+
+For that complement to mean anything, ZAP has to scan the artifact that ships.
+The `zap-pr` job originally served `ui/dist` with `npx http-server`, which sets
+none of those headers — so ZAP dutifully reported every one of them missing, on
+every pull request, and the job failed on the difference between the harness and
+production rather than on anything wrong with the change (#131). It now serves
+the bundle through `ui/nginx.conf` in the same `nginx:1.27-alpine` base the
+`ui/Dockerfile` runtime stage uses, so a header finding means a header is
+genuinely absent.
+
+Plain nginx rather than building `ui/Dockerfile`: that build installs workspace
+devDependencies and therefore needs private-registry credentials (#130), which a
+header scan has no reason to require. The runtime stage is this base image plus
+`ui/nginx.conf` and `ui/dist`, so mounting those two is the same surface.

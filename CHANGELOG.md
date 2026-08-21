@@ -31,6 +31,41 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   HIGH or CRITICAL findings at all. ([#132])
 
 ### Fixed
+- **`zap-pr` is a working gate again instead of a permanently-red one.** It had
+  failed on every pull request and on `develop`, while the scan itself found
+  nothing at FAIL level (`FAIL-NEW: 0`, `WARN-NEW: 9`). Two causes. First, it
+  served `ui/dist` with `npx http-server` — but the console ships on nginx, and
+  `ui/nginx.conf` sets CSP, `X-Frame-Options`, `nosniff`, `Permissions-Policy`
+  and `Cache-Control` explicitly, so five of the nine findings existed only
+  because the scan target was a bare static file server. It now serves the
+  bundle through the shipped `ui/nginx.conf` on the same `nginx:1.27-alpine`
+  base the `ui/Dockerfile` runtime stage uses (plain nginx rather than the image
+  build, which needs private-registry credentials a header scan has no reason to
+  require — #130). Second, `fail_action: true` alone fails on *any* alert,
+  collapsing WARN into FAIL and defeating the three-tier model `rules.tsv`
+  documents; `-I` is now passed so a WARN warns and a FAIL still fails. The cost
+  of the old behaviour was not the red check but the blindness: with the job
+  always failing, nobody could tell "the usual nine" from "ten, and the new one
+  is real". Also tuned with reasons: `90005` (Sec-Fetch-Dest) is a *request*
+  header no server can set, now IGNORE; `10049` (cacheable static assets) is the
+  intent, now WARN. ([#131])
+
+### Security
+- **The console is now cross-origin isolated.** ZAP rule 90004 was carried as a
+  WARN reading "COEP intentionally unset so the widget stays cross-origin
+  embeddable" — true of the widget, and never examined for the console. Split:
+  `ui/nginx.conf` sets `Cross-Origin-Embedder-Policy: require-corp`, which costs
+  nothing there because its CSP is `default-src 'self'` and it loads no
+  cross-origin subresources; `widget/nginx.conf` deliberately does not, because
+  the widget is loaded *into* customer pages where COEP would govern the host
+  page rather than protect the widget and `Cross-Origin-Resource-Policy:
+  cross-origin` is the header that matters. Verified in a browser against the
+  shipped config — `window.crossOriginIsolated === true`, the app mounts, no
+  console errors. `scripts/check-headers.mjs` now requires COEP on the console
+  and forbids it on the widget, so neither half can be silently undone.
+  Recorded in ADR-0012, which also picks up the stale `ADR-0011` references
+  in `rules.tsv` and `docs/security/zap.md`. ([#131])
+### Fixed
 - **The local quality gate can be run again.** `npm run check:all` — the
   pre-push gate — failed for reasons unrelated to any code under review, so
   changes were going out under `--no-verify` with CI as the only check. Two
@@ -435,6 +470,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   payload slice body-parser puts in `err.message` is never echoed).
 
 [#57]: https://github.com/AFixt/livechat/issues/57
+[#131]: https://github.com/AFixt/livechat/issues/131
 [#132]: https://github.com/AFixt/livechat/issues/132
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68

@@ -32,13 +32,36 @@
 # Downgrades (WARN) — worth seeing, but must not fail the baseline yet.
 # ---------------------------------------------------------------------------
 #
+# 90005 — Sec-Fetch-Dest Header is Missing.
+# Sec-Fetch-* are REQUEST headers the browser sends; a server cannot set them,
+# so there is nothing here to fix. An artifact of the alpha passive rules
+# (`-a`), which are kept for their genuine coverage. (#131)
+90005	IGNORE	Sec-Fetch-* are request headers the browser sends; not server-controllable
+#
+# ---------------------------------------------------------------------------
+# Downgrades (WARN) — worth seeing, but must not fail the baseline yet.
+# ---------------------------------------------------------------------------
+#
 # 90004 — Insufficient Site Isolation Against Spectre.
-# Cross-Origin-Embedder-Policy is intentionally NOT set: the widget must remain
-# cross-origin embeddable (ADR-0011). COOP + CORP are set where appropriate.
-# Track as WARN rather than fail.
-90004	WARN	COEP intentionally unset so the widget stays cross-origin embeddable (ADR-0011)
+# The CONSOLE now sets Cross-Origin-Embedder-Policy: require-corp alongside its
+# COOP + CORP, so it is fully cross-origin isolated (ADR-0012, #131). It loads
+# no cross-origin subresources — its CSP is `default-src 'self'` — so require-corp
+# costs nothing there; verified in a browser (`window.crossOriginIsolated === true`,
+# console renders clean).
+# The WIDGET deliberately does NOT set it: it is loaded as a subresource *into*
+# customer pages, where CORP (`cross-origin`) is the header that matters and
+# COEP would constrain the host page rather than protect the widget.
+# Kept at WARN so the API — JSON, no browsing context, no COEP — does not fail
+# the gate over a header that means nothing there.
+90004	WARN	Console sets COEP (ADR-0012); widget must stay embeddable; API has no browsing context
 #
 # 10063 — Permissions Policy Header Not Set.
 # The console sets Permissions-Policy; the API (JSON, no browsing context) does
 # not need one. WARN so a genuinely missing header on the console still surfaces.
 10063	WARN	API responses have no browsing context; console sets Permissions-Policy
+#
+# 10049 — Storable and Cacheable Content.
+# The console's static assets are deliberately cacheable (`public, immutable`
+# for hashed bundles; `no-store` for index.html). Being cacheable is the intent,
+# not a defect. WARN keeps it visible without failing.
+10049	WARN	Hashed static assets are intentionally cacheable; index.html is no-store
