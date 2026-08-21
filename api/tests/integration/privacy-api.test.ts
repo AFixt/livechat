@@ -51,9 +51,7 @@ describe('privacy API (integration)', () => {
     const { app } = harness;
     const tenant = await seedTenant(`read-${Math.random().toString(36).slice(2, 8)}`);
 
-    const res = await request(app)
-      .get('/api/v1/privacy/consent')
-      .query({ tenantKey: tenant.slug });
+    const res = await request(app).get('/api/v1/privacy/consent').query({ tenantKey: tenant.slug });
     expect(res.status).toBe(200);
     expect(res.body.data.jurisdiction).toBe('UNKNOWN');
     expect(res.body.data.purposes.functional).toBe('granted');
@@ -185,7 +183,7 @@ describe('privacy API (integration)', () => {
     expect(res.body.data.purposes.analytics).toBe('denied');
   });
 
-  test('POST /privacy/data-request queues an audited stub', async () => {
+  test('POST /privacy/data-request fulfils and audits the request', async () => {
     if (harness === null) return;
     const { app } = harness;
     const tenant = await seedTenant(`dsr-${Math.random().toString(36).slice(2, 8)}`);
@@ -193,8 +191,10 @@ describe('privacy API (integration)', () => {
     const res = await request(app)
       .post('/api/v1/privacy/data-request')
       .send({ tenantKey: tenant.slug, type: 'delete' });
-    expect(res.status).toBe(202);
-    expect(res.body.data.status).toBe('queued');
+    // 200 rather than the former 202: the request is fulfilled inline now
+    // (#121), so nothing is left outstanding to accept.
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('completed');
     expect(typeof res.body.data.requestId).toBe('string');
 
     const row = await AuditLog.findOne({

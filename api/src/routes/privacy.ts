@@ -153,7 +153,8 @@ export function buildPrivacyRouter(deps: PrivacyRouterDeps): Router {
       const body = parsedBody(req, recordConsentInputSchema);
       const explicitConsent: ExplicitConsent = {};
       if (body.purposes.presence !== undefined) explicitConsent.presence = body.purposes.presence;
-      if (body.purposes.analytics !== undefined) explicitConsent.analytics = body.purposes.analytics;
+      if (body.purposes.analytics !== undefined)
+        explicitConsent.analytics = body.purposes.analytics;
       const state = await recordBannerDecision({ deps, req, res, body, explicitConsent });
       res.status(201).json({ success: true, data: state });
     }),
@@ -183,12 +184,15 @@ export function buildPrivacyRouter(deps: PrivacyRouterDeps): Router {
       const body = parsedBody(req, dataSubjectRequestInputSchema);
       const tenantId = await resolveTenantId(body.tenantKey);
       const subjectKey = resolveSubject(deps, req, res);
-      const result = await deps.consent.queueDataRequest({
+      const result = await deps.consent.fulfilDataRequest({
         tenantId,
         subjectKey,
         type: body.type,
+        strategy: deps.env.VISITOR_DATA_RETENTION_STRATEGY,
       });
-      res.status(202).json({ success: true, data: result });
+      // 200, not 202: the request is fulfilled by the time this returns, so
+      // "accepted for processing" would overstate what is still outstanding.
+      res.json({ success: true, data: result });
     }),
   );
 
