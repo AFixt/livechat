@@ -7,6 +7,27 @@ interface JsonEnvelope<T> {
 }
 
 /**
+ * A non-2xx API response. Carries the status so callers can tell a recoverable
+ * "no session yet" (401) apart from a real failure, rather than string-matching
+ * the message (#129).
+ */
+export class ApiRequestError extends Error {
+  /** HTTP status of the failed response. */
+  readonly status: number;
+
+  /**
+   * Build a request error for a non-2xx response.
+   * @param status - HTTP status of the failed response.
+   * @param message - Server-supplied message, or a generated fallback.
+   */
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+  }
+}
+
+/**
  * CSRF token for cookie-authenticated writes (#77). Held in memory only —
  * never a cookie — so a cross-site attacker carrying the ambient visitor
  * cookie cannot read or forge it. Seeded from the bootstrap responses.
@@ -47,7 +68,10 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   });
   const body = (await res.json().catch(() => ({}))) as JsonEnvelope<T>;
   if (!res.ok) {
-    throw new Error(body.message ?? `Request failed: ${res.status.toString()}`);
+    throw new ApiRequestError(
+      res.status,
+      body.message ?? `Request failed: ${res.status.toString()}`,
+    );
   }
   return body;
 }
@@ -137,6 +161,42 @@ export async function initiateChat(
   return body.data;
 }
 
+/**
+ * Start a chat, establishing the visitor session first if the widget's own
+ * bootstrap has not finished yet (#129).
+ *
+ * The widget renders its start-chat form immediately, but a session only exists
+ * after several sequential round-trips. A visitor on a slow link — or one whose
+ * stored session has been expired or revoked server-side (#79) — could
+ * otherwise submit into a `401` and land on an error with their typed message
+ * still in the form and no explanation. So: make sure a session exists, and if
+ * the write is still rejected for want of one, mint a fresh session and retry
+ * exactly once. A second `401` is a real failure and propagates.
+ * @param tenantKey - Tenant slug from `data-tenant-key`.
+ * @param customerName - Name entered by the visitor.
+ * @param firstMessage - Initial message text.
+ * @param customerEmail - Optional email for transcript / fallback.
+ * @returns The new chat + first message + support availability.
+ */
+export async function startChat(
+  tenantKey: string,
+  customerName: string,
+  firstMessage: string,
+  customerEmail?: string,
+): Promise<InitiatedChat> {
+  await bootstrapVisitorSession(tenantKey);
+  try {
+    return await initiateChat(customerName, firstMessage, customerEmail);
+  } catch (err) {
+    if (!(err instanceof ApiRequestError) || err.status !== 401) throw err;
+    // The session we thought we had is gone (expired, revoked, or never
+    // finished being set). Mint a new one and retry — the visitor's typed
+    // input is still in hand, so this is invisible to them.
+    await initVisitorSession(tenantKey);
+    return initiateChat(customerName, firstMessage, customerEmail);
+  }
+}
+
 interface CurrentChatMessage {
   id: string;
   body: string;
@@ -160,4 +220,43 @@ export async function fetchCurrentChat(): Promise<CurrentChat> {
   const body = await apiFetch<CurrentChat>('/visitor/chats/current', { method: 'GET' });
   if (body.data?.csrfToken !== undefined) setCsrfToken(body.data.csrfToken);
   return body.data ?? { chat: null, messages: [] };
+}
+
+/**
+ * The one in-flight (or completed) session bootstrap for this page load.
+ * Shared so the widget's own startup and a visitor who submits the start-chat
+ * form mid-startup converge on the same session instead of racing (#129).
+ */
+let bootstrapPromise: Promise<CurrentChat | null> | null = null;
+
+/**
+ * Establish the visitor session, exactly once per page load.
+ *
+ * Probing the resumable chat doubles as the "do I have a session?" check: it
+ * succeeds only when the signed cookie is already present, so a page reload
+ * reuses the existing session rather than minting a fresh one — which would
+ * orphan a prior chat and break the returning-visitor (restart) flow.
+ *
+ * Every caller shares one promise, so a visitor who submits the form before
+ * startup finishes waits for the *same* session rather than triggering a second
+ * one. A rejected bootstrap is not cached, so a later attempt can retry.
+ * @param tenantKey - Tenant slug from `data-tenant-key`.
+ * @returns The resumable chat for a returning visitor, or null for a new one.
+ */
+export async function bootstrapVisitorSession(tenantKey: string): Promise<CurrentChat | null> {
+  bootstrapPromise ??= (async () => {
+    try {
+      return await fetchCurrentChat();
+    } catch {
+      // No existing session (401) or unreachable — start a fresh one.
+      await initVisitorSession(tenantKey);
+      return null;
+    }
+  })();
+  try {
+    return await bootstrapPromise;
+  } catch (err) {
+    bootstrapPromise = null;
+    throw err;
+  }
 }

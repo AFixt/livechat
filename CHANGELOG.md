@@ -31,6 +31,29 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   HIGH or CRITICAL findings at all. ([#132])
 
 ### Fixed
+- **Starting a chat no longer depends on winning a race against the widget's own
+  startup.** The widget renders its start-chat form immediately, but a visitor
+  session only exists after three sequential round-trips
+  (`/widget/config` -> `/visitor/chats/current` -> `/visitor/session`). Nothing
+  gated the form on that, so a visitor who submitted first sent
+  `POST /visitor/chats` with no cookie, got a `401`, and landed on a bare
+  "Visitor session required" alert. Reachable on a slow or high-latency link, for
+  a returning visitor whose cookie had expired, and whenever the API was briefly
+  slow — it reproduced deterministically with the session response delayed, and
+  failed outright under CI load. The bootstrap is now a single shared promise
+  (`bootstrapVisitorSession`) that both the widget's startup and the submit path
+  await, so an early submit waits for the *same* session instead of racing it or
+  minting a second one — a returning visitor's resumable chat is never orphaned.
+  If the write is still refused for want of a session (expired or revoked
+  server-side, #79), the widget mints a fresh session and retries exactly once; a
+  second refusal is a real failure and surfaces. `apiFetch` now throws a typed
+  `ApiRequestError` carrying the status, so that decision is made on the status
+  rather than by matching a message string. While the session is being
+  established the form is `aria-busy` and the wait is announced, so the submit
+  button is never a silently dead control (requirements.md §3). The visitor's
+  typed name and message were already preserved — the form keeps its own state
+  and stays mounted — and pressing "Start chat" again is the retry path.
+  ([#129])
 - **The local quality gate can be run again.** `npm run check:all` — the
   pre-push gate — failed for reasons unrelated to any code under review, so
   changes were going out under `--no-verify` with CI as the only check. Two
@@ -435,6 +458,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   payload slice body-parser puts in `err.message` is never echoed).
 
 [#57]: https://github.com/AFixt/livechat/issues/57
+[#129]: https://github.com/AFixt/livechat/issues/129
 [#132]: https://github.com/AFixt/livechat/issues/132
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68

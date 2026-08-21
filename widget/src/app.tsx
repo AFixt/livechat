@@ -5,12 +5,7 @@ import { ReconnectBanner } from './components/reconnect-banner.js';
 import { useChatConnection } from './hooks/use-chat-connection.js';
 import { useDelayedFlag } from './hooks/use-delayed-flag.js';
 import { useFocusReturn } from './hooks/use-focus-return.js';
-import {
-  fetchCurrentChat,
-  fetchWidgetConfig,
-  initiateChat,
-  initVisitorSession,
-} from './services/api.js';
+import { bootstrapVisitorSession, fetchWidgetConfig, startChat } from './services/api.js';
 import { playAlert } from './services/audio.js';
 import { consentStore } from './services/consent.js';
 import { announceLiveMessage } from './services/live-region.js';
@@ -110,21 +105,15 @@ export function App(props: AppProps): preact.JSX.Element {
       // the resume/socket path below is guarded too, so an unmount during the
       // consent wait is handled without an extra early return here.
       await loadInitialConfig();
-      // Reuse an existing session when the visitor already has one — a page
-      // reload must not mint a fresh session, which would orphan a prior chat
-      // and break the returning-visitor (restart) flow. Probing the resumable
-      // chat doubles as the "do I have a session?" check.
-      let resume: Awaited<ReturnType<typeof fetchCurrentChat>> | null = null;
+      // Establish the session. Shared with `handleCustomerInit`, so a visitor
+      // who submits the form before this finishes waits for the same session
+      // instead of racing it and getting a 401 (#129).
+      let resume: Awaited<ReturnType<typeof bootstrapVisitorSession>> = null;
       try {
-        resume = await fetchCurrentChat();
+        resume = await bootstrapVisitorSession(props.tenantKey);
       } catch {
-        // No existing session (401) or unreachable — start a fresh session.
-        try {
-          await initVisitorSession(props.tenantKey);
-        } catch {
-          if (live.current) dispatch({ type: 'error', message: 'Unable to start a session.' });
-          return;
-        }
+        if (live.current) dispatch({ type: 'error', message: 'Unable to start a session.' });
+        return;
       }
       if (!live.current) return;
       // A session now exists — connect the socket so this visitor shows up in
@@ -162,7 +151,14 @@ export function App(props: AppProps): preact.JSX.Element {
 
   const handleCustomerInit = async (name: string, body: string): Promise<void> => {
     try {
-      const { chat, message, supportAvailable } = await initiateChat(name, body);
+      // Announced as well as shown: the submit button's own label change is not
+      // reliably spoken, and a wait with no audible acknowledgement reads as a
+      // dead control (requirements.md §3).
+      announceLiveMessage('Starting chat…');
+      // `startChat` waits for the session bootstrap and retries once if the
+      // session turns out to be gone, so submitting before the widget has
+      // finished starting up produces a chat rather than an error (#129).
+      const { chat, message, supportAvailable } = await startChat(props.tenantKey, name, body);
       if (!supportAvailable) {
         dispatch({ type: 'chat_created_no_support', customerName: name });
         return;
@@ -179,6 +175,11 @@ export function App(props: AppProps): preact.JSX.Element {
         },
       });
     } catch (err) {
+      // The form stays mounted with the visitor's typed name and message
+      // intact, and renders this as a role="alert" above the fields — so
+      // submitting again is the retry path (#129).
+      // Not announced here: the form renders this in a `role="alert"`, which
+      // already speaks it. Announcing as well would say it twice.
       dispatch({
         type: 'error',
         message: err instanceof Error ? err.message : 'Unable to start chat',
