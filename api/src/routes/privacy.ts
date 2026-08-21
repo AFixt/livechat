@@ -19,6 +19,9 @@ import { VISITOR_COOKIE_NAME, visitorCookieOptions } from './visitor-cookie-opti
 import type { Env } from '../config/env.js';
 import type { ConsentService, VisitorSessionService } from '../services/index.js';
 
+// Side-effect import: registers this router's OpenAPI paths (#119).
+import './openapi/privacy.js';
+
 interface PrivacyRouterDeps {
   env: Env;
   consent: ConsentService;
@@ -153,7 +156,8 @@ export function buildPrivacyRouter(deps: PrivacyRouterDeps): Router {
       const body = parsedBody(req, recordConsentInputSchema);
       const explicitConsent: ExplicitConsent = {};
       if (body.purposes.presence !== undefined) explicitConsent.presence = body.purposes.presence;
-      if (body.purposes.analytics !== undefined) explicitConsent.analytics = body.purposes.analytics;
+      if (body.purposes.analytics !== undefined)
+        explicitConsent.analytics = body.purposes.analytics;
       const state = await recordBannerDecision({ deps, req, res, body, explicitConsent });
       res.status(201).json({ success: true, data: state });
     }),

@@ -12,6 +12,9 @@ import type { PresenceService } from '../services/index.js';
 import type { Redis } from 'ioredis';
 import type { Logger } from 'pino';
 
+// Side-effect import: registers this router's OpenAPI paths (#119).
+import './openapi/widget.js';
+
 /**
  * Content types a browser uses to POST CSP violations: `report-uri` sends
  * `application/csp-report`, the Reporting API sends `application/reports+json`.

@@ -30,6 +30,28 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   image, and `trivy image --severity CRITICAL --exit-code 1` now exits 0 with no
   HIGH or CRITICAL findings at all. ([#132])
 
+### Added
+- **The OpenAPI document now describes the whole API, so the security tooling
+  built in #62 has something to scan.** Only `GET /health` registered a path, so
+  the Schemathesis fuzzer and the ZAP API scan — wired, correct, and green —
+  were exercising exactly one endpoint. The document now carries **40 operations
+  across 33 paths** (auth, visitor, chats, tenants, users, invitations, privacy,
+  widget, health), each with its Zod request/response schemas, its `security`
+  requirement, and the failure codes it can actually produce, so a scanner can
+  tell a documented rejection from an undocumented 500. Registration lives in
+  `api/src/routes/openapi/`, one module per router, side-effect-imported by the
+  route module it describes — the same top-level-registration rule
+  `docs/security/api-testing.md` sets out, and small enough to keep every route
+  file under the 300-line limit. Two tests stop it drifting: a new coverage test
+  walks every mounted router and fails on a route with no path, a path with no
+  route, or a router missing from the mount table (with a floor on the number of
+  operations compared, so an empty walk cannot pass vacuously), and the existing
+  spec-security tripwire from #62 now covers the full surface. That tripwire
+  earned its keep immediately — its public-operations allowlist named
+  `post /auth/refresh` and `post /auth/verify-email`, neither of which exists;
+  the real routes are `post /auth/refresh-token` and
+  `get /auth/verify-email/{token}`, and it caught both the moment they were
+  registered. ([#119])
 ### Fixed
 - **The local quality gate can be run again.** `npm run check:all` — the
   pre-push gate — failed for reasons unrelated to any code under review, so
@@ -435,6 +457,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   payload slice body-parser puts in `err.message` is never echoed).
 
 [#57]: https://github.com/AFixt/livechat/issues/57
+[#119]: https://github.com/AFixt/livechat/issues/119
 [#132]: https://github.com/AFixt/livechat/issues/132
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68

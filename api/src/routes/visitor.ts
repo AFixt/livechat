@@ -20,6 +20,9 @@ import { VISITOR_COOKIE_NAME, visitorCookieOptions } from './visitor-cookie-opti
 import type { Env } from '../config/env.js';
 import type { ChatService, PresenceService, VisitorSessionService } from '../services/index.js';
 
+// Side-effect import: registers this router's OpenAPI paths (#119).
+import './openapi/visitor.js';
+
 interface VisitorRouterDeps {
   env: Env;
   visitorSession: VisitorSessionService;
