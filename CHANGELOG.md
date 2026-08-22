@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
-## [Unreleased]
+## [0.3.0] - 2026-08-22
 
 ### Security
 
