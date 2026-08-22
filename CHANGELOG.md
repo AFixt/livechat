@@ -11,6 +11,45 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Security
 
+- **The ui and widget images are scanned for vulnerabilities for the first
+  time.** `trivy image` builds api → ui → widget, and the ui build had never
+  succeeded: it installs workspace devDependencies (the Vite build needs
+  `vite`/`typescript`), which include private `@afixt/*` packages, and the job
+  had no registry auth — so `npm ci` 404'd. Worse, `scripts/trivy-image.sh`
+  runs under `set -euo pipefail` with an unguarded `docker build`, so that one
+  failure aborted the script and denied **widget** a scan too. The lockfile
+  carries seven private `@afixt/*` packages, several transitive
+  (`@afixt/a11y-assert` is a direct ui devDependency and pulls
+  `@afixt/test-utils`), so keeping them out of the build was not an option —
+  the build genuinely needs credentials. The npmrc is now mounted into the ui
+  and widget builds as a **BuildKit secret**, never a build arg, so the token
+  cannot persist in an image layer or in `docker history`; `required=false`
+  keeps the builds usable without one. The script no longer lets one
+  unbuildable image suppress the others: each failure is recorded, the run
+  continues, and the images that went unscanned are named explicitly at the end
+  so a red run can never be mistaken for a clean one. ([#130])
+
+### Security
+- **Container vulnerability scanning runs for the first time, and all three
+  images pass.** Getting `trivy image` past the private-registry 404 exposed two
+  further problems it had been hiding. The **ui image build had never succeeded
+  even with credentials**: `ui/tsconfig.json` includes `playwright.config.ts`,
+  which since #127 imports the repo-root `e2e/support/generated-spec-config.js`
+  that `ui/Dockerfile` never copied, so `tsc -b` failed on TS2307. Latent on
+  `develop` since #127 and invisible because nothing ever got that far. The
+  build stage now copies `e2e/`; the runtime stage still takes only `ui/dist`,
+  so nothing test-related ships. And once ui and widget scanned, the
+  **CRITICAL gate immediately failed on real findings** — `CVE-2026-31789`
+  (OpenSSL heap overflow, `libcrypto3`/`libssl3` 3.3.3-r0, fixed in 3.3.7-r0)
+  plus 33 HIGHs, all from `nginx:1.27-alpine` lagging its own Alpine base. Both
+  runtime stages now `apk upgrade --no-cache`, which takes the fix already
+  published in the repo the base points at rather than waiting for the nginx
+  image to be rebuilt. Result: api, ui and widget all scan clean at HIGH and
+  CRITICAL.
+  This also demonstrates the #60 policy with real findings rather than seeded
+  ones — 2 CRITICALs failed the gate while 33 HIGHs did not, which is exactly
+  the documented behaviour. ([#130])
+### Security
 - **Jurisdiction is now resolved server-side from a trusted edge header, not the
   request body.** The consent gate decided opt-in vs opt-out from a `country` /
   `region` the client sent, but the widget runs on the client's own site — so an
@@ -507,6 +546,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   payload slice body-parser puts in `err.message` is never echoed).
 
 [#57]: https://github.com/AFixt/livechat/issues/57
+[#130]: https://github.com/AFixt/livechat/issues/130
 [#53]: https://github.com/AFixt/livechat/issues/53
 [#55]: https://github.com/AFixt/livechat/issues/55
 [#56]: https://github.com/AFixt/livechat/issues/56
