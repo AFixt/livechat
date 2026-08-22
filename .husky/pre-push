@@ -15,8 +15,6 @@
 #
 # If no refs arrive on stdin (an invocation shape we don't recognise), fall
 # through and run the gate: the safe default is to check, not to skip.
-ZERO_SHA=0000000000000000000000000000000000000000
-
 saw_ref=0
 no_new_commits=1
 
@@ -29,7 +27,13 @@ while read -r local_ref local_sha _rest; do
     *)
       # Belt and braces: a deletion is also identifiable by its all-zero local
       # sha, so this still holds if the "(delete)" literal ever changes.
-      [ "$local_sha" = "$ZERO_SHA" ] || no_new_commits=0
+      # Matched as a pattern rather than against a fixed constant because the
+      # sha's length follows the repo's hash algorithm — 40 hex characters
+      # under SHA-1, 64 under SHA-256 — and a hardcoded 40 zeros would quietly
+      # stop matching on the latter.
+      case "$local_sha" in
+        '' | *[!0]*) no_new_commits=0 ;;
+      esac
       ;;
   esac
 done
