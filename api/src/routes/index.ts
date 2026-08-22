@@ -107,6 +107,7 @@ export function buildRouter(deps: RouterDeps): Router {
       consent: deps.services.consent,
       chat: deps.services.chat,
       presence: deps.services.presence,
+      email: deps.services.email,
     }),
   );
   router.use(

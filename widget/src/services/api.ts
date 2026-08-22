@@ -316,6 +316,19 @@ export async function fetchCurrentChat(): Promise<CurrentChat> {
 }
 
 /**
+ * POST /api/v1/visitor/chats/:id/transcript — email the visitor a copy of the
+ * conversation (§5.1.7, #80).
+ * @param chatId - The chat to transcribe.
+ * @param email - Address to send the transcript to.
+ */
+export async function emailTranscript(chatId: string, email: string): Promise<void> {
+  await apiFetch(`/visitor/chats/${chatId}/transcript`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+/**
  * The one in-flight (or completed) consent-gate call for this page load.
  *
  * Shared so the widget's own startup and a visitor who submits the start-chat

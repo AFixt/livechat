@@ -6,6 +6,7 @@ import { useChatConnection } from './hooks/use-chat-connection.js';
 import { useDelayedFlag } from './hooks/use-delayed-flag.js';
 import { useFocusReturn } from './hooks/use-focus-return.js';
 import {
+  emailTranscript,
   fetchCurrentChat,
   fetchWidgetConfig,
   initVisitorSession,
@@ -55,6 +56,9 @@ function noSupportProps(text: string | undefined): { supportHoursText?: string }
  */
 export function App(props: AppProps): preact.JSX.Element {
   const [model, dispatch] = useReducer(reduce, initialModel());
+  // Peer (support) typing indicator — transient UI state, kept out of the state
+  // machine so it never interacts with the documented widget states (#80).
+  const [peerTyping, setPeerTyping] = useState(false);
   // Transient connection state — surfaced as an aria-live banner while the
   // socket is reconnecting (issue #69). Kept out of the state machine so it
   // never perturbs the documented widget states.
@@ -180,6 +184,28 @@ export function App(props: AppProps): preact.JSX.Element {
   // this component's complexity budget.
   useChatConnection(model.chatId, dispatch, setReconnecting);
 
+  // Support's typing indicator (#80). A separate subscription rather than
+  // folding it into `useChatConnection`: that hook owns reconnect and backfill,
+  // and typing is transient presentation that must not participate in either —
+  // a re-join should not replay a stale "is typing".
+  useEffect(() => {
+    if (model.chatId === null) return undefined;
+    const socket = getVisitorSocket();
+    const onTyping = (p: {
+      chatId: string;
+      actor: 'visitor' | 'user';
+      isTyping: boolean;
+    }): void => {
+      if (p.chatId !== model.chatId || p.actor !== 'user') return;
+      setPeerTyping(p.isTyping);
+    };
+    socket.on('chat:typing', onTyping);
+    return () => {
+      socket.off('chat:typing', onTyping);
+      setPeerTyping(false);
+    };
+  }, [model.chatId]);
+
   useEffect(
     () => () => {
       disconnectVisitorSocket();
@@ -247,6 +273,11 @@ export function App(props: AppProps): preact.JSX.Element {
     dispatch({ type: 'chat_ended_by_customer' });
   };
 
+  const handleTyping = (isTyping: boolean): void => {
+    if (model.chatId === null) return;
+    getVisitorSocket().emit('chat:typing', { chatId: model.chatId, isTyping });
+  };
+
   return (
     <>
       <LiveRegion />
@@ -297,11 +328,19 @@ export function App(props: AppProps): preact.JSX.Element {
               />
             )}
             {model.state === 'active' && (
-              <ActiveState messages={model.messages} onSend={handleSend} onEnd={handleEnd} />
+              <ActiveState
+                messages={model.messages}
+                onSend={handleSend}
+                onEnd={handleEnd}
+                onTyping={handleTyping}
+                peerTyping={peerTyping}
+              />
             )}
             {model.state === 'ended' && (
               <EndedState
-                onEmailTranscript={() => Promise.resolve()}
+                onEmailTranscript={(email) =>
+                  model.chatId === null ? Promise.resolve() : emailTranscript(model.chatId, email)
+                }
                 onDone={() => {
                   dispatch({ type: 'close' });
                 }}

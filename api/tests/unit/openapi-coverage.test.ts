@@ -144,6 +144,7 @@ describe('OpenAPI spec covers the mounted API surface (#119)', () => {
         chat: services.chat,
         presence: services.presence,
         consent: services.consent,
+        email: services.email,
       }),
     },
     { prefix: '/chats', router: buildChatsRouter({ ...deps, chat: services.chat }) },

@@ -75,6 +75,7 @@ export function useStaffSocket(): void {
   const removeVisitor = useChatsStore((s) => s.removeVisitor);
   const upsertChat = useChatsStore((s) => s.upsertChat);
   const appendMessage = useChatsStore((s) => s.appendMessage);
+  const setTyping = useChatsStore((s) => s.setTyping);
   const mergeMessages = useChatsStore((s) => s.mergeMessages);
   const markEnded = useChatsStore((s) => s.markEnded);
   const setConnectionStatus = useConnectionStore((s) => s.setStatus);
@@ -115,6 +116,17 @@ export function useStaffSocket(): void {
     };
     const onEnded = (p: { chatId: string; endedBy: 'customer' | 'support' }): void => {
       markEnded(p.chatId, p.endedBy);
+      setTyping(p.chatId, false);
+    };
+    const onTyping = (p: {
+      chatId: string;
+      actor: 'visitor' | 'user';
+      isTyping: boolean;
+    }): void => {
+      // Only the visitor's typing is shown in the console; the operator's own
+      // echo is ignored (#80).
+      if (p.actor !== 'visitor') return;
+      setTyping(p.chatId, p.isTyping);
     };
     // A reconnected socket is a fresh connection in no chat rooms, so messages
     // stop arriving until we re-enter them — and any delivered mid-outage were
@@ -137,6 +149,7 @@ export function useStaffSocket(): void {
     socket.on('chat:requested', onChatRequested);
     socket.on('chat:message', onMessage);
     socket.on('chat:ended', onEnded);
+    socket.on('chat:typing', onTyping);
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
 
@@ -146,6 +159,7 @@ export function useStaffSocket(): void {
       socket.off('chat:requested', onChatRequested);
       socket.off('chat:message', onMessage);
       socket.off('chat:ended', onEnded);
+      socket.off('chat:typing', onTyping);
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
     };
@@ -155,6 +169,7 @@ export function useStaffSocket(): void {
     mergeMessages,
     removeVisitor,
     setConnectionStatus,
+    setTyping,
     t,
     upsertChat,
     upsertVisitor,

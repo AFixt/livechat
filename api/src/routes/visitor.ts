@@ -8,6 +8,7 @@ import {
   type VisitorInitiateChatInput,
 } from '@livechat/shared';
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 
 import { computeCsrfToken, csrfProtection } from '../middlewares/csrf.js';
 import { parsedBody, validate } from '../middlewares/validate.js';
@@ -29,6 +30,7 @@ import type { Env } from '../config/env.js';
 import type {
   ChatService,
   ConsentService,
+  EmailService,
   PresenceService,
   VisitorSessionService,
 } from '../services/index.js';
@@ -36,9 +38,13 @@ import type {
 // Side-effect import: registers this router's OpenAPI paths (#119).
 import './openapi/visitor.js';
 
+/** Body schema for the email-transcript endpoint (#80). */
+const emailTranscriptSchema = z.object({ email: z.email() });
+
 interface VisitorRouterDeps {
   env: Env;
   visitorSession: VisitorSessionService;
+  email: EmailService;
   consent: ConsentService;
   chat: ChatService;
   presence: PresenceService;
@@ -333,6 +339,37 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
       res.clearCookie(
         VISITOR_COOKIE_NAME,
         visitorCookieOptions(deps.env.NODE_ENV === 'production'),
+      );
+      res.json({ success: true });
+    }),
+  );
+
+  router.post(
+    '/chats/:id/transcript',
+    // Cookie-authenticated and state-changing (it sends mail), so it carries the
+    // same CSRF guard as the other visitor writes (#77). Without it a
+    // cross-site page could make a visitor mail their own transcript elsewhere.
+    csrfProtection({ COOKIE_SECRET: deps.env.COOKIE_SECRET }),
+    validate({ body: emailTranscriptSchema }),
+    asyncHandler(async (req, res) => {
+      const id = req.params.id;
+      if (typeof id !== 'string') return;
+      const visitor = await deps.visitorSession.findByCookie(requireVisitorCookie(req));
+      const { email } = parsedBody(req, emailTranscriptSchema);
+      // Scoped lookup (#72): the service refuses a chat belonging to another
+      // visitor, so one visitor cannot email another's transcript.
+      const chat = await deps.chat.getById(id, {
+        kind: 'visitor',
+        visitorSessionId: visitor.id,
+      });
+      const messages = await deps.chat.listMessages(chat.id);
+      await deps.email.sendTranscriptEmail(
+        email,
+        messages.map((m) => ({
+          senderKind: m.senderKind,
+          body: m.body,
+          deliveredAt: m.deliveredAt,
+        })),
       );
       res.json({ success: true });
     }),

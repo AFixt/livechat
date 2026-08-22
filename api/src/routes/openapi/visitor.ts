@@ -89,6 +89,23 @@ openApiRegistry.registerPath({
 
 openApiRegistry.registerPath({
   method: 'post',
+  path: '/visitor/chats/{id}/transcript',
+  summary: 'Email the visitor a copy of their conversation',
+  description:
+    'Scoped to the requesting visitor’s own chat (#72), so one visitor cannot ' +
+    'transcribe another’s. CSRF-protected like every cookie-authenticated ' +
+    'write (#77) — it sends mail off an ambient credential (#80).',
+  tags: ['visitor'],
+  security: visitorSecurity(),
+  request: {
+    params: z.object({ id: z.uuid() }),
+    body: body(z.object({ email: z.email() })),
+  },
+  responses: { 200: json('Transcript sent.', ackEnvelope()), ...errors(400, 401, 403, 404) },
+});
+
+openApiRegistry.registerPath({
+  method: 'post',
   path: '/visitor/session/forget',
   summary: 'Visitor revokes their own session ("forget me")',
   description:

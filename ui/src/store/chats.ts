@@ -28,6 +28,8 @@ interface ChatsState {
   chats: Record<string, ChatSummary>;
   /** The chat id the operator is currently viewing. */
   activeChatId: string | null;
+  /** Whether the visitor is currently typing, keyed by chat id (#80). */
+  typingByChat: Record<string, boolean>;
   /** Add or update a visitor. */
   upsertVisitor: (v: Visitor) => void;
   /** Remove a visitor. */
@@ -42,6 +44,8 @@ interface ChatsState {
   markEnded: (chatId: string, endedBy: 'customer' | 'support') => void;
   /** Set which chat is in focus. */
   setActiveChat: (chatId: string | null) => void;
+  /** Set the visitor typing flag for a chat (#80). */
+  setTyping: (chatId: string, isTyping: boolean) => void;
 }
 
 /**
@@ -52,6 +56,7 @@ export const useChatsStore = create<ChatsState>()((set) => ({
   visitors: {},
   chats: {},
   activeChatId: null,
+  typingByChat: {},
   upsertVisitor: (v) => {
     set((state) => ({ visitors: { ...state.visitors, [v.visitorSessionId]: v } }));
   },
@@ -129,5 +134,8 @@ export const useChatsStore = create<ChatsState>()((set) => ({
   },
   setActiveChat: (chatId) => {
     set({ activeChatId: chatId });
+  },
+  setTyping: (chatId, isTyping) => {
+    set((state) => ({ typingByChat: { ...state.typingByChat, [chatId]: isTyping } }));
   },
 }));

@@ -63,6 +63,29 @@ export function createEmailService(deps: EmailDeps) {
     },
 
     /**
+     * Email a plain-text copy of a chat transcript to a visitor (#80).
+     * @param to - Recipient email address (visitor-supplied).
+     * @param lines - Transcript lines in chronological order.
+     */
+    async sendTranscriptEmail(
+      to: string,
+      lines: { senderKind: 'visitor' | 'user' | 'system'; body: string; deliveredAt: Date }[],
+    ): Promise<void> {
+      const speaker: Record<'visitor' | 'user' | 'system', string> = {
+        visitor: 'You',
+        user: 'Support',
+        system: 'System',
+      };
+      const body =
+        lines.length === 0
+          ? 'This conversation had no messages.'
+          : lines
+              .map((l) => `[${l.deliveredAt.toISOString()}] ${speaker[l.senderKind]}: ${l.body}`)
+              .join('\n');
+      await send(to, 'Your chat transcript', `Here is a copy of your conversation:\n\n${body}`);
+    },
+
+    /**
      * Send the invitation email with a registration URL.
      * @param email - Recipient email.
      * @param name - Invitee name (optional; may be null).
