@@ -10,11 +10,11 @@ import {
 import { Router, type Request, type Response } from 'express';
 
 import { parsedBody, validate } from '../middlewares/validate.js';
-import { Tenant } from '../models/index.js';
-import { ApiError } from '../utils/api-error.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
-import { VISITOR_COOKIE_NAME, visitorCookieOptions } from './visitor-cookie-options.js';
+import { detectGpc, resolveSubject } from './consent-request.js';
+import { resolveGeo } from './geo-resolve.js';
+import { resolveActiveTenantId } from './tenant-resolve.js';
 
 import type { Env } from '../config/env.js';
 import type { ConsentService, VisitorSessionService } from '../services/index.js';
@@ -23,50 +23,6 @@ interface PrivacyRouterDeps {
   env: Env;
   consent: ConsentService;
   visitorSession: VisitorSessionService;
-}
-
-/**
- * Resolve an active tenant's id from its slug (the widget `data-tenant-key`).
- * @param tenantKey - Tenant slug.
- * @returns The tenant id.
- * @throws 400 if unknown.
- */
-async function resolveTenantId(tenantKey: string): Promise<string> {
-  const tenant = await Tenant.findOne({
-    where: { slug: tenantKey, status: 'active' },
-    attributes: ['id'],
-  });
-  if (tenant === null) throw ApiError.badRequest('Unknown tenant');
-  return tenant.id;
-}
-
-/**
- * Detect a universal opt-out (GPC) signal from the request. Honors both the
- * `Sec-GPC: 1` request header and an explicit client-detected flag.
- * @param req - The Express request.
- * @param clientFlag - `navigator.globalPrivacyControl` value sent by the widget.
- * @returns Whether GPC is present.
- */
-function detectGpc(req: Request, clientFlag: boolean | undefined): boolean {
-  return req.header('sec-gpc') === '1' || clientFlag === true;
-}
-
-/**
- * Resolve the visitor's durable subject key from the cookie, minting a fresh
- * cookie handle (and setting it on the response) when none is present.
- * @param deps - Router deps.
- * @param req - Request (for the incoming cookie).
- * @param res - Response (to set a new cookie when minted).
- * @returns The subject key.
- */
-function resolveSubject(deps: PrivacyRouterDeps, req: Request, res: Response): string {
-  const raw: unknown = req.cookies[VISITOR_COOKIE_NAME];
-  if (typeof raw === 'string' && raw.length > 0) {
-    return deps.visitorSession.subjectKeyFromCookie(raw);
-  }
-  const { cookieValue, subjectKey } = deps.visitorSession.mintHandle();
-  res.cookie(VISITOR_COOKIE_NAME, cookieValue, visitorCookieOptions(deps.env));
-  return subjectKey;
 }
 
 /** Explicit per-purpose choices a banner action expresses. */
@@ -101,13 +57,12 @@ interface BannerDecisionArgs {
  */
 async function recordBannerDecision(args: BannerDecisionArgs): Promise<EffectiveConsentState> {
   const { deps, req, res, body, explicitConsent, legalBasisOverride } = args;
-  const tenantId = await resolveTenantId(body.tenantKey);
-  const subjectKey = resolveSubject(deps, req, res);
+  const tenantId = await resolveActiveTenantId(body.tenantKey);
+  const { subjectKey } = resolveSubject(deps, req, res);
   const { state } = await deps.consent.decideAndRecord({
     tenantId,
     subjectKey,
-    country: body.country ?? null,
-    region: body.region ?? null,
+    ...resolveGeo(deps.env, req),
     gpc: detectGpc(req, body.gpc),
     source: 'banner',
     ip: req.ip ?? null,
@@ -115,6 +70,14 @@ async function recordBannerDecision(args: BannerDecisionArgs): Promise<Effective
     explicitConsent,
     ...(legalBasisOverride === undefined ? {} : { legalBasisOverride }),
   });
+  // Enforcing the decision, not just recording it (#53): once presence is no
+  // longer permitted — withdrawal, an explicit deny, or GPC — the tracked row
+  // is hard-deleted. Otherwise the visitor's behavioral data (IP, UA, current
+  // URL) would keep being retained and heartbeated after opting out, which is
+  // the exact harm the gate exists to prevent. Idempotent when untracked.
+  if (state.purposes.presence !== 'granted') {
+    await deps.visitorSession.forgetBySubjectKey(subjectKey);
+  }
   return state;
 }
 
@@ -135,11 +98,10 @@ export function buildPrivacyRouter(deps: PrivacyRouterDeps): Router {
       // Audit-side-effect-free: this GET writes no audit row and persists no
       // consent record. It may still set a fresh subject cookie when the request
       // carries none — session establishment, not tracking. See ADR-0019.
-      const subjectKey = resolveSubject(deps, req, res);
+      const { subjectKey } = resolveSubject(deps, req, res);
       const state = await deps.consent.resolveState({
         subjectKey,
-        country: q.country ?? null,
-        region: q.region ?? null,
+        ...resolveGeo(deps.env, req),
         gpc: detectGpc(req, q.gpc),
       });
       res.json({ success: true, data: state });
@@ -153,7 +115,8 @@ export function buildPrivacyRouter(deps: PrivacyRouterDeps): Router {
       const body = parsedBody(req, recordConsentInputSchema);
       const explicitConsent: ExplicitConsent = {};
       if (body.purposes.presence !== undefined) explicitConsent.presence = body.purposes.presence;
-      if (body.purposes.analytics !== undefined) explicitConsent.analytics = body.purposes.analytics;
+      if (body.purposes.analytics !== undefined)
+        explicitConsent.analytics = body.purposes.analytics;
       const state = await recordBannerDecision({ deps, req, res, body, explicitConsent });
       res.status(201).json({ success: true, data: state });
     }),
@@ -181,8 +144,8 @@ export function buildPrivacyRouter(deps: PrivacyRouterDeps): Router {
     validate({ body: dataSubjectRequestInputSchema }),
     asyncHandler(async (req, res) => {
       const body = parsedBody(req, dataSubjectRequestInputSchema);
-      const tenantId = await resolveTenantId(body.tenantKey);
-      const subjectKey = resolveSubject(deps, req, res);
+      const tenantId = await resolveActiveTenantId(body.tenantKey);
+      const { subjectKey } = resolveSubject(deps, req, res);
       const result = await deps.consent.queueDataRequest({
         tenantId,
         subjectKey,

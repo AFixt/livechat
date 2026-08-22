@@ -1,5 +1,7 @@
 import { io, type Socket } from 'socket.io-client';
 
+import { getSessionToken } from './api.js';
+
 let visitorSocket: Socket | null = null;
 
 /**
@@ -20,6 +22,16 @@ export function getVisitorSocket(): Socket {
     path: '/api/socket.io',
     transports: ['websocket'],
     withCredentials: true,
+    // Handshake fallback for browsers that block the third-party cookie (#75):
+    // the /visitor namespace reads `auth.cookie` when the Cookie header is
+    // absent. Supplied as a callback rather than a fixed object because #69
+    // keeps this socket for the process's lifetime — a token that arrives (or
+    // is refreshed) after construction must still reach every reconnect
+    // attempt, and socket.io re-invokes this before each one.
+    auth: (cb: (data: Record<string, unknown>) => void) => {
+      const token = getSessionToken();
+      cb(token !== null ? { cookie: token } : {});
+    },
   });
   return visitorSocket;
 }

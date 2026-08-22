@@ -43,14 +43,28 @@ jobs:
       - name: Build shared, UI and widget
         run: npm run build
 
-      - name: Serve the UI preview
+      # Serve the built bundle through the SAME nginx config the console
+      # actually ships with (ui/Dockerfile's runtime stage is this image plus
+      # these two files). Scanning `http-server` instead meant every response
+      # header the config sets — CSP, X-Frame-Options, nosniff,
+      # Permissions-Policy, Cache-Control — was reported missing, so the gate
+      # failed on a difference between the harness and production and a real
+      # regression would have been indistinguishable from the usual noise
+      # (#131). Plain nginx rather than `docker build -f ui/Dockerfile` on
+      # purpose: the image build needs private-registry credentials (#130),
+      # which a header scan has no reason to require.
+      - name: Serve the UI through the shipped nginx config
         run: |
-          npx --yes http-server ./ui/dist --port 8080 --silent &
+          docker run -d --name zap-ui-target -p 8080:80 \
+            -v "$PWD/ui/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+            -v "$PWD/ui/dist:/usr/share/nginx/html:ro" \
+            nginx:1.27-alpine
           for _ in $(seq 1 30); do
             if curl -sf http://localhost:8080/ >/dev/null; then exit 0; fi
             sleep 1
           done
-          echo "UI preview did not become ready" >&2
+          echo "UI target did not become ready" >&2
+          docker logs zap-ui-target >&2 || true
           exit 1
 
       - name: ZAP baseline scan (PR build)
@@ -60,7 +74,12 @@ jobs:
           rules_file_name: .github/zap/rules.tsv
           fail_action: true
           allow_issue_writing: false
-          cmd_options: "-a -j"
+          # `-I` stops a WARN from failing the run, which is what makes the
+          # three-tier model in rules.tsv (IGNORE | WARN | FAIL) mean anything.
+          # Without it zap-baseline exits non-zero on *any* alert, collapsing
+          # WARN into FAIL — every PR red, and no way to tell a new finding
+          # from the standing ones (#131). FAIL-level alerts still fail.
+          cmd_options: "-a -j -I"
 
   # Manual scan of a deployed environment (post-deploy gate).
   zap-deployed:
@@ -100,4 +119,5 @@ jobs:
           rules_file_name: .github/zap/rules.tsv
           fail_action: true
           allow_issue_writing: true
-          cmd_options: "-a -j"
+          # See the PR job: WARN is a warning, FAIL fails.
+          cmd_options: "-a -j -I"

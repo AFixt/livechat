@@ -46,19 +46,19 @@ rules:
     metadata:
       category: security
       cwe:
-        - 'CWE-639: Authorization Bypass Through User-Controlled Key'
+        - "CWE-639: Authorization Bypass Through User-Controlled Key"
       owasp:
-        - 'A01:2021 - Broken Access Control'
+        - "A01:2021 - Broken Access Control"
       references:
         - https://github.com/AFixt/livechat/issues/72
     patterns:
       - pattern-either:
-          - pattern: 'Chat.findByPk(...)'
-          - pattern: 'Chat.findOne(...)'
-          - pattern: 'Chat.findAll(...)'
-          - pattern: 'ChatMessage.findByPk(...)'
-          - pattern: 'ChatMessage.findOne(...)'
-          - pattern: 'ChatMessage.findAll(...)'
+          - pattern: "Chat.findByPk(...)"
+          - pattern: "Chat.findOne(...)"
+          - pattern: "Chat.findAll(...)"
+          - pattern: "ChatMessage.findByPk(...)"
+          - pattern: "ChatMessage.findOne(...)"
+          - pattern: "ChatMessage.findAll(...)"
     paths:
       include:
         - api/src/io/
@@ -88,19 +88,19 @@ rules:
     metadata:
       category: security
       cwe:
-        - 'CWE-639: Authorization Bypass Through User-Controlled Key'
+        - "CWE-639: Authorization Bypass Through User-Controlled Key"
       owasp:
-        - 'A01:2021 - Broken Access Control'
+        - "A01:2021 - Broken Access Control"
     patterns:
       - pattern-either:
-          - pattern: '$MODEL.findByPk(...)'
+          - pattern: "$MODEL.findByPk(...)"
           - patterns:
-              - pattern: '$MODEL.findOne(...)'
-              - pattern-not: '$MODEL.findOne({ where: { ..., tenantId: $T, ... }, ... })'
-              - pattern-not: '$MODEL.findOne({ where: { ..., tenant_id: $T, ... }, ... })'
-              - pattern-not: '$MODEL.findOne({ where: { ..., visitorSessionId: $V, ... }, ... })'
-              - pattern-not: '$MODEL.findOne({ where: { ..., visitor_session_id: $V, ... }, ... })'
-              - pattern-not: '$MODEL.findOne({ where: { ..., chatId: $C, ... }, ... })'
+              - pattern: "$MODEL.findOne(...)"
+              - pattern-not: "$MODEL.findOne({ where: { ..., tenantId: $T, ... }, ... })"
+              - pattern-not: "$MODEL.findOne({ where: { ..., tenant_id: $T, ... }, ... })"
+              - pattern-not: "$MODEL.findOne({ where: { ..., visitorSessionId: $V, ... }, ... })"
+              - pattern-not: "$MODEL.findOne({ where: { ..., visitor_session_id: $V, ... }, ... })"
+              - pattern-not: "$MODEL.findOne({ where: { ..., chatId: $C, ... }, ... })"
       - metavariable-regex:
           metavariable: $MODEL
           regex: ^(VisitorSession|ChatEvent|ChatAttachment|Invitation)$
@@ -133,16 +133,16 @@ rules:
     metadata:
       category: security
       cwe:
-        - 'CWE-942: Permissive Cross-domain Policy with Untrusted Domains'
+        - "CWE-942: Permissive Cross-domain Policy with Untrusted Domains"
       owasp:
-        - 'A05:2021 - Security Misconfiguration'
+        - "A05:2021 - Security Misconfiguration"
     patterns:
       - pattern-either:
           # Express cors() middleware.
-          - pattern: 'cors({ ..., origin: true, ... })'
+          - pattern: "cors({ ..., origin: true, ... })"
           - pattern: "cors({ ..., origin: '*', ... })"
           # Socket.IO server config: { cors: { origin: ... } }.
-          - pattern: 'new Server(..., { ..., cors: { ..., origin: true, ... }, ... })'
+          - pattern: "new Server(..., { ..., cors: { ..., origin: true, ... }, ... })"
           - pattern: "new Server(..., { ..., cors: { ..., origin: '*', ... }, ... })"
 
   # ---------------------------------------------------------------------------
@@ -163,20 +163,20 @@ rules:
     metadata:
       category: security
       cwe:
-        - 'CWE-942: Permissive Cross-domain Policy with Untrusted Domains'
+        - "CWE-942: Permissive Cross-domain Policy with Untrusted Domains"
       owasp:
-        - 'A05:2021 - Security Misconfiguration'
+        - "A05:2021 - Security Misconfiguration"
     patterns:
       - pattern-either:
           # origin set directly to the reflected header.
-          - pattern: 'cors({ ..., origin: $REQ.headers.origin, ... })'
-          - pattern: 'new Server(..., { ..., cors: { ..., origin: $REQ.headers.origin, ... }, ... })'
+          - pattern: "cors({ ..., origin: $REQ.headers.origin, ... })"
+          - pattern: "new Server(..., { ..., cors: { ..., origin: $REQ.headers.origin, ... }, ... })"
           # cors() delegate that reflects the origin arg or unconditionally allows.
           - patterns:
-              - pattern-inside: 'cors({ ..., origin: ($ORIGIN, $CB) => { ... }, ... })'
+              - pattern-inside: "cors({ ..., origin: ($ORIGIN, $CB) => { ... }, ... })"
               - pattern-either:
-                  - pattern: '$CB(null, $ORIGIN)'
-                  - pattern: '$CB(null, true)'
+                  - pattern: "$CB(null, $ORIGIN)"
+                  - pattern: "$CB(null, true)"
 
   # ---------------------------------------------------------------------------
   # 5. JWT verified without pinning the algorithm.
@@ -196,17 +196,17 @@ rules:
     metadata:
       category: security
       cwe:
-        - 'CWE-347: Improper Verification of Cryptographic Signature'
+        - "CWE-347: Improper Verification of Cryptographic Signature"
       owasp:
-        - 'A02:2021 - Cryptographic Failures'
+        - "A02:2021 - Cryptographic Failures"
     patterns:
       - pattern-either:
           # Two-arg form: no options object at all.
-          - pattern: 'jwt.verify($TOKEN, $SECRET)'
+          - pattern: "jwt.verify($TOKEN, $SECRET)"
           # Options object present but with no `algorithms` key.
           - patterns:
-              - pattern: 'jwt.verify($TOKEN, $SECRET, { ... })'
-              - pattern-not: 'jwt.verify($TOKEN, $SECRET, { ..., algorithms: $ALGS, ... })'
+              - pattern: "jwt.verify($TOKEN, $SECRET, { ... })"
+              - pattern-not: "jwt.verify($TOKEN, $SECRET, { ..., algorithms: $ALGS, ... })"
 
   # ---------------------------------------------------------------------------
   # 6. jwt.decode() where verification is required.
@@ -225,11 +225,11 @@ rules:
     metadata:
       category: security
       cwe:
-        - 'CWE-347: Improper Verification of Cryptographic Signature'
+        - "CWE-347: Improper Verification of Cryptographic Signature"
       owasp:
-        - 'A02:2021 - Cryptographic Failures'
+        - "A02:2021 - Cryptographic Failures"
     patterns:
-      - pattern: 'jwt.decode(...)'
+      - pattern: "jwt.decode(...)"
 
   # ---------------------------------------------------------------------------
   # 7. Cookies set without httpOnly + secure.
@@ -249,22 +249,22 @@ rules:
     metadata:
       category: security
       cwe:
-        - 'CWE-1004: Sensitive Cookie Without HttpOnly Flag'
-        - 'CWE-614: Sensitive Cookie Without Secure Flag'
+        - "CWE-1004: Sensitive Cookie Without HttpOnly Flag"
+        - "CWE-614: Sensitive Cookie Without Secure Flag"
       owasp:
-        - 'A05:2021 - Security Misconfiguration'
+        - "A05:2021 - Security Misconfiguration"
     patterns:
       - pattern-either:
           # No options object at all.
-          - pattern: '$RES.cookie($NAME, $VALUE)'
+          - pattern: "$RES.cookie($NAME, $VALUE)"
           # Options object missing httpOnly.
           - patterns:
-              - pattern: '$RES.cookie($NAME, $VALUE, { ... })'
-              - pattern-not: '$RES.cookie($NAME, $VALUE, { ..., httpOnly: $H, ... })'
+              - pattern: "$RES.cookie($NAME, $VALUE, { ... })"
+              - pattern-not: "$RES.cookie($NAME, $VALUE, { ..., httpOnly: $H, ... })"
           # Options object missing secure.
           - patterns:
-              - pattern: '$RES.cookie($NAME, $VALUE, { ... })'
-              - pattern-not: '$RES.cookie($NAME, $VALUE, { ..., secure: $S, ... })'
+              - pattern: "$RES.cookie($NAME, $VALUE, { ... })"
+              - pattern-not: "$RES.cookie($NAME, $VALUE, { ..., secure: $S, ... })"
     paths:
       include:
         - api/src/io/
@@ -309,15 +309,15 @@ rules:
     metadata:
       category: security
       cwe:
-        - 'CWE-942: Permissive Cross-domain Policy with Untrusted Domains'
+        - "CWE-942: Permissive Cross-domain Policy with Untrusted Domains"
       owasp:
-        - 'A05:2021 - Security Misconfiguration'
+        - "A05:2021 - Security Misconfiguration"
       references:
         - https://github.com/AFixt/livechat/issues/74
     patterns:
       - pattern-either:
-          - pattern: 'cors({ ..., origin: $O, credentials: true, ... })'
-          - pattern: 'new Server(..., { ..., cors: { ..., origin: $O, credentials: true, ... }, ... })'
+          - pattern: "cors({ ..., origin: $O, credentials: true, ... })"
+          - pattern: "new Server(..., { ..., cors: { ..., origin: $O, credentials: true, ... }, ... })"
       # Constrain $O to a fixed value: a string literal or a member expression.
       # Delegate callbacks (functions) and array allowlists never match here.
       - metavariable-pattern:
@@ -325,21 +325,21 @@ rules:
           patterns:
             - pattern-either:
                 - pattern: '"..."'
-                - pattern: '$A.$B'
+                - pattern: "$A.$B"
       # Array allowlist — an explicit allowlist, not a single fixed origin.
       # (The string-literal matcher above is fuzzy enough to catch an array of
       # string literals, so exclude it explicitly.)
-      - pattern-not: 'cors({ ..., origin: [...], credentials: true, ... })'
-      - pattern-not: 'new Server(..., { ..., cors: { ..., origin: [...], credentials: true, ... }, ... })'
+      - pattern-not: "cors({ ..., origin: [...], credentials: true, ... })"
+      - pattern-not: "new Server(..., { ..., cors: { ..., origin: [...], credentials: true, ... }, ... })"
       # Sanctioned first-party console origin — removed by #74 (see block above).
-      - pattern-not: 'cors({ ..., origin: $X.APP_URL, credentials: true, ... })'
-      - pattern-not: 'new Server(..., { ..., cors: { ..., origin: $X.APP_URL, credentials: true, ... }, ... })'
+      - pattern-not: "cors({ ..., origin: $X.APP_URL, credentials: true, ... })"
+      - pattern-not: "new Server(..., { ..., cors: { ..., origin: $X.APP_URL, credentials: true, ... }, ... })"
       # origin: '*' belongs to rule 3.
       - pattern-not: "cors({ ..., origin: '*', credentials: true, ... })"
       - pattern-not: "new Server(..., { ..., cors: { ..., origin: '*', credentials: true, ... }, ... })"
       # Reflected request origin belongs to rule 4.
-      - pattern-not: 'cors({ ..., origin: $R.headers.origin, credentials: true, ... })'
-      - pattern-not: 'new Server(..., { ..., cors: { ..., origin: $R.headers.origin, credentials: true, ... }, ... })'
+      - pattern-not: "cors({ ..., origin: $R.headers.origin, credentials: true, ... })"
+      - pattern-not: "new Server(..., { ..., cors: { ..., origin: $R.headers.origin, credentials: true, ... }, ... })"
 
   # ---------------------------------------------------------------------------
   # 9. Raw SQL built by string interpolation (SQL injection).
@@ -361,13 +361,13 @@ rules:
     metadata:
       category: security
       cwe:
-        - 'CWE-89: Improper Neutralization of Special Elements used in an SQL Command'
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
       owasp:
-        - 'A03:2021 - Injection'
+        - "A03:2021 - Injection"
     patterns:
       - pattern-either:
-          - pattern: '$SEQ.query(`...${$X}...`)'
-          - pattern: '$SEQ.query(`...${$X}...`, ...)'
+          - pattern: "$SEQ.query(`...${$X}...`)"
+          - pattern: "$SEQ.query(`...${$X}...`, ...)"
           - pattern: '$SEQ.query("..." + $X)'
           - pattern: '$SEQ.query("..." + $X, ...)'
     paths:
@@ -394,17 +394,17 @@ rules:
     metadata:
       category: security
       cwe:
-        - 'CWE-78: Improper Neutralization of Special Elements used in an OS Command'
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
       owasp:
-        - 'A03:2021 - Injection'
+        - "A03:2021 - Injection"
     patterns:
       - pattern-either:
-          - pattern: '$CP.exec(`...${$X}...`)'
-          - pattern: '$CP.exec(`...${$X}...`, ...)'
-          - pattern: 'exec(`...${$X}...`)'
-          - pattern: 'exec(`...${$X}...`, ...)'
-          - pattern: '$CP.execSync(`...${$X}...`)'
-          - pattern: 'execSync(`...${$X}...`)'
+          - pattern: "$CP.exec(`...${$X}...`)"
+          - pattern: "$CP.exec(`...${$X}...`, ...)"
+          - pattern: "exec(`...${$X}...`)"
+          - pattern: "exec(`...${$X}...`, ...)"
+          - pattern: "$CP.execSync(`...${$X}...`)"
+          - pattern: "execSync(`...${$X}...`)"
           - pattern: '$CP.exec("..." + $X)'
           - pattern: '$CP.exec("..." + $X, ...)'
 
@@ -428,17 +428,17 @@ rules:
     metadata:
       category: security
       cwe:
-        - 'CWE-918: Server-Side Request Forgery (SSRF)'
+        - "CWE-918: Server-Side Request Forgery (SSRF)"
       owasp:
-        - 'A10:2021 - Server-Side Request Forgery'
+        - "A10:2021 - Server-Side Request Forgery"
     patterns:
       - pattern-either:
-          - pattern: 'fetch($REQ.body.$F)'
-          - pattern: 'fetch($REQ.body.$F, ...)'
-          - pattern: 'fetch($REQ.query.$F)'
-          - pattern: 'fetch($REQ.query.$F, ...)'
-          - pattern: 'fetch($REQ.params.$F)'
-          - pattern: 'fetch($REQ.params.$F, ...)'
+          - pattern: "fetch($REQ.body.$F)"
+          - pattern: "fetch($REQ.body.$F, ...)"
+          - pattern: "fetch($REQ.query.$F)"
+          - pattern: "fetch($REQ.query.$F, ...)"
+          - pattern: "fetch($REQ.params.$F)"
+          - pattern: "fetch($REQ.params.$F, ...)"
 
   # ---------------------------------------------------------------------------
   # 12. Dynamic code execution (eval / Function constructor).
@@ -458,10 +458,10 @@ rules:
     metadata:
       category: security
       cwe:
-        - 'CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code'
+        - "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
       owasp:
-        - 'A03:2021 - Injection'
+        - "A03:2021 - Injection"
     patterns:
       - pattern-either:
-          - pattern: 'eval(...)'
-          - pattern: 'new Function(...)'
+          - pattern: "eval(...)"
+          - pattern: "new Function(...)"

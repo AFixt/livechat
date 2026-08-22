@@ -66,6 +66,17 @@ const envSpec = {
   VISITOR_SESSION_ABSOLUTE_TTL_HOURS: positiveHours({ default: 720 }),
   VISITOR_SESSION_IDLE_TTL_HOURS: positiveHours({ default: 72 }),
 
+  // Jurisdiction (#53) is a security decision, so it is resolved from a header
+  // the *edge* populates — never from the request body, which the embedding
+  // page controls and could set to a permissive value for a visitor it should
+  // not. Name the header your CDN/load balancer injects, e.g. `cf-ipcountry`
+  // (Cloudflare), `x-vercel-ip-country`, `x-appengine-country`. Leave unset and
+  // every visitor resolves to Unknown Location Mode, which is opt-in for
+  // presence — the fail-safe, and the correct default until an edge that can be
+  // trusted is actually in front of the API.
+  GEO_COUNTRY_HEADER: str({ default: '' }),
+  GEO_REGION_HEADER: str({ default: '' }),
+
   APP_URL: url(),
   API_URL: url(),
   WIDGET_URL: url(),

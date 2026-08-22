@@ -1,26 +1,26 @@
 # Security baseline
 
 This directory documents the livechat **security-baseline program** (GitHub
-issues #59-65 and #82-84): the set of automated scanners, their gate
-thresholds, the exception lifecycle that governs their suppressions, and the
-report artifacts they emit. This page is the index; the governance decision is
-recorded in [ADR-0011](../adr/0011-security-baseline-governance.md).
+issues #59-65 and #82-84): the set of automated scanners, their gate thresholds,
+the exception lifecycle that governs their suppressions, and the report
+artifacts they emit. This page is the index; the governance decision is recorded
+in [ADR-0011](../adr/0011-security-baseline-governance.md).
 
 ## The tools
 
 Everything below runs from the repo root. The gating scanners are wired into
 `npm run security` (which `npm run check:all` runs on pre-push and in CI).
 
-| Tool | npm script | Config / source | What it checks |
-| --- | --- | --- | --- |
-| npm audit | `security:audit` | `scripts/npm-audit.sh` | Known-vulnerable dependencies (high/critical). |
-| osv-scanner | `security:osv` | `osv-scanner.toml` | OSV advisories against the lockfile. |
-| semgrep | `security:semgrep` | `scripts/semgrep.sh` | SAST — OWASP Top Ten, Node/TS security rules. |
-| trufflehog | `security:secrets` | `package.json` | Verified secrets in git history. |
-| exception expiry | `security:exceptions` | `scripts/check-exceptions.sh` | Expired entries in the exception registry. |
-| TLS/HTTPS | `security:tls` | `scripts/check-tls.sh` | Deployed transport security (deployed-only; lands with #63). |
-| license allowlist | `license:check` | `package.json` | Production deps outside the SPDX allowlist. |
-| CodeQL | — | `.github/workflows/security.yml` | Scheduled deep SAST (security-extended). |
+| Tool              | npm script            | Config / source                  | What it checks                                               |
+| ----------------- | --------------------- | -------------------------------- | ------------------------------------------------------------ |
+| npm audit         | `security:audit`      | `scripts/npm-audit.sh`           | Known-vulnerable dependencies (high/critical).               |
+| osv-scanner       | `security:osv`        | `osv-scanner.toml`               | OSV advisories against the lockfile.                         |
+| semgrep           | `security:semgrep`    | `scripts/semgrep.sh`             | SAST — OWASP Top Ten, Node/TS security rules.                |
+| trufflehog        | `security:secrets`    | `package.json`                   | Verified secrets in git history.                             |
+| exception expiry  | `security:exceptions` | `scripts/check-exceptions.sh`    | Expired entries in the exception registry.                   |
+| TLS/HTTPS         | `security:tls`        | `scripts/check-tls.sh`           | Deployed transport security (deployed-only; lands with #63). |
+| license allowlist | `license:check`       | `package.json`                   | Production deps outside the SPDX allowlist.                  |
+| CodeQL            | —                     | `.github/workflows/security.yml` | Scheduled deep SAST (security-extended).                     |
 
 Sibling PRs in the program (#82-84) add trivy, checkov, and an OWASP ZAP
 baseline; they are catalogued in the threshold and exception files ahead of
@@ -112,8 +112,10 @@ turns the build red by design — that is the forcing function that stops
 
 ## See also
 
-- [`security/thresholds.yaml`](../../security/thresholds.yaml) — gate thresholds.
-- [`security/exceptions.yaml`](../../security/exceptions.yaml) — exception registry.
+- [`security/thresholds.yaml`](../../security/thresholds.yaml) — gate
+  thresholds.
+- [`security/exceptions.yaml`](../../security/exceptions.yaml) — exception
+  registry.
 - `docs/security/tls-verification.md` — deployed transport-security harness;
   lands with issue #63 (link once both PRs merge).
 - [ADR-0011](../adr/0011-security-baseline-governance.md) — the governance
