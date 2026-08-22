@@ -25,6 +25,20 @@ export default tseslint.config(
       '**/e2e/generated/**',
       'reports/**',
       '**/.vite/**',
+      // Claude Code agent worktrees: full checkouts of this repo living inside
+      // it. Without this, `npm run lint` type-checks every file once per
+      // worktree and reports the same findings that many times over, which made
+      // the pre-push gate unrunnable for anyone using them. Pinned by
+      // `shared/tests/gate-ignores.test.ts`.
+      '.claude/**',
+      // Standalone Node tooling scripts (siblings of the existing *.sh gates);
+      // run directly with `node`, outside any tsconfig, so typed linting can't
+      // resolve them.
+      'scripts/*.mjs',
+      // Semgrep rule-test fixtures: intentionally-insecure snippets consumed by
+      // `semgrep --test`, deliberately outside every tsconfig, so the typed
+      // ESLint project service cannot resolve them.
+      '.semgrep/**',
     ],
   },
 

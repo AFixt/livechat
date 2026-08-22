@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
-interface ChatMessage {
+/** A single message rendered in a chat transcript. */
+export interface ChatMessage {
   id: string;
   body: string;
   senderKind: 'visitor' | 'user' | 'system';
@@ -27,6 +28,8 @@ interface ChatsState {
   chats: Record<string, ChatSummary>;
   /** The chat id the operator is currently viewing. */
   activeChatId: string | null;
+  /** Whether the visitor is currently typing, keyed by chat id (#80). */
+  typingByChat: Record<string, boolean>;
   /** Add or update a visitor. */
   upsertVisitor: (v: Visitor) => void;
   /** Remove a visitor. */
@@ -35,10 +38,14 @@ interface ChatsState {
   upsertChat: (chat: Partial<ChatSummary> & { id: string }) => void;
   /** Append a message to a chat. */
   appendMessage: (chatId: string, message: ChatMessage) => void;
+  /** Merge a fetched transcript into a chat, de-duplicated by id. */
+  mergeMessages: (chatId: string, messages: ChatMessage[]) => void;
   /** Mark a chat as ended. */
   markEnded: (chatId: string, endedBy: 'customer' | 'support') => void;
   /** Set which chat is in focus. */
   setActiveChat: (chatId: string | null) => void;
+  /** Set the visitor typing flag for a chat (#80). */
+  setTyping: (chatId: string, isTyping: boolean) => void;
 }
 
 /**
@@ -49,6 +56,7 @@ export const useChatsStore = create<ChatsState>()((set) => ({
   visitors: {},
   chats: {},
   activeChatId: null,
+  typingByChat: {},
   upsertVisitor: (v) => {
     set((state) => ({ visitors: { ...state.visitors, [v.visitorSessionId]: v } }));
   },
@@ -92,6 +100,23 @@ export const useChatsStore = create<ChatsState>()((set) => ({
       };
     });
   },
+  mergeMessages: (chatId, messages) => {
+    set((state) => {
+      const existing = state.chats[chatId];
+      if (existing === undefined) return state;
+      // The fetched transcript is authoritative; keep any locally-held messages
+      // it doesn't contain (e.g. one that arrived live between the fetch and now)
+      // so the merge never drops a message. De-duped by id (issue #69).
+      const incomingIds = new Set(messages.map((m) => m.id));
+      const extras = existing.messages.filter((m) => !incomingIds.has(m.id));
+      return {
+        chats: {
+          ...state.chats,
+          [chatId]: { ...existing, messages: [...messages, ...extras] },
+        },
+      };
+    });
+  },
   markEnded: (chatId, endedBy) => {
     set((state) => {
       const existing = state.chats[chatId];
@@ -109,5 +134,8 @@ export const useChatsStore = create<ChatsState>()((set) => ({
   },
   setActiveChat: (chatId) => {
     set({ activeChatId: chatId });
+  },
+  setTyping: (chatId, isTyping) => {
+    set((state) => ({ typingByChat: { ...state.typingByChat, [chatId]: isTyping } }));
   },
 }));

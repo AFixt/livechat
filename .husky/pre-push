@@ -1,1 +1,28 @@
+# Git feeds this hook one line per ref being pushed:
+#   <local ref> <local sha> <remote ref> <remote sha>
+#
+# A tag-only push introduces no new commits — the commit being tagged already
+# passed this gate on its branch and again in CI — so re-running the full
+# check:all sweep only delays the release by 10-15 minutes. Skip it when every
+# ref being pushed is a tag.
+#
+# If no refs arrive on stdin (an invocation shape we don't recognise), fall
+# through and run the gate: the safe default is to check, not to skip.
+saw_ref=0
+only_tags=1
+
+while read -r local_ref _rest; do
+  [ -z "$local_ref" ] && continue
+  saw_ref=1
+  case "$local_ref" in
+    refs/tags/*) ;;
+    *) only_tags=0 ;;
+  esac
+done
+
+if [ "$saw_ref" = "1" ] && [ "$only_tags" = "1" ]; then
+  echo "pre-push: tag-only push — skipping check:all (no new commits)"
+  exit 0
+fi
+
 npm run check:all

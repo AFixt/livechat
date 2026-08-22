@@ -1,0 +1,35 @@
+id: admin-edit-user
+title: "Admin edits a user's role and status"
+type: positive
+description: |
+  Each user row exposes an Edit action that opens a dialog for changing the
+  user's role and status (the dialog is titled with the user's email
+  address). Saving applies the change without redeploying — role changes
+  must take effect on the user's next request.
+
+  Note: the role/status selectors are MUI comboboxes, not native selects —
+  the same DSL limitation that keeps admin-invite-user out of the runnable
+  set applies here (upstream @afixt/usecase-runner#6). This file is the
+  behavioural source of truth for the dialog's accessible structure.
+
+start_location: "http://localhost:5174/admin/users"
+
+expected_result: >-
+  The edit dialog opens titled with the user's email, exposing accessible
+  Role and Status controls and Save/Cancel actions.
+
+preconditions:
+  - An admin or super_admin user is authenticated.
+  - At least one user row is listed.
+
+data: {}
+
+steps:
+  - locate: heading "Users"
+  - locate: button "Edit"
+  - focus: button "Edit"
+  - activate: button "Edit"
+  - locate: field "Role"
+  - locate: field "Status"
+  - locate: button "Save"
+  - locate: button "Cancel"

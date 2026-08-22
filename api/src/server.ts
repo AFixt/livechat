@@ -5,7 +5,10 @@ import { loadEnv } from './config/env.js';
 import { createLogger } from './config/logger.js';
 import { createSequelize } from './config/mysql.js';
 import { createRedis } from './config/redis.js';
+import { createSocketRedisAdapter, type AdapterHealth } from './io/adapter.js';
 import { attachIo } from './io/index.js';
+import { createIoRef } from './io/io-ref.js';
+import { createShutdownHandler } from './lifecycle/graceful-shutdown.js';
 import { initModels } from './models/index.js';
 import { createServices } from './services/index.js';
 
@@ -17,20 +20,39 @@ const redis = createRedis(env, logger);
 initModels(sequelize);
 const services = createServices({ env, logger, redis });
 
+// Socket.IO Redis adapter so rooms span instances behind the load balancer
+// (#73). Its readiness is shared into the app so `/health` reports it.
+const socketAdapterHealth: AdapterHealth = { ready: false };
+const socketAdapter = createSocketRedisAdapter({ redis, logger, health: socketAdapterHealth });
+
 // In test (e2e) the auth limiter's `max: 5` would trip across repeated
 // logins and CI retries; NODE_ENV is only ever 'test' for the e2e stack,
 // never a deployed server, so this is safe.
+// Filled in immediately after `attachIo` below — the app must exist first,
+// because Socket.IO attaches to the HTTP server that wraps it (#123).
+const ioRef = createIoRef();
 const app = createApp({
   env,
   logger,
   redis,
   services,
+  socketAdapterHealth,
+  ioRef,
   ...(env.NODE_ENV === 'test' && { skipRateLimit: true }),
 });
 const server = createServer(app);
-attachIo(server, { env, logger, services });
+const io = attachIo(server, { env, logger, redis, services, adapter: socketAdapter.adapter });
+ioRef.current = io;
 
-const SHUTDOWN_TIMEOUT_MS = 10_000;
+// A port clash otherwise surfaces as an unhandled EADDRINUSE stack trace (#81).
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    logger.fatal(`port ${String(env.PORT)} is already in use — stop the other process or set PORT`);
+  } else {
+    logger.fatal({ err }, 'HTTP server error');
+  }
+  process.exitCode = 1;
+});
 
 /**
  * Bring up database + redis + HTTP server. Sets `process.exitCode` on failure
@@ -58,32 +80,14 @@ async function start(): Promise<void> {
   }
 }
 
-/**
- * Gracefully close the HTTP server, database, and redis, then exit.
- * Forces exit after {@link SHUTDOWN_TIMEOUT_MS}.
- * @param signal - The signal that triggered shutdown.
- */
-function shutdown(signal: NodeJS.Signals): void {
-  logger.info({ signal }, 'shutting down');
-
-  const forceTimer = setTimeout(() => {
-    logger.error('forced shutdown after timeout');
-    process.exitCode = 1;
-  }, SHUTDOWN_TIMEOUT_MS);
-  forceTimer.unref();
-
-  server.close(() => {
-    Promise.allSettled([sequelize.close(), redis.quit()])
-      .then(() => {
-        clearTimeout(forceTimer);
-        logger.info('shutdown complete');
-      })
-      .catch((err: unknown) => {
-        logger.error({ err }, 'error during shutdown');
-        process.exitCode = 1;
-      });
-  });
-}
+const shutdown = createShutdownHandler({
+  io,
+  httpServer: server,
+  sequelize,
+  redis,
+  closeAdapter: socketAdapter.close,
+  logger,
+});
 
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);

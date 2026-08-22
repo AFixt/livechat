@@ -1,0 +1,115 @@
+name: Container & IaC scan
+
+# PR-time safety net for the local security gates in scripts/{hadolint,trivy,
+# checkov}.sh. The house architecture is local-gates-first (CLAUDE.md), so
+# these are the CI backstop for --no-verify pushes and web-UI merges.
+#
+# Deliberately NOT scheduled: per the security-baseline program these run at PR
+# time (and on pushes to the long-lived branches), not on a cron. Each job
+# installs the external binary and runs the same script a developer runs
+# locally, so CI and local stay identical.
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: container-iac-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hadolint:
+    name: Hadolint (Dockerfiles)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install hadolint
+        run: |
+          set -euo pipefail
+          sudo curl -sSfL \
+            https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 \
+            -o /usr/local/bin/hadolint
+          sudo chmod +x /usr/local/bin/hadolint
+
+      - name: Lint Dockerfiles
+        run: bash scripts/hadolint.sh
+
+  trivy:
+    name: Trivy (container / IaC misconfig)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install trivy
+        run: |
+          set -euo pipefail
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sudo sh -s -- -b /usr/local/bin
+
+      - name: Scan Dockerfiles + IaC for misconfigurations
+        run: bash scripts/trivy.sh
+
+  checkov:
+    name: Checkov (Dockerfiles)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install checkov
+        run: pip install checkov
+
+      - name: Scan Dockerfiles
+        run: bash scripts/checkov.sh
+
+  kics:
+    name: KICS (docker-compose IaC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # scripts/kics.sh runs KICS via the pinned checkmarx/kics image, which is
+      # already available on the runner's Docker — no separate install step.
+      - name: Scan docker-compose files for misconfigurations
+        run: bash scripts/kics.sh
+
+  trivy-image:
+    name: Trivy (built-image vulnerabilities)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The ui and widget image builds install workspace devDependencies, which
+      # include private @afixt/* packages. This writes a runner-local .npmrc and
+      # sets NPM_CONFIG_USERCONFIG; scripts/trivy-image.sh mounts that file into
+      # the builds as a BuildKit secret (#130). Without it those two builds 404
+      # and go unscanned.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Authenticate the runner npmrc
+        run: npm config set "//registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Install trivy
+        run: |
+          set -euo pipefail
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sudo sh -s -- -b /usr/local/bin
+
+      # scripts/trivy-image.sh builds the api/ui/widget images and runs
+      # `trivy image` against each: CRITICAL fails, HIGH is reported (warn tier).
+      - name: Build images and scan for vulnerabilities
+        run: bash scripts/trivy-image.sh

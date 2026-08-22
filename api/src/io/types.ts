@@ -40,8 +40,26 @@ export interface ServerToClientEvents {
   }) => void;
   /** Chat has ended. */
   'chat:ended': (payload: { chatId: string; endedBy: 'customer' | 'support' }) => void;
-  /** Staff availability flipped (visitor-facing). */
+  /**
+   * A client event was rejected — authorization (wrong tenant/visitor) or
+   * validation. Sent only to the socket that triggered it so the caller can
+   * surface the failure instead of silently hanging (issue #72).
+   */
+  'chat:error': (payload: { event: string; message: string }) => void;
+  /**
+   * Aggregate tenant support availability flipped. Emitted to the tenant's
+   * visitor room (drives the widget's invitation / no-support states) and to
+   * the staff room. Reflects whether *any* agent is explicitly available and
+   * reachable AND the tenant is within its support hours.
+   */
   'support:availability_changed': (payload: { available: boolean }) => void;
+  /**
+   * Echo of the connected staff user's *own* explicit status, sent on connect
+   * and whenever they change it (fanned out to all of their tabs). Lets the
+   * console reflect the current status on reload and keep multiple tabs in
+   * sync.
+   */
+  'availability:self': (payload: { status: 'available' | 'away' }) => void;
   /**
    * Support proactively started a chat with this visitor (§5.1.5). Emitted to
    * the visitor's own room so the widget can surface the `support_initiated`
@@ -56,6 +74,13 @@ export interface ServerToClientEvents {
 export interface StaffToServerEvents {
   /** Staff accepts a pending chat. */
   'chat:accept': (payload: { chatId: string }) => void;
+  /**
+   * Staff (re-)joins a chat room without changing its assignment. Emitted on
+   * every socket `connect` so an operator re-enters the `chat:{id}` rooms they
+   * had open after any reconnect — unlike `chat:accept`, it never mutates
+   * `assignedTo` (issue #69).
+   */
+  'chat:join': (payload: { chatId: string }) => void;
   /** Staff sends a message. */
   'chat:message': (payload: { chatId: string; body: string }) => void;
   /** Staff typing indicator. */
@@ -64,6 +89,10 @@ export interface StaffToServerEvents {
   'chat:end': (payload: { chatId: string }) => void;
   /** Staff-initiated chat (§5.1.5). */
   'chat:initiate': (payload: { visitorSessionId: string }) => void;
+  /** Staff sets their own explicit availability. */
+  'availability:set': (payload: { status: 'available' | 'away' }) => void;
+  /** Periodic connection-liveness ping that refreshes the grace window. */
+  'availability:heartbeat': () => void;
 }
 
 /**

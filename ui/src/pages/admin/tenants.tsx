@@ -158,6 +158,13 @@ function TenantRow(props: TenantRowProps): React.JSX.Element {
                   minRows={3}
                   fullWidth
                   helperText={t('admin.tenants.allowedOriginsHelp')}
+                  // The section heading above is not a label; without this
+                  // the textarea has no accessible name at all (see
+                  // admin-edit-tenant-settings.uc.yaml, which targets it
+                  // as field "Allowed origins").
+                  slotProps={{
+                    htmlInput: { 'aria-label': t('admin.tenants.allowedOrigins') },
+                  }}
                 />
                 <Button
                   onClick={handleSaveOrigins}

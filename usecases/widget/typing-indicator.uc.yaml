@@ -1,0 +1,33 @@
+id: widget-typing-indicator
+title: "Visitor sees that support is typing"
+extends: widget-actively-chatting
+type: extension
+description: |
+  §5.1.6 / issue #80 — while a support agent is composing a reply, the widget
+  shows a typing cue. It is rendered in a `role="status"` live region, so it is
+  programmatic, visible, and announced rather than a purely visual animation
+  (requirements.md §3).
+
+  The cue is transient presentation and deliberately not part of the widget
+  state machine: it must never perturb the documented states, and a socket
+  re-join after a reconnect must not replay a stale "is typing".
+
+  The signal arrives as a `chat:typing` socket event from the console, so the
+  full round trip belongs to the cross-ends journey suite (ADR-0007). This file
+  is the behavioural source of truth for the widget's typing surface.
+
+preconditions:
+  - The visitor is in an active chat with a support agent (see
+    widget-actively-chatting).
+  - The support agent has begun composing a reply, emitting chat:typing.
+
+data: {}
+
+steps_override:
+  from_step: 4
+  steps:
+    - 'verify: text "Support is typing"'
+
+expected_result: >-
+  The widget announces and displays that support is typing while the agent
+  composes, and stops showing it once they stop.

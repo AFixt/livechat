@@ -1,0 +1,30 @@
+# trufflehog path exclusions (native allow-list), passed via --exclude-paths by
+# scripts/secret-scan.sh to BOTH tiers. Each line is a regular expression
+# matched against the file path. These paths carry only test fixtures, dev
+# placeholders, or human-readable strings — never live credentials — so they
+# are pure noise in the "suspected" tier. The verified tier stays near-silent
+# regardless (nothing here verifies), so excluding them costs no real coverage.
+#
+# Exception lifecycle: add a path here only with a one-line reason and your
+# handle + date on the same commit; drop it when the fixture goes away. Prefer
+# the line-level detect-secrets .secrets.baseline for one-off hits — reach for a
+# whole-path exclusion only when an entire file/dir is fixtures.
+
+# Committed lockfile — hashes and integrity digests trip high-entropy detectors.
+package-lock\.json$
+
+# Backend test suites — seeded passwords/tokens for fixtures, not real secrets.
+api/tests/
+api/src/config/.*\.test\.ts$
+api/scripts/seed-dev\.mjs$
+
+# Cross-end + UI/widget e2e harness — test credentials and Playwright config.
+e2e/support/
+ui/e2e/
+ui/playwright\.config\.ts$
+widget/playwright\.config\.ts$
+
+# Human-readable UI copy and use-case scripts (login flows reference "password"
+# as a field label / example value).
+ui/src/i18n/
+usecases/

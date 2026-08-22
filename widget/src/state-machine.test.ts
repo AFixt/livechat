@@ -79,6 +79,18 @@ describe('widget state machine', () => {
     expect(offline.chatId).toBeNull();
   });
 
+  it('support_available toggles the flag that gates the proactive invitation (§5.1.2)', () => {
+    // Regression guard: before #76 the only dispatch of this action set
+    // `available: false`, so the invitation surface was unreachable. Both
+    // directions must now be honoured.
+    const start = initialModel();
+    expect(start.supportAvailable).toBe(false);
+    const online = reduce(start, { type: 'support_available', available: true });
+    expect(online.supportAvailable).toBe(true);
+    const offline = reduce(online, { type: 'support_available', available: false });
+    expect(offline.supportAvailable).toBe(false);
+  });
+
   it('support_initiated opens the panel and support_accepted goes active', () => {
     const initiated = reduce(initialModel(), { type: 'support_initiated', chatId: 'chat-5' });
     expect(initiated.state).toBe('support_initiated');

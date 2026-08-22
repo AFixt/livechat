@@ -1,0 +1,40 @@
+id: admin-edit-tenant-settings
+title: "Super admin opens a tenant's settings surface"
+type: positive
+description: |
+  Each tenant row exposes an Edit toggle that expands the tenant's admin
+  surface: the embed snippet to paste into the client site, the
+  allowed-origins list that gates widget requests, and the embed-secret
+  rotation control. This use case documents the accessible structure of that
+  surface.
+
+  The allowed-origins input must be a labelled field ("Allowed origins") —
+  if it is not in the accessibility tree by that name, this case fails, and
+  that is intentional.
+
+start_location: "http://localhost:5174/admin/tenants"
+
+expected_result: >-
+  The tenant's settings surface expands with the embed snippet, a labelled
+  "Allowed origins" field, and the embed-secret rotation control all present
+  in the accessibility tree.
+
+preconditions:
+  - A super_admin user is authenticated.
+  - At least one tenant exists (see admin-create-tenant.uc.yaml).
+
+data:
+  origins: "https://example.com"
+
+steps:
+  - locate: heading "Tenants"
+  - locate: button "Edit"
+  - focus: button "Edit"
+  - activate: button "Edit"
+  - locate: heading "Embed snippet"
+  - locate: heading "Allowed origins"
+  - locate: field "Allowed origins"
+  - focus: field "Allowed origins"
+  - enter: field "Allowed origins" value "{{ origins }}"
+  - locate: button "Save"
+  - locate: heading "Rotate embed secret"

@@ -1,0 +1,29 @@
+id: widget-invitation--dismiss
+title: "Visitor dismisses the proactive invitation"
+type: extension
+description: |
+  §5.1.2 — the invitation flourish must be dismissible without opening a
+  chat. Activating the dismiss control returns the widget to its plain
+  closed trigger; the invitation does not re-appear for this visit unless
+  availability changes again.
+
+  Availability arrives over the visitor socket: the /visitor namespace emits
+  `support:availability_changed`, which the widget maps to the
+  `support_available` action (issue #76). The transition into this state
+  belongs to the cross-ends journey suite (ADR-0007); this file is the
+  behavioural source of truth for the dismiss path.
+
+start_location: "http://localhost:5175/"
+
+preconditions:
+  - At least one support agent is online and available for the tenant.
+  - The widget is closed and showing the invitation flourish.
+
+data: {}
+
+steps:
+  - locate: region "Chat invitation"
+  - locate: button "Dismiss chat invitation"
+  - focus: button "Dismiss chat invitation"
+  - activate: button "Dismiss chat invitation"
+  - locate: button "Chat with support"

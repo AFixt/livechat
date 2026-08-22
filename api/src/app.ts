@@ -8,12 +8,15 @@ import swaggerUi from 'swagger-ui-express';
 
 import { buildOpenApiSpec } from './config/swagger.js';
 import { correlationMiddleware } from './middlewares/correlation.js';
+import { buildCorsDelegate } from './middlewares/cors.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { notFoundHandler } from './middlewares/not-found-handler.js';
 import { createGlobalLimiter } from './middlewares/rate-limit.js';
 import { buildRouter } from './routes/index.js';
 
 import type { Env } from './config/env.js';
+import type { AdapterHealth } from './io/adapter.js';
+import type { IoRef } from './io/io-ref.js';
 import type { Services } from './services/index.js';
 import type { Redis } from 'ioredis';
 import type { Logger } from 'pino';
@@ -23,6 +26,13 @@ interface AppDeps {
   logger: Logger;
   redis: Redis;
   services: Services;
+  /** Socket.IO Redis adapter health, surfaced by `/health` (#73). */
+  socketAdapterHealth?: AdapterHealth;
+  /**
+   * Late-bound Socket.IO server. Populated by `server.ts` after `attachIo`,
+   * so a route can disconnect a revoked visitor's live socket (#123).
+   */
+  ioRef?: IoRef;
   /**
    * Skip global rate limiting. Set to `true` in unit tests where the Redis
    * stub can't satisfy the rate-limit-redis Lua protocol.
@@ -43,14 +53,10 @@ export function createApp(deps: AppDeps): Express {
   app.set('trust proxy', 1);
 
   app.use(helmet());
-  app.use(
-    cors({
-      origin: env.APP_URL,
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Correlation-ID', 'X-XSRF-TOKEN'],
-    }),
-  );
+  // Console routes keep the strict single-origin (APP_URL) policy; widget-facing
+  // routes reflect the requesting origin when it belongs to a tenant's
+  // allowed_origins, so the embeddable widget works cross-site (#74).
+  app.use(cors(buildCorsDelegate(env)));
   app.use(compression());
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
@@ -69,15 +75,34 @@ export function createApp(deps: AppDeps): Express {
     }),
   );
 
-  /* eslint-disable @typescript-eslint/no-deprecated -- swagger-ui-express 5 still ships .setup; replacement API not yet stable */
-  const openApiSpec = buildOpenApiSpec(env) as unknown as Parameters<typeof swaggerUi.setup>[0];
-  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
-  /* eslint-enable @typescript-eslint/no-deprecated */
+  // The OpenAPI spec + Swagger UI publish the entire route and schema
+  // inventory, including every admin surface, with no auth. Serving that in
+  // production is free reconnaissance for an attacker (#78), so it is mounted
+  // only outside production; developers read it from a local/staging run. See
+  // docs/deploy.md.
+  if (env.NODE_ENV !== 'production') {
+    // `buildOpenApiSpec` is typed `any` by zod-to-openapi; narrow to `object`
+    // so it can be served and handed to swagger-ui without unsafe-any usage.
+    const openApiSpec = buildOpenApiSpec(env) as object;
+    // Raw machine-readable spec for tooling (e.g. schema-based testing).
+    app.get('/api/docs.json', (_req, res) => {
+      res.json(openApiSpec);
+    });
+    /* eslint-disable @typescript-eslint/no-deprecated -- swagger-ui-express 5 still ships .setup; replacement API not yet stable */
+    app.use(
+      '/api/docs',
+      swaggerUi.serve,
+      swaggerUi.setup(openApiSpec as unknown as Parameters<typeof swaggerUi.setup>[0]),
+    );
+    /* eslint-enable @typescript-eslint/no-deprecated */
+  }
 
   const v1 = buildRouter({
     env,
     redis,
     services,
+    ...(deps.socketAdapterHealth && { socketAdapterHealth: deps.socketAdapterHealth }),
+    ...(deps.ioRef && { ioRef: deps.ioRef }),
     ...(deps.skipRateLimit === true && { skipRateLimit: true }),
   });
   if (deps.skipRateLimit === true) {

@@ -1,4 +1,104 @@
-# ZAP baseline rule tuning. Format: <ruleId>	<threshold>	<comment>
-# Thresholds: IGNORE | WARN | FAIL (default is FAIL for HIGH/MEDIUM, WARN for LOW)
+# OWASP ZAP baseline rule tuning for the livechat targets.
 #
-# No overrides today — start strict, relax only with a documented reason.
+# Format (tab-separated): <ruleId>	<threshold>	<comment>
+#   threshold: IGNORE | WARN | FAIL   (default: FAIL for HIGH/MEDIUM, WARN for LOW)
+#
+# Consumed by .github/workflows/zap.yml (rules_file_name). Every override below
+# is a deliberate, documented decision — start strict, relax only with a reason.
+# See docs/security/zap.md for how to run the scan and why each line exists.
+#
+# ---------------------------------------------------------------------------
+# Blocking (FAIL) — a regression in one of these turns the build red.
+# ---------------------------------------------------------------------------
+#
+# zap-baseline treats every rule as WARN unless it is named FAIL here. With
+# `-I` passed (so WARN no longer fails the run), a rules file that names nothing
+# FAIL makes the job incapable of ever going red — permanently green, which is
+# exactly as useless as the permanently red it replaced. These are the rules
+# whose regression is a real security regression on the shipped static hosts.
+# Verified: removing the console's clickjacking protection turns the run red
+# through 10020, and restoring it turns it green again (#131).
+#
+# 10020 — Missing Anti-clickjacking Header.
+# The console must never be framable: X-Frame-Options DENY + CSP
+# frame-ancestors 'none' (ADR-0012). Note ZAP accepts either, so this only
+# fires when BOTH are gone — which is the condition that actually matters.
+10020	FAIL	Console must not be framable (ADR-0012)
+#
+# 10021 — X-Content-Type-Options Header Missing.
+# `nosniff` on both static hosts; losing it re-opens MIME-confusion attacks.
+10021	FAIL	nosniff is required on both static hosts (ADR-0012)
+#
+# 10038 — Content Security Policy (CSP) Header Not Set.
+# The CSP is the console's primary XSS containment; losing it is not a warning.
+10038	FAIL	CSP is the primary XSS containment on the static hosts (ADR-0012)
+#
+# 10036 — Server Leaks Version Information via "Server" Header.
+# `server_tokens off` in both nginx configs. Found by this very scan once it
+# started targeting the shipped config instead of `http-server` (#131) — kept
+# FAIL so it cannot quietly come back.
+10036	FAIL	server_tokens off in both nginx configs (#131)
+#
+# 10017 — Cross-Domain JavaScript Source File Inclusion.
+# Both hosts serve only first-party script; a cross-domain <script> would mean
+# the CSP's `script-src 'self'` had been widened without review.
+10017	FAIL	Both hosts serve first-party script only (ADR-0012)
+#
+# ---------------------------------------------------------------------------
+# Suppressions (IGNORE) — findings that are false positives or by-design here.
+# ---------------------------------------------------------------------------
+#
+# 10015 — Incomplete or No Cache-control Header.
+# The API deliberately does not send Cache-Control on JSON responses; they are
+# not cacheable by default and carry per-request auth. The static hosts DO set
+# explicit Cache-Control (ui/nginx.conf, widget/nginx.conf). Noise on the API.
+10015	IGNORE	API JSON is non-cacheable by default; static hosts set Cache-Control explicitly
+#
+# 10096 — Timestamp Disclosure.
+# ZAP flags any integer that looks like a Unix timestamp. Our JSON carries
+# `created_at` / `expires_at` ISO fields and numeric ids by design; none are
+# secrets. Pure false positive.
+10096	IGNORE	Timestamps (created_at/expires_at) are intended API data, not a leak
+#
+# 10027 — Information Disclosure - Suspicious Comments.
+# Fires on words like "TODO"/"query" inside the minified widget/console bundles.
+# No secrets are shipped in client code (enforced by trufflehog + no-secrets).
+10027	IGNORE	Suspicious-comment heuristic hits minified bundles; no secrets in client JS
+#
+# ---------------------------------------------------------------------------
+# Downgrades (WARN) — worth seeing, but must not fail the baseline yet.
+# ---------------------------------------------------------------------------
+#
+# 90005 — Sec-Fetch-Dest Header is Missing.
+# Sec-Fetch-* are REQUEST headers the browser sends; a server cannot set them,
+# so there is nothing here to fix. An artifact of the alpha passive rules
+# (`-a`), which are kept for their genuine coverage. (#131)
+90005	IGNORE	Sec-Fetch-* are request headers the browser sends; not server-controllable
+#
+# ---------------------------------------------------------------------------
+# Downgrades (WARN) — worth seeing, but must not fail the baseline yet.
+# ---------------------------------------------------------------------------
+#
+# 90004 — Insufficient Site Isolation Against Spectre.
+# The CONSOLE now sets Cross-Origin-Embedder-Policy: require-corp alongside its
+# COOP + CORP, so it is fully cross-origin isolated (ADR-0012, #131). It loads
+# no cross-origin subresources — its CSP is `default-src 'self'` — so require-corp
+# costs nothing there; verified in a browser (`window.crossOriginIsolated === true`,
+# console renders clean).
+# The WIDGET deliberately does NOT set it: it is loaded as a subresource *into*
+# customer pages, where CORP (`cross-origin`) is the header that matters and
+# COEP would constrain the host page rather than protect the widget.
+# Kept at WARN so the API — JSON, no browsing context, no COEP — does not fail
+# the gate over a header that means nothing there.
+90004	WARN	Console sets COEP (ADR-0012); widget must stay embeddable; API has no browsing context
+#
+# 10063 — Permissions Policy Header Not Set.
+# The console sets Permissions-Policy; the API (JSON, no browsing context) does
+# not need one. WARN so a genuinely missing header on the console still surfaces.
+10063	WARN	API responses have no browsing context; console sets Permissions-Policy
+#
+# 10049 — Storable and Cacheable Content.
+# The console's static assets are deliberately cacheable (`public, immutable`
+# for hashed bundles; `no-store` for index.html). Being cacheable is the intent,
+# not a defect. WARN keeps it visible without failing.
+10049	WARN	Hashed static assets are intentionally cacheable; index.html is no-store

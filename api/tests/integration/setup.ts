@@ -39,6 +39,12 @@ export function testEnv(): Env {
     JWT_ACCESS_EXPIRES_IN: '15m',
     JWT_REFRESH_EXPIRES_IN: '7d',
     COOKIE_SECRET: 'test-cookie-secret-' + Math.random().toString(36).slice(2),
+    // Jurisdiction comes from a trusted edge header, never the request body
+    // (#53). Tests set `x-geo-country` to model an edge that resolved one.
+    GEO_COUNTRY_HEADER: 'x-geo-country',
+    GEO_REGION_HEADER: 'x-geo-region',
+    VISITOR_SESSION_ABSOLUTE_TTL_HOURS: 720,
+    VISITOR_SESSION_IDLE_TTL_HOURS: 72,
     APP_URL: 'http://localhost:25174',
     API_URL: 'http://localhost:23001',
     WIDGET_URL: 'http://localhost:25175',
@@ -142,7 +148,12 @@ export async function probeLiveHarness(): Promise<LiveTestHarness | null> {
   const base = await probeHarness();
   if (base === null) return null;
   const httpServer = createServer(base.app);
-  const io = attachIo(httpServer, { env: base.env, logger: base.logger, services: base.services });
+  const io = attachIo(httpServer, {
+    env: base.env,
+    logger: base.logger,
+    redis: base.redis,
+    services: base.services,
+  });
   await new Promise<void>((resolve) => {
     httpServer.listen(0, '127.0.0.1', () => {
       resolve();

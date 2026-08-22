@@ -16,7 +16,7 @@ const AGENT_REPLY = 'Thanks Dana — let me take a look at your cart.';
 
 test('customer and agent converse end to end, both directions', async ({ browser }) => {
   // Agent comes online first, so support is available when the visitor starts.
-  const agent = await openAgent(browser);
+  const agent = await openAgent(browser, { available: true });
   await expect(agent.page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   await expect(agent.page.getByText('No active chats.')).toBeVisible();
   // Let the staff socket connect and mark the agent available before the

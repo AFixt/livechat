@@ -1,16 +1,89 @@
-name: OWASP ZAP baseline (scheduled)
+name: OWASP ZAP baseline
 
 on:
-  schedule:
-    - cron: "0 6 * * 2"
+  pull_request:
   workflow_dispatch:
     inputs:
       target_url:
         description: "URL to scan (e.g., https://chat.afixt.com). Falls back to ZAP_TARGET_URL repo variable."
         required: false
 
+concurrency:
+  group: zap-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  zap-baseline:
+  # Scans the PR's own build: the UI bundle is built from the head commit and
+  # served locally, so a finding is attributable to the change under review.
+  # action-baseline runs the ZAP container with --network=host, so a
+  # localhost target on the runner is reachable.
+  zap-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # Least privilege: this job neither uploads SARIF (no security-events)
+    # nor opens issues (allow_issue_writing: false), so read is sufficient.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          # Writes a runner-local .npmrc so NODE_AUTH_TOKEN authenticates
+          # the private @afixt/* packages. Kept out of the committed .npmrc
+          # so local installs keep using the developer's own credentials.
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Build shared, UI and widget
+        run: npm run build
+
+      # Serve the built bundle through the SAME nginx config the console
+      # actually ships with (ui/Dockerfile's runtime stage is this image plus
+      # these two files). Scanning `http-server` instead meant every response
+      # header the config sets — CSP, X-Frame-Options, nosniff,
+      # Permissions-Policy, Cache-Control — was reported missing, so the gate
+      # failed on a difference between the harness and production and a real
+      # regression would have been indistinguishable from the usual noise
+      # (#131). Plain nginx rather than `docker build -f ui/Dockerfile` on
+      # purpose: the image build needs private-registry credentials (#130),
+      # which a header scan has no reason to require.
+      - name: Serve the UI through the shipped nginx config
+        run: |
+          docker run -d --name zap-ui-target -p 8080:80 \
+            -v "$PWD/ui/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+            -v "$PWD/ui/dist:/usr/share/nginx/html:ro" \
+            nginx:1.27-alpine
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:8080/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "UI target did not become ready" >&2
+          docker logs zap-ui-target >&2 || true
+          exit 1
+
+      - name: ZAP baseline scan (PR build)
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: http://localhost:8080
+          rules_file_name: .github/zap/rules.tsv
+          fail_action: true
+          allow_issue_writing: false
+          # `-I` stops a WARN from failing the run, which is what makes the
+          # three-tier model in rules.tsv (IGNORE | WARN | FAIL) mean anything.
+          # Without it zap-baseline exits non-zero on *any* alert, collapsing
+          # WARN into FAIL — every PR red, and no way to tell a new finding
+          # from the standing ones (#131). FAIL-level alerts still fail.
+          cmd_options: "-a -j -I"
+
+  # Manual scan of a deployed environment (post-deploy gate).
+  zap-deployed:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -46,4 +119,5 @@ jobs:
           rules_file_name: .github/zap/rules.tsv
           fail_action: true
           allow_issue_writing: true
-          cmd_options: "-a -j"
+          # See the PR job: WARN is a warning, FAIL fails.
+          cmd_options: "-a -j -I"

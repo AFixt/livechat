@@ -167,7 +167,9 @@ export function createAuthService(deps: AuthDeps) {
       }
       let decoded: RefreshPayload;
       try {
-        decoded = jwt.verify(refreshToken, deps.env.JWT_REFRESH_SECRET) as RefreshPayload;
+        decoded = jwt.verify(refreshToken, deps.env.JWT_REFRESH_SECRET, {
+          algorithms: ['HS256'],
+        }) as RefreshPayload;
       } catch {
         throw ApiError.unauthorized('Invalid refresh token');
       }

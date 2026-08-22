@@ -282,8 +282,8 @@ trigger, and no scheduled workflow that has been removed may be added back.**
 This is a standing constraint, not a default to be traded away for convenience.
 
 A timer-triggered check reports a problem hours or days after it entered the
-codebase, attributes it to no one, and gets ignored. The same check run against a
-pull request blocks the defect at the point of introduction.
+codebase, attributes it to no one, and gets ignored. The same check run against
+a pull request blocks the defect at the point of introduction.
 
 ### Rules
 
@@ -304,10 +304,11 @@ pull request blocks the defect at the point of introduction.
     as a post-deploy gate, not against a static URL on a timer.
   - End-to-end suites run as a smoke subset on `pull_request` and as the full
     matrix on merge to the default branch — never nightly.
-- `workflow_dispatch` is allowed. A manual, on-demand run is not a scheduled run.
-- Event-driven triggers (`push`, `pull_request`, `release`, `repository_dispatch`,
-  `workflow_call`) are allowed and preferred.
-- Genuinely periodic *product* work — batch jobs, data pipelines, report
+- `workflow_dispatch` is allowed. A manual, on-demand run is not a scheduled
+  run.
+- Event-driven triggers (`push`, `pull_request`, `release`,
+  `repository_dispatch`, `workflow_call`) are allowed and preferred.
+- Genuinely periodic _product_ work — batch jobs, data pipelines, report
   generation — does not belong in GitHub Actions at all. Run it on real
   infrastructure with its own scheduler, alerting, and retries.
 

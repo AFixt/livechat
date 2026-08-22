@@ -1,0 +1,25 @@
+id: support-set-availability
+title: "Operator sets their availability to available"
+type: positive
+description: |
+  Issue #76 — availability is now an explicit per-user choice, not a side
+  effect of having a socket open. The Availability page lets the operator
+  mark themselves Available or Away. The status is stored server-side and
+  gates whether the customer widget shows the proactive invitation (§5.1.2)
+  or the no-support state (§5.1.4). Setting it announces the change through
+  the live region (programmatic), updates the visible status text (visible),
+  and plays the alert chime (audible) per §3.
+
+start_location: "http://localhost:5174/settings/availability"
+
+preconditions:
+  - A staff user is authenticated (see support-login.uc.yaml).
+
+data: {}
+
+steps:
+  - locate: heading "Availability"
+  - locate: checkbox "Available"
+  - focus: checkbox "Available"
+  - select: checkbox "Available"
+  - verify: text "You are available."

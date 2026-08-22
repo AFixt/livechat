@@ -63,7 +63,11 @@ async function loginAs(baseUrl: string, email: string, password: string): Promis
 }
 
 /**
- * Init a visitor session over HTTP and return the raw cookie value + session id.
+ * Init a *tracked* visitor session over HTTP and return the raw cookie value +
+ * session id. Sends the trusted `x-geo-country: US` edge header so the consent
+ * gate resolves an opt-out jurisdiction and (with no GPC) permits presence
+ * tracking, creating the `visitor_sessions` row these presence/typing/
+ * page-change events depend on. Jurisdiction is never taken from the body.
  * @param baseUrl - Live harness base URL.
  * @param tenantSlug - Tenant to attach the session to.
  * @returns The raw `livechat_visitor` cookie value plus the session id.
@@ -71,9 +75,10 @@ async function loginAs(baseUrl: string, email: string, password: string): Promis
 async function initVisitor(
   baseUrl: string,
   tenantSlug: string,
-): Promise<{ cookie: string; sessionId: string }> {
+): Promise<{ cookie: string; sessionId: string; csrfToken: string }> {
   const res = await request(baseUrl)
     .post('/api/v1/visitor/session')
+    .set('x-geo-country', 'US')
     .send({ tenantKey: tenantSlug });
   expect(res.status).toBe(201);
   const setCookie = res.headers['set-cookie'] as string | string[] | undefined;
@@ -84,7 +89,11 @@ async function initVisitor(
       : [setCookie];
   const visitorCookie = cookies.find((c) => c.startsWith('livechat_visitor='));
   const cookie = visitorCookie?.split(';')[0]?.replace('livechat_visitor=', '') ?? '';
-  return { cookie, sessionId: res.body.data.sessionId as string };
+  return {
+    cookie,
+    sessionId: res.body.data.sessionId as string,
+    csrfToken: res.body.data.csrfToken as string,
+  };
 }
 
 function waitFor<T>(socket: Socket, event: string, timeoutMs = 3000): Promise<T> {
@@ -160,11 +169,12 @@ describe('visitor namespace + visitor routes (integration)', () => {
     const { baseUrl } = harness;
     await seedTenantAndStaff('typing', 'staff@typing.example');
     const accessToken = await loginAs(baseUrl, 'staff@typing.example', STAFF_PASSWORD);
-    const { cookie: visitorCookie } = await initVisitor(baseUrl, 'typing');
+    const { cookie: visitorCookie, csrfToken } = await initVisitor(baseUrl, 'typing');
 
     const initRes = await request(baseUrl)
       .post('/api/v1/visitor/chats')
       .set('cookie', `livechat_visitor=${visitorCookie}`)
+      .set('X-XSRF-TOKEN', csrfToken)
       .send({ customerName: 'Typer', body: 'hello' });
     expect(initRes.status).toBe(201);
     const chatId = initRes.body.data.chat.id as string;
@@ -224,11 +234,12 @@ describe('visitor namespace + visitor routes (integration)', () => {
     const { baseUrl } = harness;
     await seedTenantAndStaff('vend', 'staff@vend.example');
     const accessToken = await loginAs(baseUrl, 'staff@vend.example', STAFF_PASSWORD);
-    const { cookie: visitorCookie } = await initVisitor(baseUrl, 'vend');
+    const { cookie: visitorCookie, csrfToken } = await initVisitor(baseUrl, 'vend');
 
     const initRes = await request(baseUrl)
       .post('/api/v1/visitor/chats')
       .set('cookie', `livechat_visitor=${visitorCookie}`)
+      .set('X-XSRF-TOKEN', csrfToken)
       .send({ customerName: 'Ender', body: 'bye soon' });
     expect(initRes.status).toBe(201);
     const chatId = initRes.body.data.chat.id as string;
@@ -337,12 +348,15 @@ describe('visitor namespace + visitor routes (integration)', () => {
     if (harness === null) return;
     const { baseUrl } = harness;
     await seedTenantAndStaff('optfields', 'staff@optfields.example');
-    const res = await request(baseUrl).post('/api/v1/visitor/session').send({
-      tenantKey: 'optfields',
-      language: 'en-US',
-      currentUrl: 'https://example.com/landing',
-      referrer: 'https://google.com/search',
-    });
+    const res = await request(baseUrl)
+      .post('/api/v1/visitor/session')
+      .set('x-geo-country', 'US')
+      .send({
+        tenantKey: 'optfields',
+        language: 'en-US',
+        currentUrl: 'https://example.com/landing',
+        referrer: 'https://google.com/search',
+      });
     expect(res.status).toBe(201);
 
     const { VisitorSession } = await import('../../src/models/index.js');
@@ -364,11 +378,12 @@ describe('visitor namespace + visitor routes (integration)', () => {
     if (harness === null) return;
     const { baseUrl } = harness;
     await seedTenantAndStaff('heartbeat', 'staff@heartbeat.example');
-    const { cookie } = await initVisitor(baseUrl, 'heartbeat');
+    const { cookie, csrfToken } = await initVisitor(baseUrl, 'heartbeat');
 
     const res = await request(baseUrl)
       .post('/api/v1/visitor/heartbeat')
       .set('cookie', `livechat_visitor=${cookie}`)
+      .set('X-XSRF-TOKEN', csrfToken)
       .send({ currentUrl: 'https://example.com/heartbeat' });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
