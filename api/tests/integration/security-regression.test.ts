@@ -162,7 +162,7 @@ describe('security regression: input validation + storage (integration)', () => 
   });
 
   describe('visitor session cookie flags + forgery', () => {
-    test('the visitor cookie is HttpOnly + SameSite=Lax (dev: no Secure)', async () => {
+    test('in dev the visitor cookie is HttpOnly + SameSite=Lax (no Secure)', async () => {
       if (harness === null) return;
       const res = await request(harness.app)
         .post('/api/v1/visitor/session')
@@ -171,12 +171,13 @@ describe('security regression: input validation + storage (integration)', () => 
       const cookie = visitorSetCookie(res);
       expect(cookie).toBeDefined();
       expect(cookie).toMatch(/HttpOnly/i);
+      // Local dev is same-origin over plain HTTP: SameSite=None would require
+      // Secure, and a Secure cookie is dropped on localhost HTTP (#75).
       expect(cookie).toMatch(/SameSite=Lax/i);
-      // Non-production: the Secure attribute must be absent so localhost works.
       expect(cookie).not.toMatch(/Secure/i);
     });
 
-    test('in production the visitor cookie also carries Secure', async () => {
+    test('in production the visitor cookie is SameSite=None; Secure; Partitioned', async () => {
       if (harness === null || prodApp === null) return;
       const res = await request(prodApp)
         .post('/api/v1/visitor/session')
@@ -185,8 +186,12 @@ describe('security regression: input validation + storage (integration)', () => 
       const cookie = visitorSetCookie(res);
       expect(cookie).toBeDefined();
       expect(cookie).toMatch(/HttpOnly/i);
-      expect(cookie).toMatch(/SameSite=Lax/i);
+      // The widget is embedded cross-site, so the cookie is only ever sent
+      // with SameSite=None — which browsers reject without Secure (#75).
+      expect(cookie).toMatch(/SameSite=None/i);
       expect(cookie).toMatch(/Secure/i);
+      expect(cookie).toMatch(/Partitioned/i);
+      expect(cookie).not.toMatch(/SameSite=Lax/i);
     });
 
     test('auth/login does not set any session cookie (JWTs are returned in the body)', async () => {

@@ -10,11 +10,14 @@ import {
 import { Router, type Request, type Response } from 'express';
 
 import { parsedBody, validate } from '../middlewares/validate.js';
+import {
+  VISITOR_COOKIE_NAME,
+  readVisitorSessionValue,
+  visitorCookieOptions,
+} from '../middlewares/visitor-request.js';
 import { Tenant } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
 import { asyncHandler } from '../utils/async-handler.js';
-
-import { VISITOR_COOKIE_NAME, visitorCookieOptions } from './visitor-cookie-options.js';
 
 import type { Env } from '../config/env.js';
 import type { ConsentService, VisitorSessionService } from '../services/index.js';
@@ -52,20 +55,25 @@ function detectGpc(req: Request, clientFlag: boolean | undefined): boolean {
 }
 
 /**
- * Resolve the visitor's durable subject key from the cookie, minting a fresh
- * cookie handle (and setting it on the response) when none is present.
+ * Resolve the visitor's durable subject key from the presented session — the
+ * `X-Visitor-Session` header first, then the cookie (#75) — minting a fresh
+ * cookie handle (and setting it on the response) when neither is present.
  * @param deps - Router deps.
  * @param req - Request (for the incoming cookie).
  * @param res - Response (to set a new cookie when minted).
  * @returns The subject key.
  */
 function resolveSubject(deps: PrivacyRouterDeps, req: Request, res: Response): string {
-  const raw: unknown = req.cookies[VISITOR_COOKIE_NAME];
-  if (typeof raw === 'string' && raw.length > 0) {
+  const raw = readVisitorSessionValue(req);
+  if (raw !== undefined) {
     return deps.visitorSession.subjectKeyFromCookie(raw);
   }
   const { cookieValue, subjectKey } = deps.visitorSession.mintHandle();
-  res.cookie(VISITOR_COOKIE_NAME, cookieValue, visitorCookieOptions(deps.env));
+  res.cookie(
+    VISITOR_COOKIE_NAME,
+    cookieValue,
+    visitorCookieOptions(deps.env.NODE_ENV === 'production'),
+  );
   return subjectKey;
 }
 
@@ -153,7 +161,8 @@ export function buildPrivacyRouter(deps: PrivacyRouterDeps): Router {
       const body = parsedBody(req, recordConsentInputSchema);
       const explicitConsent: ExplicitConsent = {};
       if (body.purposes.presence !== undefined) explicitConsent.presence = body.purposes.presence;
-      if (body.purposes.analytics !== undefined) explicitConsent.analytics = body.purposes.analytics;
+      if (body.purposes.analytics !== undefined)
+        explicitConsent.analytics = body.purposes.analytics;
       const state = await recordBannerDecision({ deps, req, res, body, explicitConsent });
       res.status(201).json({ success: true, data: state });
     }),

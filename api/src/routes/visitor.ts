@@ -10,12 +10,15 @@ import { Router } from 'express';
 
 import { computeCsrfToken, csrfProtection } from '../middlewares/csrf.js';
 import { parsedBody, validate } from '../middlewares/validate.js';
+import {
+  VISITOR_COOKIE_NAME,
+  readVisitorSessionValue,
+  visitorCookieOptions,
+} from '../middlewares/visitor-request.js';
 import { Tenant } from '../models/index.js';
 import { parseSupportHours } from '../services/support-hours.js';
 import { ApiError } from '../utils/api-error.js';
 import { asyncHandler } from '../utils/async-handler.js';
-
-import { VISITOR_COOKIE_NAME, visitorCookieOptions } from './visitor-cookie-options.js';
 
 import type { Env } from '../config/env.js';
 import type { ChatService, PresenceService, VisitorSessionService } from '../services/index.js';
@@ -75,7 +78,11 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
       if (body.identityToken !== undefined) initArgs.identityToken = body.identityToken;
 
       const { session, cookieValue } = await deps.visitorSession.init(initArgs);
-      res.cookie(VISITOR_COOKIE_NAME, cookieValue, visitorCookieOptions(deps.env));
+      res.cookie(
+        VISITOR_COOKIE_NAME,
+        cookieValue,
+        visitorCookieOptions(deps.env.NODE_ENV === 'production'),
+      );
       res.status(201).json({
         success: true,
         data: {
@@ -84,6 +91,9 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
           // The widget stores this and echoes it as X-XSRF-TOKEN on write
           // requests (#77).
           csrfToken: computeCsrfToken(cookieValue, deps.env.COOKIE_SECRET),
+          // The widget persists this and resends it as X-Visitor-Session when
+          // the browser blocks the third-party cookie (#75, ADR-0021).
+          sessionToken: cookieValue,
         },
       });
     }),
@@ -95,8 +105,7 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
     validate({ body: visitorHeartbeatInputSchema }),
     asyncHandler(async (req, res) => {
       const body = parsedBody(req, visitorHeartbeatInputSchema) satisfies VisitorHeartbeatInput;
-      const rawCookie: unknown = req.cookies[VISITOR_COOKIE_NAME];
-      const cookie = typeof rawCookie === 'string' ? rawCookie : undefined;
+      const cookie = readVisitorSessionValue(req);
       if (cookie === undefined) throw ApiError.unauthorized('Visitor session required');
       const session = await deps.visitorSession.findByCookie(cookie);
       await deps.visitorSession.heartbeat(session, body.currentUrl);
@@ -113,8 +122,7 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
         req,
         visitorInitiateChatInputSchema,
       ) satisfies VisitorInitiateChatInput;
-      const rawCookie: unknown = req.cookies[VISITOR_COOKIE_NAME];
-      const cookie = typeof rawCookie === 'string' ? rawCookie : undefined;
+      const cookie = readVisitorSessionValue(req);
       if (cookie === undefined) throw ApiError.unauthorized('Visitor session required');
       const visitor = await deps.visitorSession.findByCookie(cookie);
 
@@ -135,14 +143,18 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
   router.get(
     '/chats/current',
     asyncHandler(async (req, res) => {
-      const rawCookie: unknown = req.cookies[VISITOR_COOKIE_NAME];
-      const cookie = typeof rawCookie === 'string' ? rawCookie : undefined;
+      const cookie = readVisitorSessionValue(req);
       if (cookie === undefined) throw ApiError.unauthorized('Visitor session required');
       const visitor = await deps.visitorSession.findByCookie(cookie);
       const chat = await deps.chat.findResumableByVisitorSession(visitor.id);
       const csrfToken = computeCsrfToken(cookie, deps.env.COOKIE_SECRET);
+      // Also echo the session token so a cookie-authenticated returning visitor
+      // can persist it for the header fallback on later loads (#75).
       if (chat === null) {
-        res.json({ success: true, data: { chat: null, messages: [], csrfToken } });
+        res.json({
+          success: true,
+          data: { chat: null, messages: [], csrfToken, sessionToken: cookie },
+        });
         return;
       }
       const messages = await deps.chat.listMessages(chat.id);
@@ -150,7 +162,7 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
         success: true,
         // Returning visitors reuse an existing cookie and never call /session,
         // so hand them the CSRF token here too (#77).
-        data: { chat, messages, csrfToken },
+        data: { chat, messages, csrfToken, sessionToken: cookie },
       });
     }),
   );
@@ -161,8 +173,10 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
   router.post(
     '/session/forget',
     asyncHandler(async (req, res) => {
-      const rawCookie: unknown = req.cookies[VISITOR_COOKIE_NAME];
-      const cookie = typeof rawCookie === 'string' ? rawCookie : undefined;
+      // Header-first, like every other visitor route: a visitor whose browser
+      // blocks the third-party cookie must still be able to forget their
+      // session (#75, #79).
+      const cookie = readVisitorSessionValue(req);
       if (cookie !== undefined) {
         try {
           // Deletes regardless of expiry, so a stale session's PII is still
@@ -172,7 +186,13 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
           // Invalid/forged cookie — nothing to forget.
         }
       }
-      res.clearCookie(VISITOR_COOKIE_NAME, { path: '/' });
+      // Clearing only works when the attributes match the ones the cookie was
+      // set with — a `SameSite=None; Secure; Partitioned` cookie is not cleared
+      // by a bare `path` (#75).
+      res.clearCookie(
+        VISITOR_COOKIE_NAME,
+        visitorCookieOptions(deps.env.NODE_ENV === 'production'),
+      );
       res.json({ success: true });
     }),
   );
