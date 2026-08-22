@@ -10,6 +10,7 @@ import { buildInvitationsRouter } from '../../src/routes/invitations.js';
 import { buildPrivacyRouter } from '../../src/routes/privacy.js';
 import { buildTenantsRouter } from '../../src/routes/tenants.js';
 import { buildUsersRouter } from '../../src/routes/users.js';
+import { buildVisitorSessionsRouter } from '../../src/routes/visitor-sessions.js';
 import { buildVisitorRouter } from '../../src/routes/visitor.js';
 import { buildWidgetRouter } from '../../src/routes/widget.js';
 import { createServices } from '../../src/services/index.js';
@@ -146,6 +147,15 @@ describe('OpenAPI spec covers the mounted API surface (#119)', () => {
       }),
     },
     { prefix: '/chats', router: buildChatsRouter({ ...deps, chat: services.chat }) },
+    {
+      prefix: '/visitor-sessions',
+      router: buildVisitorSessionsRouter({
+        ...deps,
+        visitorSession: services.visitorSession,
+        presence: services.presence,
+        audit: services.audit,
+      }),
+    },
   ];
 
   const mounted = new Set(MOUNTS.flatMap((m) => collectRoutes(m.router, m.prefix)));

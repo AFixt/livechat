@@ -225,6 +225,40 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
     },
 
     /**
+     * Revoke a visitor session by id — the staff-initiated counterpart to the
+     * visitor's own "forget me" (#123, following #79).
+     *
+     * Hard-deletes for the same reason `forgetByCookie` does: a soft-deleted
+     * row would still be found by {@link findByCookie}, and the whole point is
+     * that the cookie stops working. Because both the HTTP `/visitor/*` routes
+     * and the `/visitor` socket handshake resolve through `findByCookie`, a
+     * missing row is already rejected there — so revocation needs no new
+     * rejection path, it reuses the one #94 built.
+     *
+     * Deliberately does not apply the expiry gate: an already-expired session
+     * must still be revocable, since the row (and its PII) outlives the window
+     * in which the cookie works.
+     * @param sessionId - The `visitor_sessions.id` to revoke.
+     * @param callerTenantId - The caller's tenant, or null for untenanted AFixt
+     *   staff who span every tenant (#19).
+     * @returns The revoked session's tenant and id, for presence cleanup.
+     * @throws 404 if no such session; 403 if it belongs to another tenant.
+     */
+    async revokeById(
+      sessionId: string,
+      callerTenantId: string | null,
+    ): Promise<{ tenantId: string; id: string }> {
+      const session = await VisitorSession.findByPk(sessionId);
+      if (session === null) throw ApiError.notFound('Visitor session not found');
+      if (callerTenantId !== null && session.tenantId !== callerTenantId) {
+        throw ApiError.forbidden('Visitor belongs to a different tenant');
+      }
+      const revoked = { tenantId: session.tenantId, id: session.id };
+      await session.destroy({ force: true });
+      return revoked;
+    },
+
+    /**
      * Bump `last_seen_at` and optionally update `current_url`.
      * @param session - The session (already loaded from {@link findByCookie}).
      * @param currentUrl - Optional new URL.

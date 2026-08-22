@@ -16,6 +16,7 @@ import { buildRouter } from './routes/index.js';
 
 import type { Env } from './config/env.js';
 import type { AdapterHealth } from './io/adapter.js';
+import type { IoRef } from './io/io-ref.js';
 import type { Services } from './services/index.js';
 import type { Redis } from 'ioredis';
 import type { Logger } from 'pino';
@@ -27,6 +28,11 @@ interface AppDeps {
   services: Services;
   /** Socket.IO Redis adapter health, surfaced by `/health` (#73). */
   socketAdapterHealth?: AdapterHealth;
+  /**
+   * Late-bound Socket.IO server. Populated by `server.ts` after `attachIo`,
+   * so a route can disconnect a revoked visitor's live socket (#123).
+   */
+  ioRef?: IoRef;
   /**
    * Skip global rate limiting. Set to `true` in unit tests where the Redis
    * stub can't satisfy the rate-limit-redis Lua protocol.
@@ -96,6 +102,7 @@ export function createApp(deps: AppDeps): Express {
     redis,
     services,
     ...(deps.socketAdapterHealth && { socketAdapterHealth: deps.socketAdapterHealth }),
+    ...(deps.ioRef && { ioRef: deps.ioRef }),
     ...(deps.skipRateLimit === true && { skipRateLimit: true }),
   });
   if (deps.skipRateLimit === true) {
