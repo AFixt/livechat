@@ -31,7 +31,10 @@ export function CustomerInitiatedState(props: CustomerInitiatedProps): preact.JS
   };
 
   return (
-    <form class="stack" onSubmit={onSubmit}>
+    // `aria-busy` while the chat is being created: the session bootstrap can
+    // still be in flight, so this wait is real and must be exposed, not just
+    // rendered (#129). The audible half is announced from `handleCustomerInit`.
+    <form class="stack" onSubmit={onSubmit} aria-busy={submitting}>
       {props.errorMessage !== null && (
         <div class="alert" role="alert">
           {props.errorMessage}

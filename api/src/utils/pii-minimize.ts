@@ -85,9 +85,7 @@ function expandIpv6(value: string): string[] | null {
 function truncateIpv6(value: string): string | null {
   const groups = expandIpv6(value);
   if (groups === null) return null;
-  const prefix = groups
-    .slice(0, 3)
-    .map((group) => group.toLowerCase().replace(/^0+(?=.)/, ''));
+  const prefix = groups.slice(0, 3).map((group) => group.toLowerCase().replace(/^0+(?=.)/, ''));
   return `${prefix.join(':')}::`;
 }
 

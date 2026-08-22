@@ -53,6 +53,31 @@ Diverge where the hosts diverge:
 | `Cross-Origin-Resource-Policy` | `same-origin` — no other site loads console assets     | `cross-origin` — client sites must load `widget.js`              |
 | Framing                        | `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'` | no `X-Frame-Options`; CSP `frame-ancestors *` — stays embeddable |
 | `Access-Control-Allow-Origin`  | not set                                                | `*` (kept — the embed contract)                                  |
+| `Cross-Origin-Embedder-Policy` | `require-corp` — cross-origin isolated                 | not set — see below                                              |
+
+### Cross-Origin-Embedder-Policy (added by #131)
+
+ZAP rule 90004 ("Insufficient Site Isolation Against Spectre") flags a document
+that sets COOP and CORP but not COEP. It was carried as a WARN with the reason
+"COEP intentionally unset so the widget stays cross-origin embeddable" — which
+is right for the widget and was never examined for the console. Splitting the
+two:
+
+- **Console: set `require-corp`.** Its CSP is `default-src 'self'`, so it loads
+  no cross-origin subresources for COEP to block, and it makes no cross-origin
+  requests other than `fetch`/WebSocket to the API — neither of which COEP
+  constrains. The cost is therefore zero today and the gain is real cross-origin
+  isolation. Verified in a browser against the shipped config:
+  `window.crossOriginIsolated === true`, the app mounts, no console errors. The
+  forward cost is a foot-gun to know about: a future cross-origin image or font
+  would need a `Cross-Origin-Resource-Policy` from its host, or it will be
+  blocked. Given `default-src 'self'`, adding one is already a deliberate act.
+- **Widget: do not set it.** The widget is loaded as a subresource _into_
+  customer pages. COEP governs what a document may embed, so on the widget's
+  responses it would constrain the host page's context rather than protect the
+  widget — and `Cross-Origin-Resource-Policy: cross-origin` is the header that
+  actually makes the embed work. Setting COEP here would be cargo-culting a
+  header from a different threat model.
 
 Add `scripts/check-headers.mjs`, wired as `npm run security:headers` and into
 the aggregate `security` script (so it runs in `check:all`/CI). It is a **config

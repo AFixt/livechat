@@ -160,9 +160,17 @@ describe('data retention service', () => {
       new Date('2026-01-01T00:00:00.000Z'),
     );
     const retention = createDataRetentionService({ logger });
-    const first = await retention.purgeExpiredVisitorData({ retentionDays: 90, strategy: 'anonymize', now });
+    const first = await retention.purgeExpiredVisitorData({
+      retentionDays: 90,
+      strategy: 'anonymize',
+      now,
+    });
     expect(first.anonymized).toBeGreaterThanOrEqual(1);
-    const second = await retention.purgeExpiredVisitorData({ retentionDays: 90, strategy: 'anonymize', now });
+    const second = await retention.purgeExpiredVisitorData({
+      retentionDays: 90,
+      strategy: 'anonymize',
+      now,
+    });
     expect(second.anonymized).toBe(0);
   });
 

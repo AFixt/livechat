@@ -47,6 +47,9 @@ const HOSTS = [
       CONSOLE_CSP,
       'Cross-Origin-Opener-Policy "same-origin"',
       'Cross-Origin-Resource-Policy "same-origin"',
+      // Console only. Cross-origin isolation; it loads no cross-origin
+      // subresources, so require-corp costs nothing here (ADR-0012, #131).
+      'Cross-Origin-Embedder-Policy "require-corp"',
       HSTS,
       'X-Content-Type-Options "nosniff"',
       'X-Frame-Options "DENY"',
@@ -68,7 +71,11 @@ const HOSTS = [
       'Referrer-Policy "strict-origin-when-cross-origin"',
     ],
     // The widget must stay embeddable — no frame busting.
-    forbidden: ['X-Frame-Options', "frame-ancestors 'none'"],
+    // COEP is deliberately absent on the widget: it is embedded *into* customer
+    // pages, so COEP on its responses would govern the host page's context
+    // rather than protect the widget, and CORP `cross-origin` is what makes the
+    // embed work (ADR-0012, #131).
+    forbidden: ['X-Frame-Options', "frame-ancestors 'none'", 'Cross-Origin-Embedder-Policy'],
   },
 ];
 
