@@ -130,17 +130,34 @@ export async function fetchWidgetConfig(tenantKey: string): Promise<WidgetConfig
   return body.data;
 }
 
+/** Effective per-purpose tracking decision returned by the consent gate. */
+interface TrackingState {
+  functional: 'granted' | 'denied';
+  presence: 'granted' | 'denied';
+  analytics: 'granted' | 'denied';
+}
+
 interface InitSessionResponse {
-  sessionId: string;
+  /**
+   * The tracked-session id, or `null` when the consent gate suppressed ambient
+   * presence tracking. `null` means: render and allow chat (functional), but do
+   * not open the presence socket.
+   */
+  sessionId: string | null;
   tenantId: string;
   csrfToken: string;
+  jurisdiction: string;
+  gpc: boolean;
+  tracking: TrackingState;
+  /** Persisted and resent as X-Visitor-Session when the cookie is blocked (#75). */
   sessionToken: string;
 }
 
 /**
- * POST /api/v1/visitor/session — boot a visitor session.
+ * POST /api/v1/visitor/session — run the consent gate and, when ambient
+ * presence tracking is permitted, boot a tracked visitor session.
  * @param tenantKey - Tenant slug from `data-tenant-key`.
- * @returns The visitor session summary.
+ * @returns The gate decision plus the session summary.
  */
 export async function initVisitorSession(tenantKey: string): Promise<InitSessionResponse> {
   const body = await apiFetch<InitSessionResponse>('/visitor/session', {

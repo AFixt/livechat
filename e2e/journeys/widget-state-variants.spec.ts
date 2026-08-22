@@ -62,9 +62,11 @@ test('support-initiated chat shows the invitation state', async ({ browser }) =>
   await expect(agent.page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   await agent.page.waitForTimeout(1000);
 
-  // Visitor loads the widget — the session + socket connect on mount, so they
-  // appear in the console's presence list without opening the panel.
-  const visitor = await openVisitor(browser);
+  // Visitor loads the widget and consents to presence tracking (#53), so a
+  // tracked session + presence socket exist on mount and they appear in the
+  // console's list without opening the panel. Without consent the gate keeps
+  // them untracked and no agent could initiate a chat with them.
+  const visitor = await openVisitor(browser, { consentToTracking: true });
 
   const visitorRow = agent.page
     .getByRole('list', { name: 'Visitors on site' })

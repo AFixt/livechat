@@ -69,9 +69,9 @@ updated as those land.
 - Small ongoing cost: adding a suppression now requires a second edit (the
   registry entry), and expiries must be renewed or retired on their date. This
   friction is deliberate.
-- The registry and thresholds intentionally list tools that are not on
-  `develop` yet (trivy, checkov, ZAP). Those rows stay `pending` until the
-  sibling PRs wire them, so the policy is complete but not falsely enforcing.
+- The registry and thresholds intentionally list tools that are not on `develop`
+  yet (trivy, checkov, ZAP). Those rows stay `pending` until the sibling PRs
+  wire them, so the policy is complete but not falsely enforcing.
 - `check-exceptions.sh` parses the registry with Node line-scanning rather than
   a YAML dependency, keeping the gate install-free; this assumes the registry
   keeps its simple, documented block shape.

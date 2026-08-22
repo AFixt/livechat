@@ -74,6 +74,9 @@ describe('embed hardening (integration)', () => {
     });
     const res = await request(harness.app)
       .post('/api/v1/visitor/session')
+      // x-geo-country: US (trusted edge header) → opt-out jurisdiction → the consent gate creates a tracked
+      // session, which is where the identity-token sub is correlated.
+      .set('x-geo-country', 'US')
       .send({ tenantKey: 'embed', identityToken: token });
     expect(res.status).toBe(201);
 

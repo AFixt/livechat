@@ -10,6 +10,21 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 ## [Unreleased]
 
 ### Security
+
+- **Jurisdiction is now resolved server-side from a trusted edge header, not the
+  request body.** The consent gate decided opt-in vs opt-out from a `country` /
+  `region` the client sent, but the widget runs on the client's own site — so an
+  embedding page could have declared `US` for an EU visitor and turned an opt-in
+  jurisdiction into an opt-out one. Those fields are gone from
+  `POST /visitor/session` and from the `/privacy/*` bodies and query; the value
+  now comes only from the header named by `GEO_COUNTRY_HEADER` /
+  `GEO_REGION_HEADER`, which the CDN or load balancer injects and must strip
+  from client input. GPC stays client-readable on purpose — a signal that can
+  only ever *deny* tracking is safe to accept, one that could *grant* it is not.
+  With no header configured every visitor resolves to Unknown Location Mode,
+  which denies presence: the fail-safe, and the honest description of what the
+  gate could already determine, since the widget never sent a country. ([#53])
+
 - **The api image no longer ships a package manager, clearing a CRITICAL CVE.**
   `trivy image` was failing the gate on `CVE-2026-59873` (node-tar DoS via a
   crafted gzip bomb) plus seven HIGHs in `brace-expansion`, `ip-address`,
@@ -90,6 +105,23 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   `messages_synced` (de-duplicating optimistic sends), and a reconnect is
   surfaced programmatically, visibly, and audibly (widget banner + live-region
   announcement; console live-region announcement). ([#69])
+### Security
+
+- **Visitor presence tracking is now gated behind a consent decision.**
+  Previously the widget created a `visitor_sessions` row — capturing IP, user
+  agent, current URL, and referrer — for every visitor on page load, in every
+  jurisdiction, with no consent gate (behavioral tracking of visitors who never
+  engaged). Page load now runs the consent gate first: ([#53])
+  - In opt-in (EU/EEA/UK) and Unknown-location modes, **no tracked session is
+    created and no IP/geo/URL is captured** until the visitor consents or
+    actively starts a chat. `POST /visitor/session` returns `sessionId: null`
+    and the widget keeps the presence socket closed.
+  - In US opt-out modes, presence tracking proceeds by default unless the
+    visitor has opted out (or GPC is present — see #55).
+  - **Functional use is never blocked.** The widget still renders and a visitor
+    can always start a chat; opening a chat is strictly necessary and lazily
+    creates the session at that point. New widget use case
+    `functional-without-consent.uc.yaml` covers this.
 
 ### Added
 
@@ -461,6 +493,8 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   payload slice body-parser puts in `err.message` is never echoed).
 
 [#57]: https://github.com/AFixt/livechat/issues/57
+[#53]: https://github.com/AFixt/livechat/issues/53
+[#56]: https://github.com/AFixt/livechat/issues/56
 [#75]: https://github.com/AFixt/livechat/issues/75
 [ADR-0021]: docs/adr/0021-visitor-session-third-party-cookie-fallback.md
 [#132]: https://github.com/AFixt/livechat/issues/132

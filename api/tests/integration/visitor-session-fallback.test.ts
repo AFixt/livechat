@@ -47,6 +47,20 @@ describe('visitor session header fallback (#75)', () => {
       .post('/api/v1/visitor/session')
       .send({ tenantKey: TENANT_SLUG });
     const sessionToken = boot.body.data.sessionToken as string;
+    const csrfToken = boot.body.data.csrfToken as string;
+
+    // The consent gate (#53) means `POST /session` does not necessarily create
+    // a `visitor_sessions` row: under the fail-safe Unknown jurisdiction,
+    // presence tracking is denied and only a subject cookie is issued. Starting
+    // a chat is a functional purpose and creates the row regardless — so do
+    // that first, otherwise this asserts against a session that never existed
+    // rather than against the header fallback.
+    await request(harness.app)
+      .post('/api/v1/visitor/chats')
+      .set('X-Visitor-Session', sessionToken)
+      .set('X-XSRF-TOKEN', csrfToken)
+      .send({ customerName: 'Header Visitor', body: 'hello over the header' })
+      .expect(201);
 
     // No Cookie header at all — exactly the Safari/Firefox third-party-cookie
     // situation. The session must still resolve from the header.
@@ -55,7 +69,6 @@ describe('visitor session header fallback (#75)', () => {
       .set('X-Visitor-Session', sessionToken);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.chat).toBeNull();
     // The token is echoed back so a returning visitor can re-persist it.
     expect(res.body.data.sessionToken).toBe(sessionToken);
   });
