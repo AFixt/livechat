@@ -25,16 +25,16 @@ justified exceptions, an npm `security:*` script, membership in the aggregate
 the safety net. Each tool is used **only for the artifacts it actually
 evaluates** — an important correction from this change:
 
-| Tool | Scans (verified) | Config | Runner | npm |
-| --- | --- | --- | --- | --- |
-| **Hadolint** | the three Dockerfiles (lint) | `.hadolint.yaml` | `scripts/hadolint.sh` | `security:hadolint` |
-| **Trivy `config`** | the three Dockerfiles (misconfig) | `trivy.yaml` + `.trivyignore` | `scripts/trivy.sh` | `security:trivy` |
-| **Trivy `image`** | the built api/ui/widget **images** (vuln + secret) | CLI flags + `.trivyignore` | `scripts/trivy-image.sh` | `security:trivy:image` |
-| **Checkov** | the three Dockerfiles (IaC) | `.checkov.yaml` | `scripts/checkov.sh` | `security:checkov` |
-| **KICS** | `docker-compose.yml`, `docker-compose.prod.yml` (IaC misconfig) | `scripts/kics.sh` | `scripts/kics.sh` | `security:kics` |
+| Tool               | Scans (verified)                                                | Config                        | Runner                   | npm                    |
+| ------------------ | --------------------------------------------------------------- | ----------------------------- | ------------------------ | ---------------------- |
+| **Hadolint**       | the three Dockerfiles (lint)                                    | `.hadolint.yaml`              | `scripts/hadolint.sh`    | `security:hadolint`    |
+| **Trivy `config`** | the three Dockerfiles (misconfig)                               | `trivy.yaml` + `.trivyignore` | `scripts/trivy.sh`       | `security:trivy`       |
+| **Trivy `image`**  | the built api/ui/widget **images** (vuln + secret)              | CLI flags + `.trivyignore`    | `scripts/trivy-image.sh` | `security:trivy:image` |
+| **Checkov**        | the three Dockerfiles (IaC)                                     | `.checkov.yaml`               | `scripts/checkov.sh`     | `security:checkov`     |
+| **KICS**           | `docker-compose.yml`, `docker-compose.prod.yml` (IaC misconfig) | `scripts/kics.sh`             | `scripts/kics.sh`        | `security:kics`        |
 
-**Why KICS.** Neither Trivy nor Checkov evaluates docker-compose files. `trivy
-config` recognises only Dockerfiles/Kubernetes/Terraform/etc. and reports
+**Why KICS.** Neither Trivy nor Checkov evaluates docker-compose files.
+`trivy config` recognises only Dockerfiles/Kubernetes/Terraform/etc. and reports
 "supported files not found" for a compose file; Checkov has no docker-compose
 framework in any current release, and its `yaml` framework yields zero checks on
 a compose file. KICS (Checkmarx, Apache-2.0) has a dedicated DockerCompose query
@@ -117,7 +117,8 @@ Dockerfiles (Checkov CKV_DOCKER_2 / Trivy AVD-DS-0026).
 ## Links
 
 - Issue #60; security-baseline program #59–65, #82–84
-- ADR-0001 (tooling stack), ADR-0008 (trufflehog), ADR-0010 (mutable action tags)
+- ADR-0001 (tooling stack), ADR-0008 (trufflehog), ADR-0010 (mutable action
+  tags)
 - `scripts/hadolint.sh`, `scripts/trivy.sh`, `scripts/trivy-image.sh`,
   `scripts/checkov.sh`, `scripts/kics.sh`
 - `security/thresholds.yaml`, `security/exceptions.yaml` (#65 governance)

@@ -95,7 +95,16 @@ export function buildCorsDelegate(env: Pick<Env, 'APP_URL'>): CorsOptionsDelegat
   const base: CorsOptions = {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Correlation-ID', 'X-XSRF-TOKEN'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Correlation-ID',
+      'X-XSRF-TOKEN',
+      // The widget's cross-site session fallback (#75): browsers that block
+      // third-party cookies send the signed session in this header instead, so
+      // it must be allow-listed or the preflight rejects every widget call.
+      'X-Visitor-Session',
+    ],
   };
 
   return (req, callback) => {

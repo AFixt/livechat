@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-import { Tenant, VisitorSession } from '../models/index.js';
+import { VisitorSession } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
 import { coarsenGeo, truncateIp } from '../utils/pii-minimize.js';
 
@@ -17,42 +17,40 @@ interface VisitorSessionDeps {
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 
-interface InitParams {
-  tenantSlug: string;
-  userAgent?: string;
-  ipAddress?: string;
-  language?: string;
-  currentUrl?: string;
-  referrer?: string;
-  /**
-   * Raw HS256 JWT minted by the client's backend with the tenant's
-   * `embed_secret`. When present and valid, the decoded `sub` claim is
-   * stored on the visitor session so staff can correlate the chat with
-   * the client's own user record.
-   */
-  identityToken?: string;
-}
-
 interface IdentityTokenPayload {
   sub: string;
   email?: string;
   name?: string;
 }
 
-interface InitResult {
-  session: VisitorSession;
-  cookieValue: string;
+interface CreateTrackedParams {
+  tenantId: string;
+  /**
+   * The durable subject key — HMAC of the visitor cookie's session id. Stored
+   * as `session_cookie_hash` so the socket handshake and consent records line
+   * up with this row. Obtain via {@link VisitorSessionService.mintHandle} or
+   * {@link VisitorSessionService.subjectKeyFromCookie}.
+   */
+  subjectKey: string;
+  /** Verified `sub` claim from the client identity token, if any. */
+  identityTokenSub?: string | null;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+  language?: string | null;
+  currentUrl?: string | null;
+  referrer?: string | null;
+  country?: string | null;
+  city?: string | null;
 }
 
 /**
  * Verify the optional identity-token JWT against a tenant's embed secret.
- * Extracted so the reducer in `init()` stays under the complexity cap.
  * @param token - Raw JWT (or undefined, in which case returns null).
  * @param secret - Tenant `embed_secret` (HS256).
  * @returns The `sub` claim, or null when no token was provided.
  * @throws 400 ApiError on any verification failure.
  */
-function verifyIdentityToken(token: string | undefined, secret: string): string | null {
+export function verifyIdentityToken(token: string | undefined, secret: string): string | null {
   if (token === undefined) return null;
   try {
     const decoded = jwt.verify(token, secret, {
@@ -74,6 +72,37 @@ function verifyIdentityToken(token: string | undefined, secret: string): string 
  * @returns Visitor session methods.
  */
 export function createVisitorSessionService(deps: VisitorSessionDeps) {
+  /**
+   * Derive the durable subject key (hex HMAC of the cookie's session id) from a
+   * signed visitor cookie. Single source of truth for the cookie -> subject-key
+   * derivation used by every lookup below.
+   * @param cookieValue - Raw cookie value from the widget.
+   * @returns The subject key.
+   * @throws 401 if the cookie signature is invalid.
+   */
+  function subjectKeyOf(cookieValue: string): string {
+    const sessionId = verifyVisitorCookie(cookieValue, deps.env.COOKIE_SECRET);
+    return hashSessionId(sessionId, deps.env.COOKIE_SECRET);
+  }
+
+  /**
+   * Load the tracked row for a subject key, without any expiry gate.
+   * @param subjectKey - The durable subject key.
+   * @returns The row, or null when the subject has no tracked session.
+   */
+  async function findBySubject(subjectKey: string): Promise<VisitorSession | null> {
+    return VisitorSession.findOne({ where: { sessionCookieHash: subjectKey } });
+  }
+
+  /**
+   * Hard-delete a subject's tracked row, if present. Idempotent.
+   * @param subjectKey - The durable subject key.
+   */
+  async function forgetSubject(subjectKey: string): Promise<void> {
+    const session = await findBySubject(subjectKey);
+    if (session !== null) await session.destroy({ force: true });
+  }
+
   return {
     /**
      * Mint a signed visitor cookie **without** creating any `visitor_sessions`
@@ -97,37 +126,29 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
      * @throws 401 if the cookie is missing/invalid.
      */
     subjectKeyFromCookie(cookieValue: string): string {
-      const sessionId = verifyVisitorCookie(cookieValue, deps.env.COOKIE_SECRET);
-      return hashSessionId(sessionId, deps.env.COOKIE_SECRET);
+      return subjectKeyOf(cookieValue);
     },
 
     /**
-     * Create a brand-new visitor session and return the signed cookie.
-     * @param params - Init params from the widget.
-     * @returns The new session + its signed cookie value.
+     * Create a tracked visitor-session row for a subject that has cleared the
+     * consent gate (presence granted, or an actively-started chat). Captures
+     * the behavioral/PII fields the console shows.
+     * @param params - Tenant, subject key, and captured fields.
+     * @returns The created session.
      */
-    async init(params: InitParams): Promise<InitResult> {
-      const tenant = await Tenant.findOne({
-        where: { slug: params.tenantSlug, status: 'active' },
-      });
-      if (tenant === null) throw ApiError.badRequest('Unknown tenant');
-
-      const identityTokenSub = verifyIdentityToken(params.identityToken, tenant.embedSecret);
-
-      const { sessionId, cookieValue } = mintVisitorCookie(deps.env.COOKIE_SECRET);
-      const hash = hashSessionId(sessionId, deps.env.COOKIE_SECRET);
+    async createTracked(params: CreateTrackedParams): Promise<VisitorSession> {
       const now = new Date();
       // Data minimization at the point of capture: the IP is truncated (last
       // IPv4 octet / last 80 IPv6 bits zeroed) and geolocation is coarsened to
       // country level before it is ever persisted. See pii-minimize.ts and
       // docs/adr/0020-geo-retention-minimization.md.
-      const geo = coarsenGeo({ country: null, city: null });
-      const session = await VisitorSession.create({
-        tenantId: tenant.id,
-        sessionCookieHash: hash,
-        identityTokenSub,
+      const geo = coarsenGeo({ country: params.country ?? null, city: params.city ?? null });
+      return VisitorSession.create({
+        tenantId: params.tenantId,
+        sessionCookieHash: params.subjectKey,
+        identityTokenSub: params.identityTokenSub ?? null,
         userAgent: params.userAgent ?? null,
-        ipAddress: truncateIp(params.ipAddress),
+        ipAddress: truncateIp(params.ipAddress ?? undefined),
         country: geo.country,
         city: geo.city,
         language: params.language ?? null,
@@ -137,7 +158,15 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
         firstSeenAt: now,
         lastSeenAt: now,
       });
-      return { session, cookieValue };
+    },
+
+    /**
+     * Look up a tracked session by its durable subject key.
+     * @param subjectKey - The subject key (from cookie or handle).
+     * @returns The session, or null if none has been created (gated visitor).
+     */
+    async findBySubjectKey(subjectKey: string): Promise<VisitorSession | null> {
+      return findBySubject(subjectKey);
     },
 
     /**
@@ -152,11 +181,7 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
      *   passed its absolute or idle lifetime.
      */
     async findByCookie(cookieValue: string): Promise<VisitorSession> {
-      const sessionId = verifyVisitorCookie(cookieValue, deps.env.COOKIE_SECRET);
-      const hash = hashSessionId(sessionId, deps.env.COOKIE_SECRET);
-      const session = await VisitorSession.findOne({
-        where: { sessionCookieHash: hash },
-      });
+      const session = await findBySubject(subjectKeyOf(cookieValue));
       // A revoked ("forget me") session is hard-deleted, so a missing row is
       // also the revoked case.
       if (session === null) throw ApiError.unauthorized('Visitor session not found');
@@ -185,12 +210,18 @@ export function createVisitorSessionService(deps: VisitorSessionDeps) {
      * @throws 401 if the cookie signature is invalid (nothing to forget).
      */
     async forgetByCookie(cookieValue: string): Promise<void> {
-      const sessionId = verifyVisitorCookie(cookieValue, deps.env.COOKIE_SECRET);
-      const hash = hashSessionId(sessionId, deps.env.COOKIE_SECRET);
-      const session = await VisitorSession.findOne({
-        where: { sessionCookieHash: hash },
-      });
-      if (session !== null) await session.destroy({ force: true });
+      await forgetSubject(subjectKeyOf(cookieValue));
+    },
+
+    /**
+     * Hard-delete the tracked row for a subject key, if any. Used both by the
+     * "forget me" path and by the consent gate when presence tracking stops
+     * being permitted (withdrawal / GPC), so a revoked visitor's behavioral row
+     * does not linger. Idempotent.
+     * @param subjectKey - The durable subject key.
+     */
+    async forgetBySubjectKey(subjectKey: string): Promise<void> {
+      await forgetSubject(subjectKey);
     },
 
     /**

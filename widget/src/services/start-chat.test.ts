@@ -116,7 +116,7 @@ describe('startChat — submitting before the widget has finished starting up (#
     );
   });
 
-  it('does not mint a second session when startup is already in flight', async () => {
+  it('asks the consent gate once, however many callers need the session', async () => {
     const api = await freshApi();
     const { calls } = stubApi({
       'GET /visitor/chats/current': NO_RESUMABLE_CHAT,
@@ -126,28 +126,32 @@ describe('startChat — submitting before the widget has finished starting up (#
 
     // The widget's own bootstrap and the visitor's submit, concurrently.
     const [, result] = await Promise.all([
-      api.bootstrapVisitorSession('acme'),
+      api.initVisitorSession('acme'),
       api.startChat('acme', 'Fast Visitor', 'hello'),
     ]);
 
     expect(result.chat.id).toBe('c1');
+    // One request, not two: a second would ask the consent gate to decide
+    // twice for a single page view, and could mint a competing session.
     expect(calls.filter((c) => c === 'POST /visitor/session')).toHaveLength(1);
   });
 
-  it('reuses a returning visitor session instead of orphaning their chat', async () => {
+  it('shares the established session with a later caller without re-asking', async () => {
     const api = await freshApi();
-    const { calls } = stubApi(
-      {
-        'GET /visitor/chats/current': NO_RESUMABLE_CHAT,
-        'POST /visitor/chats': CHAT_OK,
-      },
-      { hasSession: true },
-    );
+    const { calls } = stubApi({
+      'GET /visitor/chats/current': NO_RESUMABLE_CHAT,
+      'POST /visitor/session': SESSION_OK,
+      'POST /visitor/chats': CHAT_OK,
+    });
 
+    // Bootstrap first, then a submit some time later — the common case.
+    await api.initVisitorSession('acme');
     await api.startChat('acme', 'Returning Visitor', 'hello again');
 
-    // A session already existed, so no new one may be minted.
-    expect(calls).not.toContain('POST /visitor/session');
+    // Reuse of an existing visitor row is the server's job
+    // (`ensureSessionForInit` refreshes rather than replaces); the widget's
+    // part is simply not to ask a second time.
+    expect(calls.filter((c) => c === 'POST /visitor/session')).toHaveLength(1);
   });
 
   it('recovers once when the held session has been revoked server-side', async () => {
@@ -216,7 +220,7 @@ describe('startChat — submitting before the widget has finished starting up (#
     });
 
     await expect(api.startChat('acme', 'Unlucky', 'hello')).rejects.toThrow('Server error');
-    // The failed bootstrap must not be cached — pressing "Start chat" again works.
+    // The failed call must not be cached — pressing "Start chat" again works.
     const result = await api.startChat('acme', 'Unlucky', 'hello');
     expect(result.chat.id).toBe('c1');
   });

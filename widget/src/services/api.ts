@@ -42,6 +42,51 @@ export function setCsrfToken(token: string): void {
   csrfToken = token;
 }
 
+/** First-party storage key for the visitor session token (#75). */
+const SESSION_STORAGE_KEY = 'afixt.livechat.session';
+
+/**
+ * Read the persisted session token from first-party storage, tolerating
+ * environments where storage is unavailable (private mode, blocked storage).
+ * @returns The stored token, or null.
+ */
+function readStoredSession(): string | null {
+  try {
+    return window.localStorage.getItem(SESSION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Visitor session token for the third-party-cookie fallback (#75). When the
+ * browser blocks the cross-site cookie (Safari ITP, Firefox TCP), the widget
+ * resends this value — first-party storage of the visitor's own session — as
+ * `X-Visitor-Session`. See ADR-0021.
+ */
+let sessionToken: string | null = readStoredSession();
+
+/**
+ * Record the visitor session token, persisting it for later page loads.
+ * @param token - The signed session value from a bootstrap response.
+ */
+export function setSessionToken(token: string): void {
+  sessionToken = token;
+  try {
+    window.localStorage.setItem(SESSION_STORAGE_KEY, token);
+  } catch {
+    // Storage blocked/full — the in-memory copy still serves this page load.
+  }
+}
+
+/**
+ * The current visitor session token, for the socket handshake `auth` payload.
+ * @returns The token, or null if no session yet.
+ */
+export function getSessionToken(): string | null {
+  return sessionToken;
+}
+
 /**
  * Minimal fetch wrapper — cookie-authed, credentials: 'include' so the
  * signed visitor cookie is sent on every request. No axios dependency
@@ -60,6 +105,11 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   // reads; the server only checks it on state-changing routes.
   if (csrfToken !== null && !headers.has('X-XSRF-TOKEN')) {
     headers.set('X-XSRF-TOKEN', csrfToken);
+  }
+  // Send the session token when the browser blocks the third-party cookie
+  // (#75). The server prefers this header over the cookie when both arrive.
+  if (sessionToken !== null && !headers.has('X-Visitor-Session')) {
+    headers.set('X-Visitor-Session', sessionToken);
   }
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -104,18 +154,54 @@ export async function fetchWidgetConfig(tenantKey: string): Promise<WidgetConfig
   return body.data;
 }
 
+/** Effective per-purpose tracking decision returned by the consent gate. */
+interface TrackingState {
+  functional: 'granted' | 'denied';
+  presence: 'granted' | 'denied';
+  analytics: 'granted' | 'denied';
+}
+
 interface InitSessionResponse {
-  sessionId: string;
+  /**
+   * The tracked-session id, or `null` when the consent gate suppressed ambient
+   * presence tracking. `null` means: render and allow chat (functional), but do
+   * not open the presence socket.
+   */
+  sessionId: string | null;
   tenantId: string;
   csrfToken: string;
+  jurisdiction: string;
+  gpc: boolean;
+  tracking: TrackingState;
+  /** Persisted and resent as X-Visitor-Session when the cookie is blocked (#75). */
+  sessionToken: string;
 }
 
 /**
- * POST /api/v1/visitor/session — boot a visitor session.
- * @param tenantKey - Tenant slug from `data-tenant-key`.
- * @returns The visitor session summary.
+ * Read the browser's Global Privacy Control signal, if the runtime exposes it.
+ * `navigator.globalPrivacyControl` is `true` when the visitor has enabled a
+ * universal opt-out. Returns `true` only when explicitly set, never a guess.
+ * @returns Whether GPC is enabled.
  */
-export async function initVisitorSession(tenantKey: string): Promise<InitSessionResponse> {
+function detectGpc(): boolean {
+  return (
+    (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true
+  );
+}
+
+/**
+ * POST /api/v1/visitor/session — run the consent gate and, when ambient
+ * presence tracking is permitted, boot a tracked visitor session. Sends the
+ * browser's GPC signal so a universal opt-out suppresses tracking before it
+ * starts.
+ *
+ * The raw call. Use {@link initVisitorSession}, which shares one in-flight
+ * request across callers.
+ * @param tenantKey - Tenant slug from `data-tenant-key`.
+ * @returns The gate decision plus the session summary.
+ */
+async function requestVisitorSession(tenantKey: string): Promise<InitSessionResponse> {
+  const gpc = detectGpc();
   const body = await apiFetch<InitSessionResponse>('/visitor/session', {
     method: 'POST',
     body: JSON.stringify({
@@ -123,10 +209,12 @@ export async function initVisitorSession(tenantKey: string): Promise<InitSession
       currentUrl: window.location.href,
       referrer: document.referrer.length > 0 ? document.referrer : undefined,
       language: navigator.language,
+      ...(gpc && { gpc: true }),
     }),
   });
   if (body.data === undefined) throw new Error('No session returned');
   setCsrfToken(body.data.csrfToken);
+  setSessionToken(body.data.sessionToken);
   return body.data;
 }
 
@@ -184,15 +272,17 @@ export async function startChat(
   firstMessage: string,
   customerEmail?: string,
 ): Promise<InitiatedChat> {
-  await bootstrapVisitorSession(tenantKey);
+  await initVisitorSession(tenantKey);
   try {
     return await initiateChat(customerName, firstMessage, customerEmail);
   } catch (err) {
     if (!(err instanceof ApiRequestError) || err.status !== 401) throw err;
     // The session we thought we had is gone (expired, revoked, or never
-    // finished being set). Mint a new one and retry — the visitor's typed
-    // input is still in hand, so this is invisible to them.
-    await initVisitorSession(tenantKey);
+    // finished being set). Establish a fresh one and retry — the visitor's
+    // typed input is still in hand, so this is invisible to them. Bypasses the
+    // shared promise deliberately: the cached one resolved to the session that
+    // just failed.
+    await requestVisitorSession(tenantKey);
     return initiateChat(customerName, firstMessage, customerEmail);
   }
 }
@@ -209,6 +299,8 @@ interface CurrentChat {
   messages: CurrentChatMessage[];
   /** Present for a returning visitor who never re-calls /session (#77). */
   csrfToken?: string;
+  /** Echoed session token so it can be persisted for the header fallback (#75). */
+  sessionToken?: string;
 }
 
 /**
@@ -219,44 +311,37 @@ interface CurrentChat {
 export async function fetchCurrentChat(): Promise<CurrentChat> {
   const body = await apiFetch<CurrentChat>('/visitor/chats/current', { method: 'GET' });
   if (body.data?.csrfToken !== undefined) setCsrfToken(body.data.csrfToken);
+  if (body.data?.sessionToken !== undefined) setSessionToken(body.data.sessionToken);
   return body.data ?? { chat: null, messages: [] };
 }
 
 /**
- * The one in-flight (or completed) session bootstrap for this page load.
+ * The one in-flight (or completed) consent-gate call for this page load.
+ *
  * Shared so the widget's own startup and a visitor who submits the start-chat
- * form mid-startup converge on the same session instead of racing (#129).
+ * form mid-startup converge on the same session instead of racing (#129). It
+ * also stops a second `POST /visitor/session` being issued, which would ask the
+ * consent gate to decide twice for one page view.
  */
-let bootstrapPromise: Promise<CurrentChat | null> | null = null;
+let sessionPromise: Promise<InitSessionResponse> | null = null;
 
 /**
- * Establish the visitor session, exactly once per page load.
+ * Run the consent gate and establish the visitor session, exactly once per page
+ * load. Every caller shares one request, so a visitor who submits the start-chat
+ * form before startup finishes waits for the *same* session rather than sending
+ * a chat write with no cookie and getting a 401 (#129).
  *
- * Probing the resumable chat doubles as the "do I have a session?" check: it
- * succeeds only when the signed cookie is already present, so a page reload
- * reuses the existing session rather than minting a fresh one — which would
- * orphan a prior chat and break the returning-visitor (restart) flow.
- *
- * Every caller shares one promise, so a visitor who submits the form before
- * startup finishes waits for the *same* session rather than triggering a second
- * one. A rejected bootstrap is not cached, so a later attempt can retry.
+ * A rejected call is not cached, so a later attempt retries rather than
+ * inheriting the failure.
  * @param tenantKey - Tenant slug from `data-tenant-key`.
- * @returns The resumable chat for a returning visitor, or null for a new one.
+ * @returns The gate decision plus the session summary.
  */
-export async function bootstrapVisitorSession(tenantKey: string): Promise<CurrentChat | null> {
-  bootstrapPromise ??= (async () => {
-    try {
-      return await fetchCurrentChat();
-    } catch {
-      // No existing session (401) or unreachable — start a fresh one.
-      await initVisitorSession(tenantKey);
-      return null;
-    }
-  })();
+export async function initVisitorSession(tenantKey: string): Promise<InitSessionResponse> {
+  sessionPromise ??= requestVisitorSession(tenantKey);
   try {
-    return await bootstrapPromise;
+    return await sessionPromise;
   } catch (err) {
-    bootstrapPromise = null;
+    sessionPromise = null;
     throw err;
   }
 }

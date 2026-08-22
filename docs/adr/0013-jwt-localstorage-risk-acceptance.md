@@ -4,23 +4,22 @@
 - **Date:** 2026-08-15
 - **Deciders:** Karl Groves
 - **Risk owner:** Karl Groves
-- **Review by:** 2027-02-15 (or sooner — see "Conditions that force a
-  revisit")
+- **Review by:** 2027-02-15 (or sooner — see "Conditions that force a revisit")
 
 ## Context
 
-The support console (`ui/`) persists the JWT **access token** and the
-**refresh token** to `localStorage`, via Zustand's `persist` middleware keyed
+The support console (`ui/`) persists the JWT **access token** and the **refresh
+token** to `localStorage`, via Zustand's `persist` middleware keyed
 `livechat.auth` (`ui/src/store/auth.ts`). The comment there records the intent:
 "Persisted to localStorage so refreshes don't immediately log out." The token is
-read back on every request by the axios interceptor
-(`ui/src/services/api.ts`) and on socket connect (`ui/src/services/socket.ts`).
+read back on every request by the axios interceptor (`ui/src/services/api.ts`)
+and on socket connect (`ui/src/services/socket.ts`).
 
-Issue #59 flags this against the `secure-project-baseline` (spec.md §16
-"auth tokens are not stored in localStorage unless explicitly accepted"). The
-concrete risk: **`localStorage` is readable by any JavaScript running on the
-console origin, so a successful XSS on the console can exfiltrate both tokens.**
-The refresh token is the more serious of the two — it is long-lived (7 days) and
+Issue #59 flags this against the `secure-project-baseline` (spec.md §16 "auth
+tokens are not stored in localStorage unless explicitly accepted"). The concrete
+risk: **`localStorage` is readable by any JavaScript running on the console
+origin, so a successful XSS on the console can exfiltrate both tokens.** The
+refresh token is the more serious of the two — it is long-lived (7 days) and
 rotating, so a stolen refresh token buys an attacker a renewable session rather
 than a 15-minute window.
 
@@ -49,8 +48,8 @@ tolerable. Each was confirmed in the codebase while writing this ADR:
   `15m` (`api/src/config/env.ts`). A stolen _access_ token expires quickly.
 - **Refresh rotation on use.** `AuthService.refresh()`
   (`api/src/services/auth-service.ts`) verifies the presented refresh token,
-  issues a **new** pair, and re-hashes/updates the `user_sessions` row — a
-  used refresh token does not remain valid.
+  issues a **new** pair, and re-hashes/updates the `user_sessions` row — a used
+  refresh token does not remain valid.
 - **Refresh tokens stored hashed, never in plaintext, server-side.** Each
   `user_sessions` row holds a bcrypt hash of the refresh token, not the token.
 - **Access-token revocation (JTI blacklist).** `logout()` writes the JTI to
@@ -63,14 +62,14 @@ tolerable. Each was confirmed in the codebase while writing this ADR:
 ## Compensating controls (committed as part of this acceptance)
 
 - **No token logging.** The console does not log the access or refresh token
-  (verified: no `console.*` writes the token, and the axios response
-  interceptor logs nothing). Any future logging that includes a token is a
-  regression and must be rejected in review.
+  (verified: no `console.*` writes the token, and the axios response interceptor
+  logs nothing). Any future logging that includes a token is a regression and
+  must be rejected in review.
 - **No unsanitized HTML rendering — keep the XSS surface small.** Per CLAUDE.md,
   rich text must go through `dompurify`, and `dangerouslySetInnerHTML` is
-  banned. Verified: `ui/src/` contains **no** `dangerouslySetInnerHTML`. This
-  is the single most important compensating control, because the accepted risk
-  is realized _only_ through XSS.
+  banned. Verified: `ui/src/` contains **no** `dangerouslySetInnerHTML`. This is
+  the single most important compensating control, because the accepted risk is
+  realized _only_ through XSS.
 - **Content-Security-Policy on the console host — pending #61.** A restrictive
   CSP materially reduces the chance that an injected script can run and reach
   `localStorage`. Issue #61 (console/widget static hosts missing CSP/COOP/CORP/
@@ -112,13 +111,13 @@ Re-open this decision (and prefer the httpOnly-refresh-cookie design below) when
 
 ## Alternatives considered
 
-- **httpOnly + `SameSite` refresh cookie, access token in memory only
-  (preferred long-term).** The refresh token becomes unreadable by page
-  JavaScript; the access token lives in a JS variable and is lost on reload
-  (re-minted via the refresh cookie). Rejected _for now_ only on scope: it needs
-  a new cookie-authenticated `/auth/refresh` path, CSRF defense for that
-  endpoint (double-submit or `SameSite=Strict`), and coordinated widget/console
-  work. This is the intended successor.
+- **httpOnly + `SameSite` refresh cookie, access token in memory only (preferred
+  long-term).** The refresh token becomes unreadable by page JavaScript; the
+  access token lives in a JS variable and is lost on reload (re-minted via the
+  refresh cookie). Rejected _for now_ only on scope: it needs a new
+  cookie-authenticated `/auth/refresh` path, CSRF defense for that endpoint
+  (double-submit or `SameSite=Strict`), and coordinated widget/console work.
+  This is the intended successor.
 - **BFF / server-side session (token-handler pattern).** A backend-for-frontend
   holds tokens and exposes only an opaque session cookie to the browser.
   Strongest option; rejected as disproportionate to a single-console SPA at this
