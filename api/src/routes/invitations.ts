@@ -9,6 +9,9 @@ import type { AdminRouterDeps } from './admin-router.js';
 import type { InvitationService } from '../services/index.js';
 import type { Router } from 'express';
 
+// Side-effect import: registers the admin routers' OpenAPI paths (#119).
+import './openapi/admin.js';
+
 interface InvitationsRouterDeps extends AdminRouterDeps {
   invitation: InvitationService;
 }

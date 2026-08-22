@@ -11,6 +11,9 @@ import type { AdminRouterDeps } from './admin-router.js';
 import type { AuditService, UserService } from '../services/index.js';
 import type { Router } from 'express';
 
+// Side-effect import: registers the admin routers' OpenAPI paths (#119).
+import './openapi/admin.js';
+
 interface UsersRouterDeps extends AdminRouterDeps {
   user: UserService;
   audit: AuditService;

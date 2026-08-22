@@ -19,6 +19,9 @@ import { resolveActiveTenantId } from './tenant-resolve.js';
 import type { Env } from '../config/env.js';
 import type { ConsentService, VisitorSessionService } from '../services/index.js';
 
+// Side-effect import: registers this router's OpenAPI paths (#119).
+import './openapi/privacy.js';
+
 interface PrivacyRouterDeps {
   env: Env;
   consent: ConsentService;

@@ -33,6 +33,9 @@ import type {
   VisitorSessionService,
 } from '../services/index.js';
 
+// Side-effect import: registers this router's OpenAPI paths (#119).
+import './openapi/visitor.js';
+
 interface VisitorRouterDeps {
   env: Env;
   visitorSession: VisitorSessionService;
