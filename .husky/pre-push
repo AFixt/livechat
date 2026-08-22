@@ -1,27 +1,45 @@
 # Git feeds this hook one line per ref being pushed:
 #   <local ref> <local sha> <remote ref> <remote sha>
 #
-# A tag-only push introduces no new commits — the commit being tagged already
-# passed this gate on its branch and again in CI — so re-running the full
-# check:all sweep only delays the release by 10-15 minutes. Skip it when every
-# ref being pushed is a tag.
+# Two kinds of push introduce no new commits, so running the full check:all
+# sweep for them costs 10-15 minutes and verifies nothing:
+#
+#   - A tag-only push. The commit being tagged already passed this gate on its
+#     branch and again in CI.
+#   - A branch deletion. Git sends "(delete)" as the local ref and an all-zero
+#     local sha. There is no content being sent at all — the gate would be
+#     checking the working tree against a push that only removes a ref.
+#
+# Skip only when EVERY ref in the push is one of those. A mixed push — a real
+# branch alongside a tag or a deletion — still runs the gate.
 #
 # If no refs arrive on stdin (an invocation shape we don't recognise), fall
 # through and run the gate: the safe default is to check, not to skip.
 saw_ref=0
-only_tags=1
+no_new_commits=1
 
-while read -r local_ref _rest; do
+while read -r local_ref local_sha _rest; do
   [ -z "$local_ref" ] && continue
   saw_ref=1
   case "$local_ref" in
     refs/tags/*) ;;
-    *) only_tags=0 ;;
+    '(delete)') ;;
+    *)
+      # Belt and braces: a deletion is also identifiable by its all-zero local
+      # sha, so this still holds if the "(delete)" literal ever changes.
+      # Matched as a pattern rather than against a fixed constant because the
+      # sha's length follows the repo's hash algorithm — 40 hex characters
+      # under SHA-1, 64 under SHA-256 — and a hardcoded 40 zeros would quietly
+      # stop matching on the latter.
+      case "$local_sha" in
+        '' | *[!0]*) no_new_commits=0 ;;
+      esac
+      ;;
   esac
 done
 
-if [ "$saw_ref" = "1" ] && [ "$only_tags" = "1" ]; then
-  echo "pre-push: tag-only push — skipping check:all (no new commits)"
+if [ "$saw_ref" = "1" ] && [ "$no_new_commits" = "1" ]; then
+  echo "pre-push: no new commits (tags and/or deletions) — skipping check:all"
   exit 0
 fi
 
