@@ -19,8 +19,8 @@ renewable.
 
 ## Why it is accepted for now
 
-Server-side mitigations blunt the impact, and compensating controls keep the
-XSS surface small:
+Server-side mitigations blunt the impact, and compensating controls keep the XSS
+surface small:
 
 - 15-minute access-token TTL; refresh rotation on use; refresh tokens stored
   only as bcrypt hashes in `user_sessions`; JTI blacklist on logout; sessions

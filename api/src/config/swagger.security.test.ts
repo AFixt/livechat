@@ -18,11 +18,11 @@ const PUBLIC_OPERATIONS = new Set<string>([
   'post /widget/csp-report', // browser-posted CSP violation reports
   'post /auth/login', // credentials in, token out
   'post /auth/register', // invitation-token gated, no session yet
-  'post /auth/refresh', // refresh cookie/token is the credential
-  'post /auth/forgot-password', // pre-auth
+  'post /auth/refresh-token', // the refresh token in the body is the credential
+  'post /auth/forgot-password', // pre-auth; never discloses whether the address exists
   'post /auth/reset-password', // reset-token gated
-  'post /auth/verify-email', // verification-token gated
-  'post /visitor/session', // mints the visitor cookie; none yet
+  'get /auth/verify-email/{token}', // verification-token gated
+  'post /visitor/session', // mints the visitor cookie; none exists yet
 ]);
 
 const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'patch', 'options', 'head'] as const;
@@ -98,9 +98,12 @@ describe('OpenAPI spec — security', () => {
     }
 
     // Tripwire: every registered operation must be either public (allowlisted)
-    // or authenticated. It passes today (only the public /health is
-    // registered) and fails the moment a protected route is added to the spec
-    // without declaring `security` — forcing the author to make the call.
+    // or authenticated. It now covers the whole registered surface (#119), and
+    // fails the moment a route is added to the spec without declaring
+    // `security` — forcing the author to make the call. Note it earned its
+    // keep immediately: two entries in the allowlist above named paths that
+    // did not exist (`post /auth/refresh`, `post /auth/verify-email`), and this
+    // caught both the moment the real ones were registered.
     expect(gaps).toEqual([]);
   });
 });

@@ -22,6 +22,9 @@ import type { Env } from '../config/env.js';
 import type { AuditService, AuthService } from '../services/index.js';
 import type { Redis } from 'ioredis';
 
+// Side-effect import: registers this router's OpenAPI paths (#119).
+import './openapi/auth.js';
+
 interface AuthRouterDeps {
   env: Env;
   redis: Redis;

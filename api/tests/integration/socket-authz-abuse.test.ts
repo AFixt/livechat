@@ -122,7 +122,11 @@ describe('socket.io authorization abuse (integration)', () => {
       .send({ tenantKey: 'socket-abuse' });
     expect(created.status).toBe(201);
     const setCookie = created.headers['set-cookie'] as string[] | string | undefined;
-    const cookies = Array.isArray(setCookie) ? setCookie : setCookie === undefined ? [] : [setCookie];
+    const cookies = Array.isArray(setCookie)
+      ? setCookie
+      : setCookie === undefined
+        ? []
+        : [setCookie];
     const value =
       cookies
         .find((c) => c.startsWith('livechat_visitor='))

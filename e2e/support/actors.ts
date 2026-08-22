@@ -16,14 +16,59 @@ export interface Actor {
   close: () => Promise<void>;
 }
 
+/** The seeded tenant slug the widget dev host embeds. */
+const TENANT_KEY = 'acme';
+
+/** Options for {@link openVisitor}. */
+export interface VisitorOptions {
+  /**
+   * Grant presence consent before the widget boots, so the visitor is tracked
+   * and appears in the staff console's "Visitors on site" list.
+   *
+   * The consent gate (#53) leaves a visitor **untracked** by default: with no
+   * geo hint the jurisdiction resolves to `UNKNOWN`, which is opt-in for
+   * presence, so no `visitor_sessions` row exists and no presence socket opens.
+   * That is the intended fail-safe. Journeys that assert staff-side presence
+   * therefore have to model an *engaged, consented* visitor explicitly — this
+   * flag performs the same `POST /privacy/consent` a consent banner would.
+   */
+  consentToTracking?: boolean;
+}
+
+/**
+ * Record presence consent for the current visitor context, then reload so the
+ * widget re-runs its bootstrap and this time receives a tracked session.
+ * @param page - The visitor's page (already on the widget host).
+ */
+async function grantPresenceConsent(page: Page): Promise<void> {
+  // Same-origin via the widget dev server's `/api` proxy, so the signed
+  // visitor cookie (SameSite=Lax) is sent and the subject key matches the one
+  // the widget just established.
+  const status = await page.evaluate(async (tenantKey: string) => {
+    const res = await fetch('/api/v1/privacy/consent', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenantKey,
+        purposes: { presence: 'granted', analytics: 'granted' },
+      }),
+    });
+    return res.status;
+  }, TENANT_KEY);
+  if (status !== 201) throw new Error(`Recording visitor consent failed: HTTP ${String(status)}`);
+  await page.reload();
+}
+
 /**
  * Open an anonymous visitor on the widget dev host (a fresh context, so the
  * signed visitor cookie is unique per test). The dev host embeds
  * `<afixt-livechat data-tenant-key="acme">`, matching the seeded tenant.
  * @param browser - The Playwright browser.
+ * @param options - Visitor options (see {@link VisitorOptions}).
  * @returns The visitor actor.
  */
-export async function openVisitor(browser: Browser): Promise<Actor> {
+export async function openVisitor(browser: Browser, options: VisitorOptions = {}): Promise<Actor> {
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto(WIDGET_URL);
@@ -31,14 +76,18 @@ export async function openVisitor(browser: Browser): Promise<Actor> {
   // before handing the page over.
   //
   // The trigger button and the entire start-chat form render immediately, but
-  // the session only exists at the end of an async chain: the CMP consent gate,
-  // then `/widget/config`, then `/visitor/chats/current` (401 for a new
-  // visitor), and only then `POST /visitor/session`. Playwright completes the
-  // form in ~70ms, so it can submit before that chain finishes — `POST
-  // /visitor/chats` then 401s and the widget renders its *error* state, which
-  // matches neither the active-transcript nor the no-support assertion. That is
-  // why the resulting failures looked like an availability problem in both
-  // directions.
+  // the visitor cookie only exists at the end of an async chain: the CMP
+  // consent gate, then `/widget/config`, then `POST /visitor/session`.
+  // Playwright completes the form in ~70ms, so it can submit before that chain
+  // finishes — `POST /visitor/chats` then 401s and the widget renders its
+  // *error* state, which matches neither the active-transcript nor the
+  // no-support assertion, so journeys failed in both directions.
+  //
+  // Under the consent gate this is still the right signal even though a gated
+  // visitor gets no `visitor_sessions` row: `POST /visitor/session` always
+  // mints the cookie handle and always records a consent decision, and
+  // `getOrCreateVisitorForChat` accepts either an existing row or a prior
+  // decision. So "cookie present" still means "starting a chat will not 401".
   //
   // Polling the cookie waits on the actual precondition rather than a
   // wall-clock guess, so it neither flakes nor slows the suite down.
@@ -47,6 +96,11 @@ export async function openVisitor(browser: Browser): Promise<Actor> {
       timeout: 15_000,
     })
     .toBe(true);
+  // Only after the cookie exists: `grantPresenceConsent` posts with
+  // `credentials: 'include'` and must land on the subject key the widget just
+  // established, otherwise it records consent for a different subject and the
+  // visitor silently stays untracked.
+  if (options.consentToTracking === true) await grantPresenceConsent(page);
   return { page, close: () => context.close() };
 }
 

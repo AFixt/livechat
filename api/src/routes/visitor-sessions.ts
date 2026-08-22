@@ -11,6 +11,9 @@ import type { IoRef } from '../io/io-ref.js';
 import type { AuditService, PresenceService, VisitorSessionService } from '../services/index.js';
 import type { Redis } from 'ioredis';
 
+// Side-effect import: registers this router's OpenAPI paths (#119).
+import './openapi/visitor-sessions.js';
+
 interface VisitorSessionsRouterDeps {
   env: Env;
   redis: Redis;
