@@ -85,6 +85,57 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   HIGH or CRITICAL findings at all. ([#132])
 
 ### Fixed
+- **`zap-pr` is a working gate again instead of a permanently-red one.** It had
+  failed on every pull request and on `develop`, while the scan itself found
+  nothing at FAIL level (`FAIL-NEW: 0`, `WARN-NEW: 9`). Two causes. First, it
+  served `ui/dist` with `npx http-server` — but the console ships on nginx, and
+  `ui/nginx.conf` sets CSP, `X-Frame-Options`, `nosniff`, `Permissions-Policy`
+  and `Cache-Control` explicitly, so five of the nine findings existed only
+  because the scan target was a bare static file server. It now serves the
+  bundle through the shipped `ui/nginx.conf` on the same `nginx:1.27-alpine`
+  base the `ui/Dockerfile` runtime stage uses (plain nginx rather than the image
+  build, which needs private-registry credentials a header scan has no reason to
+  require — #130). Second, `fail_action: true` alone fails on *any* alert,
+  collapsing WARN into FAIL and defeating the three-tier model `rules.tsv`
+  documents; `-I` is now passed so a WARN warns and a FAIL still fails. The cost
+  of the old behaviour was not the red check but the blindness: with the job
+  always failing, nobody could tell "the usual nine" from "ten, and the new one
+  is real". Also tuned with reasons: `90005` (Sec-Fetch-Dest) is a _request_
+  header no server can set, now IGNORE; `10049` (cacheable static assets) is the
+  intent, now WARN.
+  `-I` alone would have replaced a permanently-red gate with a permanently-green
+  one — `zap-baseline` treats every rule as WARN unless the rules file names it
+  FAIL, and nothing was named. `rules.tsv` now has an explicit FAIL tier
+  (clickjacking, nosniff, CSP, server-version leak, cross-domain script), and
+  the gate was demonstrated end to end against the real nginx config rather than
+  assumed: shipped config exits 0, removing the console's clickjacking
+  protection exits 1 on rule 10020, restoring it exits 0. Removing only
+  `X-Frame-Options` correctly does _not_ fail, because CSP `frame-ancestors
+  'none'` still protects the page. ([#131])
+
+### Security
+- **Both nginx hosts stopped advertising their exact version.** `Server:
+  nginx/1.27.5` narrows a published nginx CVE into a targeted request.
+  `server_tokens off` in `ui/nginx.conf` and `widget/nginx.conf` leaves a bare
+  `Server: nginx`. Found by the ZAP baseline (rule 10036) on its first run
+  against the shipped config — the old `http-server` target could not have
+  surfaced it — and the rule is now FAIL-tier so it cannot come back quietly.
+  ([#131])
+- **The console is now cross-origin isolated.** ZAP rule 90004 was carried as a
+  WARN reading "COEP intentionally unset so the widget stays cross-origin
+  embeddable" — true of the widget, and never examined for the console. Split:
+  `ui/nginx.conf` sets `Cross-Origin-Embedder-Policy: require-corp`, which costs
+  nothing there because its CSP is `default-src 'self'` and it loads no
+  cross-origin subresources; `widget/nginx.conf` deliberately does not, because
+  the widget is loaded *into* customer pages where COEP would govern the host
+  page rather than protect the widget and `Cross-Origin-Resource-Policy:
+  cross-origin` is the header that matters. Verified in a browser against the
+  shipped config — `window.crossOriginIsolated === true`, the app mounts, no
+  console errors. `scripts/check-headers.mjs` now requires COEP on the console
+  and forbids it on the widget, so neither half can be silently undone.
+  Recorded in ADR-0012, which also picks up the stale `ADR-0011` references
+  in `rules.tsv` and `docs/security/zap.md`. ([#131])
+### Fixed
 - **The widget can work on a third-party site at all — the visitor session now
   survives cross-site embedding.** The `livechat_visitor` cookie was
   `SameSite=Lax`, so no browser sent it on the cross-site subresource requests
@@ -546,6 +597,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   payload slice body-parser puts in `err.message` is never echoed).
 
 [#57]: https://github.com/AFixt/livechat/issues/57
+[#131]: https://github.com/AFixt/livechat/issues/131
 [#130]: https://github.com/AFixt/livechat/issues/130
 [#53]: https://github.com/AFixt/livechat/issues/53
 [#55]: https://github.com/AFixt/livechat/issues/55
