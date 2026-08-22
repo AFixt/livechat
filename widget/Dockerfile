@@ -24,6 +24,16 @@ COPY widget ./widget
 RUN npm --workspace @livechat/widget run build
 
 FROM nginx:1.27-alpine AS runtime
+# Patch the base image's OS packages. `nginx:1.27-alpine` lags its Alpine
+# base, and `trivy image` fails the CRITICAL gate on CVE-2026-31789 (OpenSSL
+# heap overflow, libcrypto3/libssl3 3.3.3-r0 -> fixed in 3.3.7-r0) plus 33
+# HIGHs. None are ours — they are all base-image OS packages — but an unpatched
+# CRITICAL in a shipped image is a finding whoever it belongs to.
+#
+# `apk upgrade` rather than pinning a newer digest: the fix is already in the
+# Alpine repo the base points at, so upgrading takes it without waiting for the
+# nginx image to be rebuilt, and keeps working for the next advisory.
+RUN apk upgrade --no-cache
 COPY widget/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/widget/dist /usr/share/nginx/html
 COPY widget/index.html /usr/share/nginx/html/index.html

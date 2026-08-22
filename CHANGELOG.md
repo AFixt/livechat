@@ -30,6 +30,26 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   so a red run can never be mistaken for a clean one. ([#130])
 
 ### Security
+- **Container vulnerability scanning runs for the first time, and all three
+  images pass.** Getting `trivy image` past the private-registry 404 exposed two
+  further problems it had been hiding. The **ui image build had never succeeded
+  even with credentials**: `ui/tsconfig.json` includes `playwright.config.ts`,
+  which since #127 imports the repo-root `e2e/support/generated-spec-config.js`
+  that `ui/Dockerfile` never copied, so `tsc -b` failed on TS2307. Latent on
+  `develop` since #127 and invisible because nothing ever got that far. The
+  build stage now copies `e2e/`; the runtime stage still takes only `ui/dist`,
+  so nothing test-related ships. And once ui and widget scanned, the
+  **CRITICAL gate immediately failed on real findings** — `CVE-2026-31789`
+  (OpenSSL heap overflow, `libcrypto3`/`libssl3` 3.3.3-r0, fixed in 3.3.7-r0)
+  plus 33 HIGHs, all from `nginx:1.27-alpine` lagging its own Alpine base. Both
+  runtime stages now `apk upgrade --no-cache`, which takes the fix already
+  published in the repo the base points at rather than waiting for the nginx
+  image to be rebuilt. Result: api, ui and widget all scan clean at HIGH and
+  CRITICAL.
+  This also demonstrates the #60 policy with real findings rather than seeded
+  ones — 2 CRITICALs failed the gate while 33 HIGHs did not, which is exactly
+  the documented behaviour. ([#130])
+### Security
 - **The api image no longer ships a package manager, clearing a CRITICAL CVE.**
   `trivy image` was failing the gate on `CVE-2026-59873` (node-tar DoS via a
   crafted gzip bomb) plus seven HIGHs in `brace-expansion`, `ip-address`,
