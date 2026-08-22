@@ -4,14 +4,16 @@ import { originAllowed } from '../middlewares/origin-allowed.js';
 
 import { buildAuthRouter } from './auth.js';
 import { buildChatsRouter } from './chats.js';
-import healthRouter from './health.js';
+import { buildHealthRouter } from './health.js';
 import { buildInvitationsRouter } from './invitations.js';
+import { buildPrivacyRouter } from './privacy.js';
 import { buildTenantsRouter } from './tenants.js';
 import { buildUsersRouter } from './users.js';
 import { buildVisitorRouter } from './visitor.js';
 import { buildWidgetRouter } from './widget.js';
 
 import type { Env } from '../config/env.js';
+import type { AdapterHealth } from '../io/adapter.js';
 import type { Services } from '../services/index.js';
 import type { Redis } from 'ioredis';
 
@@ -19,6 +21,8 @@ interface RouterDeps {
   env: Env;
   redis: Redis;
   services: Services;
+  /** Socket.IO Redis adapter health, surfaced by `/health` (#73). */
+  socketAdapterHealth?: AdapterHealth;
   /** Skip all rate limiters (for unit tests). */
   skipRateLimit?: boolean;
 }
@@ -30,7 +34,12 @@ interface RouterDeps {
  */
 export function buildRouter(deps: RouterDeps): Router {
   const router = Router();
-  router.use('/health', healthRouter);
+  router.use(
+    '/health',
+    buildHealthRouter(
+      deps.socketAdapterHealth ? { socketAdapterHealth: deps.socketAdapterHealth } : {},
+    ),
+  );
   router.use(
     '/auth',
     buildAuthRouter({
@@ -67,7 +76,24 @@ export function buildRouter(deps: RouterDeps): Router {
       invitation: deps.services.invitation,
     }),
   );
-  router.use('/widget', originAllowed(), buildWidgetRouter());
+  router.use(
+    '/widget',
+    originAllowed(),
+    buildWidgetRouter({
+      presence: deps.services.presence,
+      redis: deps.redis,
+      ...(deps.skipRateLimit === true && { skipRateLimit: true }),
+    }),
+  );
+  router.use(
+    '/privacy',
+    originAllowed(),
+    buildPrivacyRouter({
+      env: deps.env,
+      consent: deps.services.consent,
+      visitorSession: deps.services.visitorSession,
+    }),
+  );
   router.use(
     '/visitor',
     originAllowed(),

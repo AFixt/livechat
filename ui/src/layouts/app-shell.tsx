@@ -7,6 +7,7 @@ import Typography from '@mui/material/Typography';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, Outlet, useNavigate } from 'react-router-dom';
 
+import { useStaffPresence } from '../hooks/use-staff-presence.js';
 import { getApi } from '../services/api.js';
 import { disconnectStaffSocket } from '../services/socket.js';
 import { useAuthStore } from '../store/auth.js';
@@ -20,6 +21,9 @@ export function AppShell(): React.JSX.Element {
   const clear = useAuthStore((s) => s.clear);
   const user = useAuthStore((s) => s.user);
   const navigate = useNavigate();
+  // Keep the operator's availability in sync (echo + heartbeat) for the whole
+  // authenticated session, independent of which page is mounted.
+  useStaffPresence();
 
   const handleLogout = async (): Promise<void> => {
     try {
@@ -45,6 +49,9 @@ export function AppShell(): React.JSX.Element {
             </Button>
             <Button component={RouterLink} to="/settings/availability" color="inherit">
               {t('nav.availability')}
+            </Button>
+            <Button component={RouterLink} to="/settings/preferences" color="inherit">
+              {t('nav.preferences')}
             </Button>
             {user?.role !== 'client' && user !== null && (
               <>

@@ -10,11 +10,16 @@ description: |
   The transition is driven by a chat:end socket event from the console, so
   the full round trip is exercised in the cross-ends journey suite
   (ADR-0007). This file is the behavioural source of truth for the
-  chat-ended surface. Note: the transcript email delivery itself is not yet
-  implemented server-side (the submit currently no-ops); this use case
-  documents the required behavior.
+  chat-ended surface. The transcript is now actually delivered: submitting
+  posts to `/visitor/chats/:id/transcript`, which mails the conversation
+  (#80). The route is scoped to the requesting visitor's own chat, so one
+  visitor cannot transcribe another's.
 
 start_location: "http://localhost:5175/"
+
+expected_result: >-
+  The chat surface is replaced with an accessible offer to email a
+  transcript; submitting an address returns the widget to its closed trigger.
 
 preconditions:
   - The visitor was in an active chat that a support agent has just ended.

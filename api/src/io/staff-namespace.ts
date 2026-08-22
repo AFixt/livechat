@@ -1,13 +1,22 @@
-import jwt from 'jsonwebtoken';
+import { availabilityStatusSchema } from '@livechat/shared';
 
-import { detach } from './detach.js';
+import { authenticateAccessToken } from '../middlewares/authenticate.js';
+import { GLOBAL_STAFF_TENANT } from '../services/presence-service.js';
+
+import { broadcastGlobalStaffAvailability, broadcastTenantAvailability } from './availability.js';
+import { detach, guard, type SocketErrorPayload } from './detach.js';
 import { GLOBAL_STAFF_ROOM } from './rooms.js';
 
 import type { ServerToClientEvents, StaffSocketData, StaffToServerEvents } from './types.js';
 import type { Env } from '../config/env.js';
+import type { ChatCaller } from '../services/chat-service.js';
 import type { Services } from '../services/index.js';
+import type { Redis } from 'ioredis';
 import type { Logger } from 'pino';
 import type { Namespace, Server, Socket } from 'socket.io';
+
+/** Roles that may open a `/staff` socket and act on chats. */
+const STAFF_ROLES = ['super_admin', 'admin', 'staff'];
 
 /**
  *
@@ -18,17 +27,11 @@ type StaffNamespace = Namespace<StaffToServerEvents, ServerToClientEvents, objec
  */
 type StaffSocket = Socket<StaffToServerEvents, ServerToClientEvents, object, StaffSocketData>;
 
-interface JwtPayload {
-  sub: string;
-  role: string;
-  tenantId: string | null;
-  jti: string;
-}
-
 interface StaffDeps {
   io: Server;
   logger: Logger;
   env: Pick<Env, 'JWT_ACCESS_SECRET'>;
+  redis: Redis;
   services: Pick<Services, 'chat' | 'presence'>;
 }
 
@@ -42,46 +45,92 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
   const nsp = deps.io.of('/staff') as StaffNamespace;
 
   nsp.use((socket, next) => {
-    const token = socket.handshake.auth.token as string | undefined;
-    if (token === undefined) {
-      next(new Error('Authentication required'));
-      return;
-    }
-    try {
-      const decoded = jwt.verify(token, deps.env.JWT_ACCESS_SECRET) as JwtPayload;
-      socket.data.userId = decoded.sub;
-      socket.data.role = decoded.role;
-      socket.data.tenantId = decoded.tenantId;
+    (async () => {
+      const token = socket.handshake.auth.token as string | undefined;
+      if (token === undefined) {
+        next(new Error('Authentication required'));
+        return;
+      }
+      // Reuse the full HTTP auth path (JTI blacklist, active status, tenant
+      // expiry) so a logged-out or deactivated token cannot keep a live socket
+      // for the rest of its ~15-minute lifetime (issue #72).
+      let userId: string;
+      let role: string;
+      let tenantId: string | null;
+      try {
+        const { user } = await authenticateAccessToken({ env: deps.env, redis: deps.redis }, token);
+        ({ id: userId, role, tenantId } = user);
+      } catch {
+        next(new Error('Invalid token'));
+        return;
+      }
+      if (!STAFF_ROLES.includes(role)) {
+        next(new Error('Insufficient permissions'));
+        return;
+      }
+      socket.data.userId = userId;
+      socket.data.role = role;
+      socket.data.tenantId = tenantId;
       next();
-    } catch {
-      next(new Error('Invalid token'));
-    }
+    })().catch(next);
   });
 
   nsp.on('connection', (socket: StaffSocket) => {
     const { userId, role, tenantId } = socket.data;
+    // The handshake already rejected any non-staff role, so every connected
+    // socket is a staff operator. `tenantId === null` is an untenanted AFixt
+    // operator who serves every tenant (issue #72).
+    const caller: ChatCaller = { kind: 'staff', tenantId };
+    const emitError = (payload: SocketErrorPayload): void => {
+      socket.emit('chat:error', payload);
+    };
+
     detach(deps.logger, 'staff room join failed', async () => {
       await socket.join(`user:${userId}`);
-      if (['super_admin', 'admin', 'staff'].includes(role)) {
-        await socket.join('staff');
-        // AFixt staff with no tenant of their own serve every tenant, so they
-        // join the global room that visitor/chat events are mirrored to. Note
-        // the `staff` room is NOT used for that — it holds tenant-scoped staff
-        // too, and broadcasting there would break tenant isolation.
-        if (tenantId === null) await socket.join(GLOBAL_STAFF_ROOM);
-      }
-      if (tenantId !== null) await socket.join(`tenant:${tenantId}`);
+      await socket.join('staff');
+      // AFixt staff with no tenant of their own serve every tenant, so they
+      // join the global room that visitor/chat events are mirrored to. Note
+      // the `staff` room is NOT used for that — it holds tenant-scoped staff
+      // too, and broadcasting there would break tenant isolation.
+      if (tenantId === null) await socket.join(GLOBAL_STAFF_ROOM);
+      else await socket.join(`tenant:${tenantId}`);
     });
-    if (['super_admin', 'admin', 'staff'].includes(role)) {
-      detach(deps.logger, 'marking staff available failed', async () =>
-        deps.services.presence.setStaffAvailable(userId),
-      );
-      nsp.emit('support:availability_changed', { available: true });
+    const isStaff = ['super_admin', 'admin', 'staff'].includes(role);
+    // Untenanted AFixt staff serve every tenant (issue #19); bucket their
+    // availability globally rather than under a single tenant.
+    const availabilityTenant = tenantId ?? GLOBAL_STAFF_TENANT;
+    if (isStaff) {
+      detach(deps.logger, 'restoring staff availability failed', async () => {
+        // Do NOT auto-mark available on connect: keep the user's persisted,
+        // explicit status so availability survives reconnects/reloads.
+        const restore = (): ReturnType<typeof deps.services.presence.restoreOnConnect> =>
+          deps.services.presence.restoreOnConnect(userId, availabilityTenant);
+        // Global (untenanted) staff serve every tenant (issue #19). If the grace
+        // window lapsed while they were gone, re-livening them here can flip
+        // effective availability for tenants that had no other reachable agent,
+        // so live-push those transitions too (bounded like the toggle path).
+        const status =
+          tenantId === null
+            ? await broadcastGlobalStaffAvailability({
+                io: deps.io,
+                presence: deps.services.presence,
+                apply: restore,
+              })
+            : await restore();
+        if (tenantId !== null) {
+          await broadcastTenantAvailability({
+            io: deps.io,
+            presence: deps.services.presence,
+            tenantId,
+          });
+        }
+        nsp.to(`user:${userId}`).emit('availability:self', { status });
+      });
     }
 
     socket.on('chat:accept', (payload) => {
-      detach(deps.logger, 'staff chat:accept failed', async () => {
-        const chat = await deps.services.chat.assign(payload.chatId, userId);
+      guard(deps.logger, emitError, 'chat:accept', async () => {
+        const chat = await deps.services.chat.assign(payload.chatId, userId, caller);
         await socket.join(`chat:${chat.id}`);
         const assigned = { chatId: chat.id, assignedTo: userId };
         nsp.to(`chat:${chat.id}`).emit('chat:assigned', assigned);
@@ -89,14 +138,29 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
       });
     });
 
+    socket.on('chat:join', (payload) => {
+      guard(deps.logger, emitError, 'chat:join', async () => {
+        // Re-enter a chat room the operator already had open (e.g. after a
+        // reconnect) without touching assignment (issue #69). `getById`
+        // enforces the same tenant scoping as `chat:accept` — a null-tenant
+        // AFixt operator spans all tenants, a scoped one is limited to theirs
+        // (#72) — so a client-supplied chatId cannot cross the boundary.
+        const chat = await deps.services.chat.getById(payload.chatId, caller);
+        await socket.join(`chat:${chat.id}`);
+      });
+    });
+
     socket.on('chat:message', (payload) => {
-      detach(deps.logger, 'staff chat:message failed', async () => {
-        const msg = await deps.services.chat.sendMessage({
-          chatId: payload.chatId,
-          senderKind: 'user',
-          senderUserId: userId,
-          body: payload.body,
-        });
+      guard(deps.logger, emitError, 'chat:message', async () => {
+        const msg = await deps.services.chat.sendMessage(
+          {
+            chatId: payload.chatId,
+            senderKind: 'user',
+            senderUserId: userId,
+            body: payload.body,
+          },
+          caller,
+        );
         const event = {
           chatId: payload.chatId,
           messageId: msg.id,
@@ -111,6 +175,9 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
     });
 
     socket.on('chat:typing', (payload) => {
+      // Only relay typing for a chat this socket has actually joined, so a
+      // typing packet cannot be spoofed into an arbitrary chat room (#72).
+      if (!socket.rooms.has(`chat:${payload.chatId}`)) return;
       const typingEvent = {
         chatId: payload.chatId,
         actor: 'user' as const,
@@ -121,11 +188,11 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
     });
 
     socket.on('chat:end', (payload) => {
-      detach(deps.logger, 'staff chat:end failed', async () => {
-        const chat = await deps.services.chat.endChat({
-          chatId: payload.chatId,
-          endedBy: 'support',
-        });
+      guard(deps.logger, emitError, 'chat:end', async () => {
+        const chat = await deps.services.chat.endChat(
+          { chatId: payload.chatId, endedBy: 'support' },
+          caller,
+        );
         const endEvent = { chatId: chat.id, endedBy: 'support' as const };
         nsp.to(`chat:${chat.id}`).emit('chat:ended', endEvent);
         deps.io.of('/visitor').to(`chat:${chat.id}`).emit('chat:ended', endEvent);
@@ -133,7 +200,7 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
     });
 
     socket.on('chat:initiate', (payload) => {
-      detach(deps.logger, 'staff chat:initiate failed', async () => {
+      guard(deps.logger, emitError, 'chat:initiate', async () => {
         if (tenantId === null) return;
         const chat = await deps.services.chat.initiateBySupport({
           tenantId,
@@ -156,17 +223,51 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
       });
     });
 
-    socket.on('disconnect', () => {
-      if (['super_admin', 'admin', 'staff'].includes(role)) {
-        detach(deps.logger, 'staff disconnect cleanup failed', async () => {
-          await deps.services.presence.setStaffUnavailable(userId);
-          const anyLeft = await deps.services.presence.anyStaffAvailable();
-          if (!anyLeft) {
-            nsp.emit('support:availability_changed', { available: false });
-          }
-        });
-      }
+    socket.on('availability:set', (payload) => {
+      if (!isStaff) return;
+      // Validate at runtime: the payload is untrusted socket input (a client
+      // can emit anything, including no payload), so a malformed status must
+      // not be persisted or echoed back to the client.
+      const raw = payload as { status?: unknown } | null | undefined;
+      const parsed = availabilityStatusSchema.safeParse(raw?.status);
+      if (!parsed.success) return;
+      const status = parsed.data;
+      detach(deps.logger, 'staff availability:set failed', async () => {
+        if (tenantId === null) {
+          // Global (untenanted) staff serve every tenant (issue #19): a toggle
+          // here can change availability for many tenants at once. Bound the
+          // fan-out to tenants with a connected visitor whose effective state
+          // actually flips (see broadcastGlobalStaffAvailability).
+          await broadcastGlobalStaffAvailability({
+            io: deps.io,
+            presence: deps.services.presence,
+            apply: () => deps.services.presence.setAvailability(userId, availabilityTenant, status),
+          });
+        } else {
+          await deps.services.presence.setAvailability(userId, availabilityTenant, status);
+          await broadcastTenantAvailability({
+            io: deps.io,
+            presence: deps.services.presence,
+            tenantId,
+          });
+        }
+        // Echo to every tab of this user so the console reflects the change
+        // and multi-tab stays in sync (availability is per-user, not per-tab).
+        nsp.to(`user:${userId}`).emit('availability:self', { status });
+      });
     });
+
+    socket.on('availability:heartbeat', () => {
+      if (!isStaff) return;
+      detach(deps.logger, 'staff availability:heartbeat failed', async () =>
+        deps.services.presence.heartbeat(userId),
+      );
+    });
+
+    // No availability change on disconnect: status is explicit and persists.
+    // A full disconnect (all tabs closed, heartbeats stop) stops the agent
+    // counting only once the connection grace window lapses — a dropped
+    // socket never flips them away immediately.
   });
 
   return nsp;

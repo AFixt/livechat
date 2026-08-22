@@ -50,7 +50,7 @@ function makeStubRedis(): Redis {
 }
 
 describe('GET /api/v1/health', () => {
-  it('returns { success: true, data: { status: "ok" } }', async () => {
+  it('returns { success: true, data: { status: "ok", socketAdapter: "disabled" } }', async () => {
     const env = makeEnv();
     const logger = pino({ level: 'silent' });
     const redis = makeStubRedis();
@@ -60,6 +60,8 @@ describe('GET /api/v1/health', () => {
     const res = await request(app).get('/api/v1/health');
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ success: true, data: { status: 'ok' } });
+    // With no Socket.IO Redis adapter wired (single-process unit context), the
+    // health payload reports the adapter as `disabled` alongside `status: ok`.
+    expect(res.body).toEqual({ success: true, data: { status: 'ok', socketAdapter: 'disabled' } });
   });
 });

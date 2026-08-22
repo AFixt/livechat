@@ -68,9 +68,27 @@ done
 # themselves). The widget's standalone happy-path specs have no agent socket,
 # so they opt in via SEED_STAFF_AVAILABLE=1 to seed one placeholder — otherwise
 # a visitor-initiated chat would (correctly) land in the no_support state.
-docker exec livechat-redis redis-cli DEL presence:staff:available >/dev/null 2>&1 || true
+# The keys are tenant- and user-scoped (see presence-service.ts):
+#   presence:staff:available:<tenantId>   set of explicitly-available user ids
+#   presence:staff:conn:<userId>          connection-liveness marker, TTL 120s
+# `anyStaffAvailable` unions the tenant + global sets and then drops any member
+# with no live conn key, so a seeded placeholder needs BOTH.
+for k in $(docker exec livechat-redis redis-cli --scan --pattern 'presence:staff:available:*'); do
+  docker exec livechat-redis redis-cli DEL "$k" >/dev/null 2>&1 || true
+done
+for k in $(docker exec livechat-redis redis-cli --scan --pattern 'presence:staff:status:*'); do
+  docker exec livechat-redis redis-cli DEL "$k" >/dev/null 2>&1 || true
+done
 if [ "${SEED_STAFF_AVAILABLE:-}" = "1" ]; then
-  docker exec livechat-redis redis-cli SADD presence:staff:available e2e-seed-agent >/dev/null 2>&1 || true
+  seed_tenant=$(docker exec livechat-mysql mysql -N -B -uroot "-p${ROOT_PASS}" \
+    -e "SELECT id FROM tenants WHERE slug='acme' LIMIT 1;" "${DB_NAME}" 2>/dev/null | tr -d '\r')
+  if [ -z "$seed_tenant" ]; then
+    echo "e2e: SEED_STAFF_AVAILABLE=1 but the acme tenant was not found in ${DB_NAME}" >&2
+    exit 1
+  fi
+  docker exec livechat-redis redis-cli SADD "presence:staff:available:${seed_tenant}" e2e-seed-agent >/dev/null
+  docker exec livechat-redis redis-cli SET presence:staff:conn:e2e-seed-agent 1 EX 3600 >/dev/null
+  echo "e2e: seeded a placeholder available agent for tenant ${seed_tenant}"
 fi
 
 exec node_modules/.bin/tsx api/src/server.ts

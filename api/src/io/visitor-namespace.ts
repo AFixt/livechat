@@ -1,7 +1,8 @@
-import { detach } from './detach.js';
+import { detach, guard, type SocketErrorPayload } from './detach.js';
 import { GLOBAL_STAFF_ROOM } from './rooms.js';
 
 import type { ServerToClientEvents, VisitorSocketData, VisitorToServerEvents } from './types.js';
+import type { ChatCaller } from '../services/chat-service.js';
 import type { Services } from '../services/index.js';
 import type { Logger } from 'pino';
 import type { Namespace, Server, Socket } from 'socket.io';
@@ -72,9 +73,20 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
 
   nsp.on('connection', (socket: VisitorSocket) => {
     const { visitorSessionId, tenantId } = socket.data;
-    detach(deps.logger, 'visitor room join failed', async () =>
-      socket.join(`visitor:${visitorSessionId}`),
-    );
+    // A visitor may only ever touch chats bound to their own signed session
+    // (issue #72).
+    const caller: ChatCaller = { kind: 'visitor', visitorSessionId };
+    const emitError = (payload: SocketErrorPayload): void => {
+      socket.emit('chat:error', payload);
+    };
+
+    detach(deps.logger, 'visitor room join failed', async () => {
+      await socket.join(`visitor:${visitorSessionId}`);
+      // Join the tenant-wide room so this visitor receives
+      // `support:availability_changed` broadcasts and can flip between the
+      // invitation (§5.1.2) and no-support (§5.1.4) states in real time.
+      await socket.join(`tenant:${tenantId}`);
+    });
 
     detach(deps.logger, 'marking visitor present failed', async () =>
       deps.services.presence.markVisitorPresent(tenantId, visitorSessionId, {
@@ -87,13 +99,15 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
     });
 
     socket.on('chat:join', (payload) => {
-      detach(deps.logger, 'chat room join failed', async () => {
+      guard(deps.logger, emitError, 'chat:join', async () => {
+        // Resolve the chat scoped to this visitor first: a visitor must not be
+        // able to join another visitor's chat room by id (#72).
+        const chat = await deps.services.chat.getById(payload.chatId, caller);
         await socket.join(`chat:${payload.chatId}`);
         // Notify staff that this chat needs attention. Visitor-initiated
         // chats are created over HTTP, which emits nothing — without this
         // the chat never reaches the console's list. Idempotent: the client
         // upserts, so re-joining (e.g. restart) is harmless.
-        const chat = await deps.services.chat.getById(payload.chatId);
         deps.io.of(STAFF_NS).to(`tenant:${tenantId}`).to(GLOBAL_STAFF_ROOM).emit('chat:requested', {
           chatId: chat.id,
           tenantId,
@@ -104,12 +118,15 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
     });
 
     socket.on('chat:message', (payload) => {
-      detach(deps.logger, 'visitor chat:message failed', async () => {
-        const msg = await deps.services.chat.sendMessage({
-          chatId: payload.chatId,
-          senderKind: 'visitor',
-          body: payload.body,
-        });
+      guard(deps.logger, emitError, 'chat:message', async () => {
+        const msg = await deps.services.chat.sendMessage(
+          {
+            chatId: payload.chatId,
+            senderKind: 'visitor',
+            body: payload.body,
+          },
+          caller,
+        );
         const event: Parameters<ServerToClientEvents['chat:message']>[0] = {
           chatId: payload.chatId,
           messageId: msg.id,
@@ -129,6 +146,9 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
     });
 
     socket.on('chat:typing', (payload) => {
+      // Only relay typing for a chat this visitor has actually joined, so it
+      // cannot be spoofed into another visitor's chat room (#72).
+      if (!socket.rooms.has(`chat:${payload.chatId}`)) return;
       nsp.to(`chat:${payload.chatId}`).emit('chat:typing', {
         chatId: payload.chatId,
         actor: 'visitor',
@@ -142,11 +162,11 @@ export function registerVisitorNamespace(deps: VisitorDeps): VisitorNamespace {
     });
 
     socket.on('chat:end', (payload) => {
-      detach(deps.logger, 'visitor chat:end failed', async () => {
-        const chat = await deps.services.chat.endChat({
-          chatId: payload.chatId,
-          endedBy: 'customer',
-        });
+      guard(deps.logger, emitError, 'chat:end', async () => {
+        const chat = await deps.services.chat.endChat(
+          { chatId: payload.chatId, endedBy: 'customer' },
+          caller,
+        );
         const event: Parameters<ServerToClientEvents['chat:ended']>[0] = {
           chatId: chat.id,
           endedBy: 'customer',

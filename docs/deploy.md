@@ -47,6 +47,26 @@ doctl apps create-deployment <APP_ID>
 curl -s https://api.livechat.afixt.com/api/v1/health
 ```
 
+### Post-deploy verification
+
+After every deploy that changes the edge/TLS configuration (and at least once
+per environment), verify the transport security of each public host with the TLS
+harness:
+
+```bash
+TLS_TARGET_URL=https://api.livechat.afixt.com npm run security:tls
+TLS_TARGET_URL=https://console.livechat.afixt.com npm run security:tls
+TLS_TARGET_URL=https://widget.livechat.afixt.com npm run security:tls
+```
+
+It fails (non-zero exit) if a host still offers TLS 1.0/1.1, presents weak
+ciphers or an invalid chain (via `testssl.sh`), does not redirect HTTP→HTTPS, is
+missing HSTS, or sets a cookie without `Secure`/`HttpOnly`/`SameSite`. With no
+`TLS_TARGET_URL` set it no-ops, so it is safe in the local `npm run security`
+aggregate. See
+[`docs/security/tls-verification.md`](security/tls-verification.md) for what
+each check means and how to read `testssl.sh` output.
+
 ### Every subsequent deploy
 
 Pushing to `main` (or a manually-run deploy) rebuilds the three containers and
@@ -84,12 +104,34 @@ rate-limit state is reconstructible.
 - **OWASP ZAP baseline**: weekly against `ZAP_TARGET_URL` (configure as a repo
   variable once a public URL exists).
 
-### Scaling
+### API documentation
+
+Swagger UI (`/api/docs`) and the raw OpenAPI document (`/api/docs.json`) are
+served **only when `NODE_ENV !== 'production'`** — publishing the full route and
+schema inventory unauthenticated is free reconnaissance (#78). To read the spec,
+run the API locally or in staging (`NODE_ENV=development`) and open
+`http://localhost:23001/api/docs`, or fetch `/api/docs.json` for the machine-
+readable spec. In production both paths return `404`.
+
+### Horizontal scaling
 
 - **api**: bump `instance_count` in `.do/app.yaml` (currently 2). Redis is
-  shared — rate-limit counters and Socket.IO adapter state both live there, so
-  horizontal scaling is safe. Socket.IO needs a Redis adapter when > 1 instance;
-  confirm before flipping to 3+.
+  shared, so both stateful layers span instances:
+  - **Rate-limit counters** and **presence** (staff availability + the visitor
+    list) are plain Redis keys — already global.
+  - **Socket.IO rooms** are per-process by default. The **Redis adapter**
+    (`api/src/io/adapter.ts`, wired in `server.ts` via `attachIo`) publishes
+    every room broadcast through Redis so a visitor on instance A and an agent
+    on instance B reach each other. **This is required for
+    `instance_count > 1`** — without it roughly half of all cross-instance
+    messages are silently lost (issue #73). It is on by default; there is
+    nothing to enable.
+  - The adapter uses two dedicated Redis connections (a subscriber connection
+    cannot serve other commands), separate from the shared client.
+  - **Verify after scaling:** `GET /api/v1/health` reports `data.socketAdapter`.
+    It must be `"ready"`; `"degraded"` means the adapter's Redis connection is
+    down and rooms are **not** spanning instances — treat it as a real-time
+    outage even though liveness stays `200`.
 - **Managed MySQL**: resize via the DO UI. No app changes.
 - **widget + ui**: static sites; App Platform serves them through its CDN. No
   scaling knobs.

@@ -11,6 +11,7 @@ import Typography from '@mui/material/Typography';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ConnectionBanner } from '../components/connection-banner.js';
 import { useChatInbox } from '../hooks/use-chat-inbox.js';
 import { useStaffSocket } from '../hooks/use-staff-socket.js';
 import { getStaffSocket } from '../services/socket.js';
@@ -34,6 +35,7 @@ export function DashboardPage(): React.JSX.Element {
 
   return (
     <Stack spacing={3}>
+      <ConnectionBanner />
       <Typography component="h2" variant="h4">
         {t('dashboard.heading')}
       </Typography>

@@ -1,6 +1,32 @@
+import { isWithinSupportHours } from './support-hours.js';
+
+import type { SupportHours } from '@livechat/shared';
 import type { Redis } from 'ioredis';
 
-const STAFF_AVAILABLE_KEY = 'presence:staff:available';
+/** Explicit per-user status (never expires — survives reconnect/reload). */
+const statusKey = (userId: string): string => `presence:staff:status:${userId}`;
+/** Per-tenant set of user ids whose explicit status is `available`. */
+const availableSetKey = (tenantId: string): string => `presence:staff:available:${tenantId}`;
+/** Connection-liveness marker with a grace TTL, refreshed by connect/heartbeat. */
+const connKey = (userId: string): string => `presence:staff:conn:${userId}`;
+
+/**
+ * Availability bucket for untenanted AFixt staff who serve every tenant
+ * (issue #19). Their availability is unioned into every tenant's count.
+ */
+export const GLOBAL_STAFF_TENANT = '__global__';
+
+/**
+ * Grace window (seconds) an agent still counts as reachable after their last
+ * socket connect/heartbeat. A dropped socket therefore does NOT immediately
+ * mark the agent away; only a full disconnect for longer than this window
+ * (all tabs closed, no heartbeat) stops them counting.
+ */
+const CONN_GRACE_S = 120;
+
+/** Availability status value persisted per user. */
+type StaffStatus = 'available' | 'away';
+
 const VISITOR_PRESENCE_TTL_S = 60;
 
 /**
@@ -17,35 +43,126 @@ interface PresenceDeps {
 }
 
 /**
- * Build the presence service.
+ * Build the presence service — Redis-backed staff availability (per-user, not
+ * per-socket) and per-tenant visitor presence.
  * @param deps - Redis dependency.
  * @returns Presence methods.
  */
 export function createPresenceService(deps: PresenceDeps) {
+  /**
+   * Refresh the connection-liveness marker for a user.
+   * @param userId - Staff user id.
+   */
+  async function touchConnection(userId: string): Promise<void> {
+    await deps.redis.set(connKey(userId), '1', 'EX', CONN_GRACE_S);
+  }
+
+  /**
+   * Read a user's persisted status, defaulting to `away`.
+   * @param userId - Staff user id.
+   * @returns The stored status.
+   */
+  async function readStatus(userId: string): Promise<StaffStatus> {
+    const raw = await deps.redis.get(statusKey(userId));
+    return raw === 'available' ? 'available' : 'away';
+  }
+
   return {
     /**
-     * Mark a staff user as available. Called when a support socket connects.
+     * Set a staff user's explicit availability. Persists indefinitely so it
+     * survives reconnects and reloads, and mirrors set-membership used by the
+     * availability count. Also refreshes the connection marker.
      * @param userId - Staff user id.
+     * @param tenantId - The user's tenant (availability is tenant-scoped).
+     * @param status - `available` or `away`.
      */
-    async setStaffAvailable(userId: string): Promise<void> {
-      await deps.redis.sadd(STAFF_AVAILABLE_KEY, userId);
+    async setAvailability(userId: string, tenantId: string, status: StaffStatus): Promise<void> {
+      await deps.redis.set(statusKey(userId), status);
+      if (status === 'available') {
+        await deps.redis.sadd(availableSetKey(tenantId), userId);
+        await touchConnection(userId);
+      } else {
+        await deps.redis.srem(availableSetKey(tenantId), userId);
+      }
     },
 
     /**
-     * Remove a staff user from availability (disconnect or manual toggle).
+     * Read a staff user's persisted availability. Brand-new users (no stored
+     * value) default to `away` — they opt in to `available`.
      * @param userId - Staff user id.
+     * @returns The stored status, or `away` by default.
      */
-    async setStaffUnavailable(userId: string): Promise<void> {
-      await deps.redis.srem(STAFF_AVAILABLE_KEY, userId);
+    async getAvailability(userId: string): Promise<StaffStatus> {
+      return readStatus(userId);
     },
 
     /**
-     * Return whether any staff is currently available.
-     * @returns True if at least one staff user is in the available set.
+     * Restore availability when a staff socket connects: keep the user's
+     * persisted status (never auto-mark them available), re-assert set
+     * membership if they were available, and refresh the connection marker.
+     * @param userId - Staff user id.
+     * @param tenantId - The user's tenant.
+     * @returns The restored status.
      */
-    async anyStaffAvailable(): Promise<boolean> {
-      const n = await deps.redis.scard(STAFF_AVAILABLE_KEY);
-      return n > 0;
+    async restoreOnConnect(userId: string, tenantId: string): Promise<StaffStatus> {
+      const status = await readStatus(userId);
+      if (status === 'available') await deps.redis.sadd(availableSetKey(tenantId), userId);
+      await touchConnection(userId);
+      return status;
+    },
+
+    /**
+     * Refresh a user's connection-liveness marker. Called on a periodic
+     * heartbeat from the console while a socket is open.
+     * @param userId - Staff user id.
+     */
+    async heartbeat(userId: string): Promise<void> {
+      await touchConnection(userId);
+    },
+
+    /**
+     * Whether at least one agent is *explicitly available and reachable*
+     * (within the connection grace window) for a tenant, and — when a
+     * schedule is supplied — the tenant is currently within support hours.
+     * @param tenantId - Tenant UUID.
+     * @param opts - Optional support-hours schedule and evaluation instant.
+     * @returns True only when support should be treated as available.
+     */
+    async anyStaffAvailable(
+      tenantId: string,
+      opts: { supportHours?: SupportHours | null; now?: Date } = {},
+    ): Promise<boolean> {
+      if (!isWithinSupportHours(opts.supportHours ?? null, opts.now)) return false;
+      // Union the tenant's own available agents with untenanted AFixt staff,
+      // who serve every tenant (issue #19).
+      const members = await deps.redis.sunion(
+        availableSetKey(tenantId),
+        availableSetKey(GLOBAL_STAFF_TENANT),
+      );
+      if (members.length === 0) return false;
+      const pipeline = deps.redis.pipeline();
+      for (const userId of members) pipeline.exists(connKey(userId));
+      const results = (await pipeline.exec()) ?? [];
+      let anyLive = false;
+      const dead: string[] = [];
+      results.forEach(([, live], index) => {
+        const member = members[index];
+        if (member === undefined) return;
+        if (live === 1) anyLive = true;
+        else dead.push(member);
+      });
+      // Opportunistic cleanup: an agent who closed all tabs (connection key
+      // expired) but never went 'away' would otherwise linger in the set
+      // forever. Prune those stale members from both the tenant and global
+      // sets — a no-op where absent, and self-healing since restoreOnConnect
+      // re-adds them if they reconnect still 'available'.
+      if (dead.length > 0) {
+        const cleanup = deps.redis.pipeline();
+        cleanup.srem(availableSetKey(tenantId), ...dead);
+        cleanup.srem(availableSetKey(GLOBAL_STAFF_TENANT), ...dead);
+        await cleanup.exec();
+      }
+      return anyLive;
     },
 
     /**

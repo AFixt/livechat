@@ -1,14 +1,19 @@
 import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 
 import { LiveRegion } from './components/live-region.js';
+import { ReconnectBanner } from './components/reconnect-banner.js';
+import { useChatConnection } from './hooks/use-chat-connection.js';
+import { useDelayedFlag } from './hooks/use-delayed-flag.js';
 import { useFocusReturn } from './hooks/use-focus-return.js';
 import {
   emailTranscript,
   fetchCurrentChat,
+  fetchWidgetConfig,
   initiateChat,
   initVisitorSession,
 } from './services/api.js';
 import { playAlert } from './services/audio.js';
+import { consentStore } from './services/consent.js';
 import { announceLiveMessage } from './services/live-region.js';
 import { disconnectVisitorSocket, getVisitorSocket } from './services/socket.js';
 import { initialModel, reduce } from './state-machine.js';
@@ -21,18 +26,26 @@ import { NoSupportState } from './states/no-support.js';
 import { RestartState } from './states/restart.js';
 import { SupportInitiatedState } from './states/support-initiated.js';
 
-import type { WidgetMessage } from './types.js';
-
 interface AppProps {
   tenantKey: string;
 }
 
-interface SocketMessageEvent {
-  chatId: string;
-  messageId: string;
-  senderKind: 'visitor' | 'user' | 'system';
-  body: string;
-  deliveredAt: string;
+/**
+ * How long support must stay available before the proactive invitation
+ * surfaces. §5.1.2 calls for the CTA "after a short period" — the widget shows
+ * its plain trigger first and only escalates to the invitation once support has
+ * been online continuously for this long.
+ */
+const INVITATION_DELAY_MS = 5000;
+
+/**
+ * Optional support-hours props for the no-support state. Returns an empty
+ * object when unset so it is safe to spread under `exactOptionalPropertyTypes`.
+ * @param text - Configured support-hours display text, or undefined.
+ * @returns Props to spread onto `<NoSupportState>`.
+ */
+function noSupportProps(text: string | undefined): { supportHoursText?: string } {
+  return text === undefined ? {} : { supportHoursText: text };
 }
 
 /**
@@ -46,6 +59,15 @@ export function App(props: AppProps): preact.JSX.Element {
   // Peer (support) typing indicator — transient UI state, kept out of the state
   // machine so it never interacts with the documented widget states (#80).
   const [peerTyping, setPeerTyping] = useState(false);
+  // Transient connection state — surfaced as an aria-live banner while the
+  // socket is reconnecting (issue #69). Kept out of the state machine so it
+  // never perturbs the documented widget states.
+  const [reconnecting, setReconnecting] = useState(false);
+  const [supportHoursText, setSupportHoursText] = useState<string | undefined>(undefined);
+  // §5.1.2: the invitation appears "after a short period", not the instant
+  // support comes online. `supportAvailable` still drives the offline/online
+  // logic everywhere else; only the proactive flourish waits out this delay.
+  const showInvitation = useDelayedFlag(model.supportAvailable, INVITATION_DELAY_MS);
   useFocusReturn(model.open);
   const panelHeaderRef = useRef<HTMLHeadingElement>(null);
 
@@ -63,7 +85,35 @@ export function App(props: AppProps): preact.JSX.Element {
       announceLiveMessage('A support agent wants to chat');
       playAlert();
     };
+    // The /visitor namespace bridges staff availability to the widget, making
+    // the proactive invitation (§5.1.2) and no-support (§5.1.4) states
+    // reachable. Both true and false are dispatched.
+    const onAvailabilityChanged = (p: { available: boolean }): void => {
+      dispatch({ type: 'support_available', available: p.available });
+      if (p.available) announceLiveMessage('Support is now online');
+    };
+    // Public tenant config — support-hours text plus the current availability
+    // flag, so the invitation/no-support states are correct on first paint
+    // before any live socket event arrives. Best-effort: the widget still
+    // works if this fails.
+    const loadInitialConfig = async (): Promise<void> => {
+      try {
+        const config = await fetchWidgetConfig(props.tenantKey);
+        if (!live.current) return;
+        setSupportHoursText(config.supportHoursText ?? undefined);
+        dispatch({ type: 'support_available', available: config.supportAvailable });
+      } catch {
+        // ignore — config is optional
+      }
+    };
     void (async () => {
+      // CMP consent gate (#54): hold presence/analytics capture until the host
+      // CMP grants it; resolves immediately when consent isn't required.
+      await consentStore.whenCaptureAllowed();
+      // `loadInitialConfig` self-guards on `live.current` after its fetch, and
+      // the resume/socket path below is guarded too, so an unmount during the
+      // consent wait is handled without an extra early return here.
+      await loadInitialConfig();
       // Reuse an existing session when the visitor already has one — a page
       // reload must not mint a fresh session, which would orphan a prior chat
       // and break the returning-visitor (restart) flow. Probing the resumable
@@ -84,6 +134,7 @@ export function App(props: AppProps): preact.JSX.Element {
       // A session now exists — connect the socket so this visitor shows up in
       // the console's presence list and can receive proactive support events.
       getVisitorSocket().on('support:initiated', onSupportInitiated);
+      getVisitorSocket().on('support:availability_changed', onAvailabilityChanged);
       // Returning visitor with an unfinished chat? Offer to resume it.
       if (resume !== null && resume.chat !== null) {
         dispatch({
@@ -97,31 +148,22 @@ export function App(props: AppProps): preact.JSX.Element {
     return () => {
       live.current = false;
       getVisitorSocket().off('support:initiated', onSupportInitiated);
+      getVisitorSocket().off('support:availability_changed', onAvailabilityChanged);
     };
   }, [props.tenantKey]);
 
+  // Owns the active chat's socket subscription, including reconnect re-join +
+  // transcript backfill (issue #69). Extracted so its branching stays out of
+  // this component's complexity budget.
+  useChatConnection(model.chatId, dispatch, setReconnecting);
+
+  // Support's typing indicator (#80). A separate subscription rather than
+  // folding it into `useChatConnection`: that hook owns reconnect and backfill,
+  // and typing is transient presentation that must not participate in either —
+  // a re-join should not replay a stale "is typing".
   useEffect(() => {
-    if (model.chatId === null) return;
+    if (model.chatId === null) return undefined;
     const socket = getVisitorSocket();
-    socket.emit('chat:join', { chatId: model.chatId });
-    const onMessage = (msg: SocketMessageEvent): void => {
-      if (msg.chatId !== model.chatId || msg.senderKind === 'visitor') return;
-      const message: WidgetMessage = {
-        id: msg.messageId,
-        body: msg.body,
-        senderKind: msg.senderKind,
-        deliveredAt: msg.deliveredAt,
-      };
-      dispatch({ type: 'message_received', message });
-      announceLiveMessage('New message from support');
-      playAlert();
-    };
-    const onEnded = (p: { chatId: string; endedBy: 'customer' | 'support' }): void => {
-      if (p.chatId !== model.chatId) return;
-      dispatch({
-        type: p.endedBy === 'support' ? 'chat_ended_by_support' : 'chat_ended_by_customer',
-      });
-    };
     const onTyping = (p: {
       chatId: string;
       actor: 'visitor' | 'user';
@@ -130,12 +172,8 @@ export function App(props: AppProps): preact.JSX.Element {
       if (p.chatId !== model.chatId || p.actor !== 'user') return;
       setPeerTyping(p.isTyping);
     };
-    socket.on('chat:message', onMessage);
-    socket.on('chat:ended', onEnded);
     socket.on('chat:typing', onTyping);
     return () => {
-      socket.off('chat:message', onMessage);
-      socket.off('chat:ended', onEnded);
       socket.off('chat:typing', onTyping);
       setPeerTyping(false);
     };
@@ -220,6 +258,7 @@ export function App(props: AppProps): preact.JSX.Element {
               ×
             </button>
           </header>
+          <ReconnectBanner active={reconnecting} />
           <div class="panel-body">
             {model.state === 'initial' && (
               <CustomerInitiatedState
@@ -236,7 +275,7 @@ export function App(props: AppProps): preact.JSX.Element {
             {model.state === 'no_support' && (
               <NoSupportState
                 onSubmit={() => Promise.resolve()}
-                supportHoursText="Mon–Fri, 9am–5pm"
+                {...noSupportProps(supportHoursText)}
               />
             )}
             {model.state === 'support_initiated' && (
@@ -277,7 +316,7 @@ export function App(props: AppProps): preact.JSX.Element {
             )}
           </div>
         </section>
-      ) : model.supportAvailable ? (
+      ) : showInvitation ? (
         <InvitationState
           onOpen={() => {
             dispatch({ type: 'open' });
