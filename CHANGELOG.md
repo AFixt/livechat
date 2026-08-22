@@ -46,6 +46,32 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   HIGH or CRITICAL findings at all. ([#132])
 
 ### Fixed
+- **The widget can work on a third-party site at all — the visitor session now
+  survives cross-site embedding.** The `livechat_visitor` cookie was
+  `SameSite=Lax`, so no browser sent it on the cross-site subresource requests
+  an embedded widget makes: every call after the bootstrap was unauthenticated
+  and the Socket.IO handshake carried no credential. This is the fix reviewed
+  and approved in PR #93, which never reached `develop` — it merged into
+  `fix/77-csrf` twelve minutes after that branch had itself merged, so the
+  branch was abandoned with the work on it. Re-applied here on top of the
+  consent work (ADR-0019) that has since moved the cookie options into a shared
+  helper. In production the cookie is now `SameSite=None; Secure; Partitioned`
+  (CHIPS); local dev stays `Lax`, since `None` requires `Secure` and a `Secure`
+  cookie is dropped on localhost HTTP. Because Safari (ITP) and Firefox (TCP)
+  block third-party cookies outright, the cookie alone is not enough: the
+  bootstrap endpoints also return the signed session as `sessionToken`, the
+  widget persists it in first-party storage and resends it as
+  `X-Visitor-Session` (allow-listed in CORS, passed as `auth.cookie` on the
+  socket handshake), and the API resolves the session from that header first
+  and the cookie second through one shared helper. The header path is still
+  CSRF-gated, and cannot be set cross-site without a preflight the per-tenant
+  CORS layer (#74) already gates. Also fixed on the way through: `clearCookie`
+  on "forget me" now repeats the cookie's attributes, without which a
+  `SameSite=None; Secure; Partitioned` cookie is never cleared (#79), and the
+  privacy router resolves its subject through the same helper so a
+  cookie-blocked visitor can still read, record and withdraw consent (#56). The
+  security-regression suite pinned `SameSite=Lax` in production and now pins
+  `SameSite=None; Secure; Partitioned`. See [ADR-0021]. ([#75])
 - **The local quality gate can be run again.** `npm run check:all` — the
   pre-push gate — failed for reasons unrelated to any code under review, so
   changes were going out under `--no-verify` with CI as the only check. Two
@@ -469,6 +495,8 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 [#57]: https://github.com/AFixt/livechat/issues/57
 [#53]: https://github.com/AFixt/livechat/issues/53
 [#56]: https://github.com/AFixt/livechat/issues/56
+[#75]: https://github.com/AFixt/livechat/issues/75
+[ADR-0021]: docs/adr/0021-visitor-session-third-party-cookie-fallback.md
 [#132]: https://github.com/AFixt/livechat/issues/132
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68

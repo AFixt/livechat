@@ -11,6 +11,11 @@ import { Router, type Request, type Response } from 'express';
 
 import { computeCsrfToken, csrfProtection } from '../middlewares/csrf.js';
 import { parsedBody, validate } from '../middlewares/validate.js';
+import {
+  VISITOR_COOKIE_NAME,
+  readVisitorSessionValue,
+  visitorCookieOptions,
+} from '../middlewares/visitor-request.js';
 import { Tenant, type VisitorSession } from '../models/index.js';
 import { parseSupportHours } from '../services/support-hours.js';
 import { verifyIdentityToken } from '../services/visitor-session-service.js';
@@ -19,7 +24,6 @@ import { asyncHandler } from '../utils/async-handler.js';
 
 import { detectGpc, resolveSubject } from './consent-request.js';
 import { resolveGeo } from './geo-resolve.js';
-import { VISITOR_COOKIE_NAME } from './visitor-cookie-options.js';
 
 import type { Env } from '../config/env.js';
 import type {
@@ -44,11 +48,12 @@ interface VisitorRouterDeps {
  * @throws 401 when absent.
  */
 function requireVisitorCookie(req: Request): string {
-  const raw: unknown = req.cookies[VISITOR_COOKIE_NAME];
-  if (typeof raw !== 'string' || raw.length === 0) {
-    throw ApiError.unauthorized('Visitor session required');
-  }
-  return raw;
+  // Header first, then cookie (#75): browsers that block the third-party cookie
+  // send the signed session in `X-Visitor-Session` instead, which is the only
+  // way the widget works cross-site on Safari and Firefox.
+  const value = readVisitorSessionValue(req);
+  if (value === undefined) throw ApiError.unauthorized('Visitor session required');
+  return value;
 }
 
 /**
@@ -183,6 +188,9 @@ async function runSessionInit(
     // requests (#77). Issued regardless of the tracking decision — a gated
     // visitor can still start a chat, which is a CSRF-protected write.
     csrfToken: computeCsrfToken(cookieValue, deps.env.COOKIE_SECRET),
+    // Persisted by the widget and resent as X-Visitor-Session when the browser
+    // blocks the third-party cookie (#75).
+    sessionToken: cookieValue,
     jurisdiction: state.jurisdiction,
     gpc: state.gpc,
     tracking: state.purposes,
@@ -273,8 +281,13 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
       const visitor = await deps.visitorSession.findByCookie(cookie);
       const chat = await deps.chat.findResumableByVisitorSession(visitor.id);
       const csrfToken = computeCsrfToken(cookie, deps.env.COOKIE_SECRET);
+      // Also echo the session token so a cookie-authenticated returning visitor
+      // can persist it for the header fallback on later loads (#75).
       if (chat === null) {
-        res.json({ success: true, data: { chat: null, messages: [], csrfToken } });
+        res.json({
+          success: true,
+          data: { chat: null, messages: [], csrfToken, sessionToken: cookie },
+        });
         return;
       }
       const messages = await deps.chat.listMessages(chat.id);
@@ -282,7 +295,7 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
         success: true,
         // Returning visitors reuse an existing cookie and never call /session,
         // so hand them the CSRF token here too (#77).
-        data: { chat, messages, csrfToken },
+        data: { chat, messages, csrfToken, sessionToken: cookie },
       });
     }),
   );
@@ -293,8 +306,10 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
   router.post(
     '/session/forget',
     asyncHandler(async (req, res) => {
-      const rawCookie: unknown = req.cookies[VISITOR_COOKIE_NAME];
-      const cookie = typeof rawCookie === 'string' ? rawCookie : undefined;
+      // Header-first, like every other visitor route: a visitor whose browser
+      // blocks the third-party cookie must still be able to forget their
+      // session (#75, #79).
+      const cookie = readVisitorSessionValue(req);
       if (cookie !== undefined) {
         try {
           // Deletes regardless of expiry, so a stale session's PII is still
@@ -304,7 +319,13 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
           // Invalid/forged cookie — nothing to forget.
         }
       }
-      res.clearCookie(VISITOR_COOKIE_NAME, { path: '/' });
+      // Clearing only works when the attributes match the ones the cookie was
+      // set with — a `SameSite=None; Secure; Partitioned` cookie is not cleared
+      // by a bare `path` (#75).
+      res.clearCookie(
+        VISITOR_COOKIE_NAME,
+        visitorCookieOptions(deps.env.NODE_ENV === 'production'),
+      );
       res.json({ success: true });
     }),
   );

@@ -1,4 +1,8 @@
-import { VISITOR_COOKIE_NAME, visitorCookieOptions } from './visitor-cookie-options.js';
+import {
+  VISITOR_COOKIE_NAME,
+  readVisitorSessionValue,
+  visitorCookieOptions,
+} from '../middlewares/visitor-request.js';
 
 import type { Env } from '../config/env.js';
 import type { VisitorSessionService } from '../services/index.js';
@@ -42,11 +46,18 @@ export interface ResolvedSubject {
  * @returns The subject key and the raw cookie value backing it.
  */
 export function resolveSubject(deps: SubjectDeps, req: Request, res: Response): ResolvedSubject {
-  const raw: unknown = req.cookies[VISITOR_COOKIE_NAME];
+  // Header first, then cookie (#75): a visitor whose browser blocks the
+  // third-party cookie still has a subject, so their consent decision attaches
+  // to the session they already have rather than minting a second one.
+  const raw: unknown = readVisitorSessionValue(req);
   if (typeof raw === 'string' && raw.length > 0) {
     return { subjectKey: deps.visitorSession.subjectKeyFromCookie(raw), cookieValue: raw };
   }
   const { cookieValue, subjectKey } = deps.visitorSession.mintHandle();
-  res.cookie(VISITOR_COOKIE_NAME, cookieValue, visitorCookieOptions(deps.env));
+  res.cookie(
+    VISITOR_COOKIE_NAME,
+    cookieValue,
+    visitorCookieOptions(deps.env.NODE_ENV === 'production'),
+  );
   return { subjectKey, cookieValue };
 }
