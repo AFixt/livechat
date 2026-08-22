@@ -35,14 +35,23 @@ API_URL=https://staging-api.afixt.com \
 The generated `servers[0].url` is `<API_URL>/api/v1`; point scanners at that
 same base.
 
-> **Current coverage gap.** Only `GET /health` currently registers an OpenAPI
-> path (`api/src/routes/health.ts`). The other routers serve traffic but do not
-> yet call `openApiRegistry.registerPath`, so they are absent from the document
-> and therefore invisible to the fuzzer and the ZAP API scan. Registering paths
-> (with request/response Zod schemas and a `security` requirement) for `auth`,
-> `visitor`, `chats`, `tenants`, `users`, `invitations`, and `admin` is the
-> follow-up that makes this tooling bite. Until then the harness is wired and
-> correct but exercises a single endpoint.
+> **Coverage.** The document describes **40 operations across 33 paths** —
+> `auth`, `visitor`, `chats`, `tenants`, `users`, `invitations`, `privacy`,
+> `widget` and `health` (#119). Registration lives in `api/src/routes/openapi/`,
+> one module per router, each side-effect-imported by the route module it
+> describes; `api/src/routes/openapi/support.ts` carries the
+> envelope/error/security helpers so an operation is a dozen readable lines.
+>
+> Two tests keep this honest, and both belong to the same job — making sure the
+> scanners see the real surface:
+>
+> - `api/tests/unit/openapi-coverage.test.ts` walks every mounted router and
+>   fails on a route with no OpenAPI path, on an OpenAPI path with no route, and
+>   on a router that is mounted but missing from its own mount table. It also
+>   pins a floor on the number of operations compared, so a walk that silently
+>   returns nothing cannot pass vacuously.
+> - `api/src/config/swagger.security.test.ts` fails any operation that neither
+>   declares a `security` requirement nor appears in its public allowlist.
 >
 > **Register paths at module top level.** The spec is assembled by _importing_ >
 > `api/src/routes/index.js` for its side effects — so a route only appears in

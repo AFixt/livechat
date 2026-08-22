@@ -2,6 +2,8 @@ import { Op } from 'sequelize';
 
 import { VisitorSession } from '../models/index.js';
 
+import { VISITOR_PII_COLUMNS, visitorPiiNulls } from './visitor-pii.js';
+
 import type { Logger } from 'pino';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -16,18 +18,11 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 export type RetentionStrategy = 'anonymize' | 'delete';
 
 /**
- * Personal-data columns cleared by the `anonymize` strategy. Kept in one place
- * so the "any PII still present" filter and the update payload cannot drift.
+ * Personal-data columns cleared by the `anonymize` strategy. Defined in
+ * `visitor-pii.ts` and shared with on-demand erasure (#121), so a new PII
+ * column cannot be handled by the sweep but missed by a data-subject request.
  */
-const PII_COLUMNS = [
-  'ipAddress',
-  'userAgent',
-  'country',
-  'city',
-  'currentUrl',
-  'referrer',
-  'identityTokenSub',
-] as const;
+const PII_COLUMNS = VISITOR_PII_COLUMNS;
 
 interface PurgeParams {
   /** Retention window in days; sessions untouched for longer are purged. */
@@ -86,23 +81,12 @@ export function createDataRetentionService(deps: DataRetentionDeps) {
       return { cutoff, strategy, anonymized: 0, deleted };
     }
 
-    const [anonymized] = await VisitorSession.update(
-      {
-        ipAddress: null,
-        userAgent: null,
-        country: null,
-        city: null,
-        currentUrl: null,
-        referrer: null,
-        identityTokenSub: null,
+    const [anonymized] = await VisitorSession.update(visitorPiiNulls(), {
+      where: {
+        lastSeenAt: { [Op.lt]: cutoff },
+        [Op.or]: PII_COLUMNS.map((column) => ({ [column]: { [Op.ne]: null } })),
       },
-      {
-        where: {
-          lastSeenAt: { [Op.lt]: cutoff },
-          [Op.or]: PII_COLUMNS.map((column) => ({ [column]: { [Op.ne]: null } })),
-        },
-      },
-    );
+    });
     deps.logger.info(
       { cutoff, strategy, anonymized, retentionDays: params.retentionDays },
       'visitor data retention: anonymized expired sessions',

@@ -9,11 +9,13 @@ import { buildInvitationsRouter } from './invitations.js';
 import { buildPrivacyRouter } from './privacy.js';
 import { buildTenantsRouter } from './tenants.js';
 import { buildUsersRouter } from './users.js';
+import { buildVisitorSessionsRouter } from './visitor-sessions.js';
 import { buildVisitorRouter } from './visitor.js';
 import { buildWidgetRouter } from './widget.js';
 
 import type { Env } from '../config/env.js';
 import type { AdapterHealth } from '../io/adapter.js';
+import type { IoRef } from '../io/io-ref.js';
 import type { Services } from '../services/index.js';
 import type { Redis } from 'ioredis';
 
@@ -23,6 +25,8 @@ interface RouterDeps {
   services: Services;
   /** Socket.IO Redis adapter health, surfaced by `/health` (#73). */
   socketAdapterHealth?: AdapterHealth;
+  /** Late-bound Socket.IO server, for disconnecting a revoked visitor (#123). */
+  ioRef?: IoRef;
   /** Skip all rate limiters (for unit tests). */
   skipRateLimit?: boolean;
 }
@@ -100,9 +104,21 @@ export function buildRouter(deps: RouterDeps): Router {
     buildVisitorRouter({
       env: deps.env,
       visitorSession: deps.services.visitorSession,
+      consent: deps.services.consent,
       chat: deps.services.chat,
       presence: deps.services.presence,
       email: deps.services.email,
+    }),
+  );
+  router.use(
+    '/visitor-sessions',
+    buildVisitorSessionsRouter({
+      env: deps.env,
+      redis: deps.redis,
+      visitorSession: deps.services.visitorSession,
+      presence: deps.services.presence,
+      audit: deps.services.audit,
+      ...(deps.ioRef && { ioRef: deps.ioRef }),
     }),
   );
   router.use(

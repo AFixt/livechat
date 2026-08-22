@@ -18,6 +18,9 @@ import type { ChatCaller, ChatService } from '../services/index.js';
 import type { Request } from 'express';
 import type { Redis } from 'ioredis';
 
+// Side-effect import: registers this router's OpenAPI paths (#119).
+import './openapi/chats.js';
+
 interface ChatsRouterDeps {
   env: Env;
   redis: Redis;

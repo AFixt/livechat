@@ -18,8 +18,10 @@ test('untenanted super-admin sees a visitor arrive in the console', async ({ bro
   await admin.page.waitForTimeout(1000);
 
   // A visitor loads the widget in tenant "acme"; their presence must reach the
-  // untenanted admin, who has no tenant room of their own.
-  const visitor = await openVisitor(browser);
+  // untenanted admin, who has no tenant room of their own. Presence tracking is
+  // consent-gated (#53), so this journey models a visitor who has consented —
+  // otherwise no tracked session exists and there is no presence to mirror.
+  const visitor = await openVisitor(browser, { consentToTracking: true });
 
   const visitorRow = admin.page
     .getByRole('list', { name: 'Visitors on site' })

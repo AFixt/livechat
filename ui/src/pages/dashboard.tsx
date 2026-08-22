@@ -2,12 +2,14 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { visuallyHidden } from '@mui/utils';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -15,6 +17,7 @@ import { ConnectionBanner } from '../components/connection-banner.js';
 import { useChatInbox } from '../hooks/use-chat-inbox.js';
 import { useStaffSocket } from '../hooks/use-staff-socket.js';
 import { getStaffSocket } from '../services/socket.js';
+import { revokeVisitorSession } from '../services/visitors-api.js';
 import { useChatsStore } from '../store/chats.js';
 
 /**
@@ -29,9 +32,31 @@ export function DashboardPage(): React.JSX.Element {
   const chats = useChatsStore((s) => s.chats);
   const activeChatId = useChatsStore((s) => s.activeChatId);
 
+  const removeVisitor = useChatsStore((s) => s.removeVisitor);
+  const [status, setStatus] = useState('');
+
   const activeChat = activeChatId === null ? null : (chats[activeChatId] ?? null);
   const visitorList = Object.values(visitors);
   const chatList = Object.values(chats);
+
+  /**
+   * Revoke a visitor's session (#123). The server hard-deletes the row and
+   * closes the visitor's socket; the row is dropped locally too rather than
+   * waiting for the `visitor:left` event, so the list never shows a session
+   * that no longer exists.
+   * @param visitorSessionId - The visitor session to revoke.
+   */
+  const revoke = (visitorSessionId: string): void => {
+    const id = visitorSessionId.slice(0, 8);
+    void revokeVisitorSession(visitorSessionId)
+      .then(() => {
+        removeVisitor(visitorSessionId);
+        setStatus(t('dashboard.visitors.revoked', { id }));
+      })
+      .catch(() => {
+        setStatus(t('dashboard.visitors.revokeFailed', { id }));
+      });
+  };
 
   return (
     <Stack spacing={3}>
@@ -39,6 +64,19 @@ export function DashboardPage(): React.JSX.Element {
       <Typography component="h2" variant="h4">
         {t('dashboard.heading')}
       </Typography>
+      {/* Revoking removes a row from the list, so the outcome has to be
+          announced — the visual change alone is not perceivable to a screen
+          reader user who was focused on that row (requirements.md §3). Named,
+          because ConnectionBanner is also a `status` region and the two are
+          otherwise indistinguishable. */}
+      <Box
+        role="status"
+        aria-live="polite"
+        aria-label={t('dashboard.visitors.statusRegion')}
+        sx={visuallyHidden}
+      >
+        {status}
+      </Box>
       <Box
         sx={{
           display: 'grid',
@@ -57,20 +95,42 @@ export function DashboardPage(): React.JSX.Element {
           ) : (
             <List aria-label={t('dashboard.visitors.heading')}>
               {visitorList.map((v) => (
-                <ListItemButton
+                // `secondaryAction` renders the revoke button as a SIBLING of
+                // the row button, not inside it. Nesting a button within a
+                // button is invalid and leaves the inner control unreachable
+                // for keyboard and AT users.
+                <ListItem
                   key={v.visitorSessionId}
-                  aria-label={t('dashboard.visitors.startChat', {
-                    id: v.visitorSessionId.slice(0, 8),
-                  })}
-                  onClick={() => {
-                    initiateChatWithVisitor(v.visitorSessionId);
-                  }}
+                  disablePadding
+                  secondaryAction={
+                    <Button
+                      size="small"
+                      color="warning"
+                      aria-label={t('dashboard.visitors.revokeLabel', {
+                        id: v.visitorSessionId.slice(0, 8),
+                      })}
+                      onClick={() => {
+                        revoke(v.visitorSessionId);
+                      }}
+                    >
+                      {t('dashboard.visitors.revoke')}
+                    </Button>
+                  }
                 >
-                  <ListItemText
-                    primary={v.visitorSessionId.slice(0, 8)}
-                    secondary={v.currentUrl ?? ''}
-                  />
-                </ListItemButton>
+                  <ListItemButton
+                    aria-label={t('dashboard.visitors.startChat', {
+                      id: v.visitorSessionId.slice(0, 8),
+                    })}
+                    onClick={() => {
+                      initiateChatWithVisitor(v.visitorSessionId);
+                    }}
+                  >
+                    <ListItemText
+                      primary={v.visitorSessionId.slice(0, 8)}
+                      secondary={v.currentUrl ?? ''}
+                    />
+                  </ListItemButton>
+                </ListItem>
               ))}
             </List>
           )}

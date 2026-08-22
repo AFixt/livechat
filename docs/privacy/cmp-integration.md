@@ -94,7 +94,8 @@ window.addEventListener('afixt-livechat:consent', (e) => {
 
 Calling `setConsent({ analytics: false })` records the withdrawal and blocks
 future capture. (Data already captured under a prior grant is governed by the
-visitor data-retention / minimization policy — see ADR-0020 and issue 57.)
+visitor data-retention / minimization policy — ADR-0011, landing with issue
+`#57`.)
 
 ## Relationship to the consent foundation (#56/#53/#55)
 

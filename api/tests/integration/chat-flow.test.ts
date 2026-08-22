@@ -53,7 +53,10 @@ async function initVisitor(
   tenantSlug: string,
 ): Promise<{ cookie: string; sessionId: string; csrfToken: string }> {
   const res = await request(baseUrl)
+    // x-geo-country: US (trusted edge header) → opt-out jurisdiction → the consent gate creates a tracked
+    // session (non-null sessionId), matching an engaged/visible visitor.
     .post('/api/v1/visitor/session')
+    .set('x-geo-country', 'US')
     .send({ tenantKey: tenantSlug });
   expect(res.status).toBe(201);
   const setCookie = res.headers['set-cookie'] as string | string[] | undefined;

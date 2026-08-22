@@ -64,7 +64,7 @@ and the widget:
 - **No use for AFixt's own purposes beyond delivering the live-chat service**
   (operating the chat, correlating a session to its chat history, and honoring
   the mute preference). Data minimization and retention are governed by the
-  visitor data-retention ADR (ADR-0011, landing with issue #57).
+  visitor data-retention ADR (ADR-0011, landing with issue `#57`).
 
 ## CMP / consent
 

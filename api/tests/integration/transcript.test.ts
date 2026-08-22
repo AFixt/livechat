@@ -140,8 +140,20 @@ describe('email transcript (#80)', () => {
       .send({ customerName: 'Aay', body: 'private' });
     const chatA = initA.body.data.chat.id as string;
 
-    // B presents their own valid session and CSRF token — so this is refused by
-    // the chat's ownership scope (#72), not incidentally by the CSRF guard.
+    // B needs a session of their own, or this asserts nothing: under the
+    // consent gate (#53) `POST /visitor/session` issues only a subject cookie,
+    // so B would be refused at authentication with a 401 and never reach the
+    // ownership check this test exists for. Starting a chat creates the row.
+    await request(app)
+      .post('/api/v1/visitor/chats')
+      .set('cookie', `livechat_visitor=${b.cookie}`)
+      .set('X-XSRF-TOKEN', b.csrfToken)
+      .send({ customerName: 'Bee', body: 'my own chat' })
+      .expect(201);
+
+    // B presents a valid session of their own and a valid CSRF token — so this
+    // is refused by the chat's ownership scope (#72), not incidentally by
+    // authentication or the CSRF guard.
     const cross = await request(app)
       .post(`/api/v1/visitor/chats/${chatA}/transcript`)
       .set('cookie', `livechat_visitor=${b.cookie}`)
