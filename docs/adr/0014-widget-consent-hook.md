@@ -74,9 +74,9 @@ budget 50 KB).
 - **Block on a cookie/localStorage flag the host sets** — rejected: couples the
   contract to storage the CMP may itself gate, and gives no event/callback for
   dynamic consent changes.
-- **Bundle a CMP/TCF library** — rejected: violates the size budget and the
-  "no third-party SDKs" rule; host CMPs differ, so a thin mapping surface is
-  more portable than adopting one vendor's model.
+- **Bundle a CMP/TCF library** — rejected: violates the size budget and the "no
+  third-party SDKs" rule; host CMPs differ, so a thin mapping surface is more
+  portable than adopting one vendor's model.
 
 ## Links
 

@@ -10,6 +10,60 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 ## [Unreleased]
 
 ### Security
+
+- **The ui and widget images are scanned for vulnerabilities for the first
+  time.** `trivy image` builds api → ui → widget, and the ui build had never
+  succeeded: it installs workspace devDependencies (the Vite build needs
+  `vite`/`typescript`), which include private `@afixt/*` packages, and the job
+  had no registry auth — so `npm ci` 404'd. Worse, `scripts/trivy-image.sh`
+  runs under `set -euo pipefail` with an unguarded `docker build`, so that one
+  failure aborted the script and denied **widget** a scan too. The lockfile
+  carries seven private `@afixt/*` packages, several transitive
+  (`@afixt/a11y-assert` is a direct ui devDependency and pulls
+  `@afixt/test-utils`), so keeping them out of the build was not an option —
+  the build genuinely needs credentials. The npmrc is now mounted into the ui
+  and widget builds as a **BuildKit secret**, never a build arg, so the token
+  cannot persist in an image layer or in `docker history`; `required=false`
+  keeps the builds usable without one. The script no longer lets one
+  unbuildable image suppress the others: each failure is recorded, the run
+  continues, and the images that went unscanned are named explicitly at the end
+  so a red run can never be mistaken for a clean one. ([#130])
+
+### Security
+- **Container vulnerability scanning runs for the first time, and all three
+  images pass.** Getting `trivy image` past the private-registry 404 exposed two
+  further problems it had been hiding. The **ui image build had never succeeded
+  even with credentials**: `ui/tsconfig.json` includes `playwright.config.ts`,
+  which since #127 imports the repo-root `e2e/support/generated-spec-config.js`
+  that `ui/Dockerfile` never copied, so `tsc -b` failed on TS2307. Latent on
+  `develop` since #127 and invisible because nothing ever got that far. The
+  build stage now copies `e2e/`; the runtime stage still takes only `ui/dist`,
+  so nothing test-related ships. And once ui and widget scanned, the
+  **CRITICAL gate immediately failed on real findings** — `CVE-2026-31789`
+  (OpenSSL heap overflow, `libcrypto3`/`libssl3` 3.3.3-r0, fixed in 3.3.7-r0)
+  plus 33 HIGHs, all from `nginx:1.27-alpine` lagging its own Alpine base. Both
+  runtime stages now `apk upgrade --no-cache`, which takes the fix already
+  published in the repo the base points at rather than waiting for the nginx
+  image to be rebuilt. Result: api, ui and widget all scan clean at HIGH and
+  CRITICAL.
+  This also demonstrates the #60 policy with real findings rather than seeded
+  ones — 2 CRITICALs failed the gate while 33 HIGHs did not, which is exactly
+  the documented behaviour. ([#130])
+### Security
+- **Jurisdiction is now resolved server-side from a trusted edge header, not the
+  request body.** The consent gate decided opt-in vs opt-out from a `country` /
+  `region` the client sent, but the widget runs on the client's own site — so an
+  embedding page could have declared `US` for an EU visitor and turned an opt-in
+  jurisdiction into an opt-out one. Those fields are gone from
+  `POST /visitor/session` and from the `/privacy/*` bodies and query; the value
+  now comes only from the header named by `GEO_COUNTRY_HEADER` /
+  `GEO_REGION_HEADER`, which the CDN or load balancer injects and must strip
+  from client input. GPC stays client-readable on purpose — a signal that can
+  only ever *deny* tracking is safe to accept, one that could *grant* it is not.
+  With no header configured every visitor resolves to Unknown Location Mode,
+  which denies presence: the fail-safe, and the honest description of what the
+  gate could already determine, since the widget never sent a country. ([#53])
+
 - **The api image no longer ships a package manager, clearing a CRITICAL CVE.**
   `trivy image` was failing the gate on `CVE-2026-59873` (node-tar DoS via a
   crafted gzip bomb) plus seven HIGHs in `brace-expansion`, `ip-address`,
@@ -50,7 +104,165 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   subject is one visitor's worth of rows: a queue plus a status endpoint would
   add a window in which the request is accepted but not honoured, without the
   answer arriving sooner. ([#121])
+- **Staff can end a visitor's session from the console.** #79 (PR #94) delivered
+  server-side expiry and a visitor-initiated "forget me", but deferred the
+  issue's "at minimum, staff can end a session" clause, so an operator had no
+  way to revoke a specific visitor. `DELETE /api/v1/visitor-sessions/:id` now
+  does it, staff-authenticated and tenant-scoped — a tenanted operator is
+  confined to their own tenant, an untenanted AFixt operator spans all of them
+  (#19). It reuses #94's rejection path rather than adding a new one: the row is
+  hard-deleted, and because both the HTTP `/visitor/*` routes and the `/visitor`
+  socket handshake resolve through `findByCookie`, a missing row already 401s.
+  Any live socket is disconnected through the adapter so it reaches other nodes
+  (#73), presence is cleared so the console list drops the visitor, and the
+  action is audited. Deliberately skips the expiry gate — an already-expired
+  session must stay revocable, since the row and its PII outlive the window in
+  which the cookie works. In the console each visitor row now carries two
+  **sibling** controls (MUI `ListItem` + `secondaryAction`) rather than a button
+  nested inside a button, which would be invalid and unreachable by keyboard;
+  each is named for the visitor it acts on, and the outcome is announced in a
+  named live region, because a row silently vanishing is not perceivable to
+  someone focused on it. ([#123])
+- **The OpenAPI document now describes the whole API, so the security tooling
+  built in #62 has something to scan.** Only `GET /health` registered a path, so
+  the Schemathesis fuzzer and the ZAP API scan — wired, correct, and green —
+  were exercising exactly one endpoint. The document now carries **40 operations
+  across 33 paths** (auth, visitor, chats, tenants, users, invitations, privacy,
+  widget, health), each with its Zod request/response schemas, its `security`
+  requirement, and the failure codes it can actually produce, so a scanner can
+  tell a documented rejection from an undocumented 500. Registration lives in
+  `api/src/routes/openapi/`, one module per router, side-effect-imported by the
+  route module it describes — the same top-level-registration rule
+  `docs/security/api-testing.md` sets out, and small enough to keep every route
+  file under the 300-line limit. Two tests stop it drifting: a new coverage test
+  walks every mounted router and fails on a route with no path, a path with no
+  route, or a router missing from the mount table (with a floor on the number of
+  operations compared, so an empty walk cannot pass vacuously), and the existing
+  spec-security tripwire from #62 now covers the full surface. That tripwire
+  earned its keep immediately — its public-operations allowlist named
+  `post /auth/refresh` and `post /auth/verify-email`, neither of which exists;
+  the real routes are `post /auth/refresh-token` and
+  `get /auth/verify-email/{token}`, and it caught both the moment they were
+  registered. ([#119])
 ### Fixed
+- **Availability live-push now reaches visitors on every node, not just the one
+  the agent happens to be connected to.** `broadcastGlobalStaffAvailability`
+  (#101) bounded its fan-out to tenants with a connected visitor by reading the
+  `/visitor` namespace's `tenant:{id}` room membership. `adapter.rooms` only
+  ever describes the **local** node, so once #73's Redis adapter spread visitors
+  across processes, a tenant whose visitors were all on other nodes was never
+  enumerated and never received the push — it silently fell back to picking the
+  change up on the next `/widget/config` fetch. The tenant set now comes from
+  Redis-backed presence instead: `markVisitorPresent` maintains a
+  `presence:visitor-tenants` index, and `presence.tenantsWithVisitors()` reads
+  it, pruning members whose presence hash has expired so the set cannot
+  accumulate tenants nobody is watching and widen the fan-out it exists to
+  bound. Both narrowings are kept, so a toggle that changes nothing observable
+  still emits nothing. Proved with two presence services on separate Redis
+  connections standing in for two nodes — and the same test demonstrates the old
+  source failing, with a room joined on one Socket.IO server invisible to the
+  other. ([#125])
+### Fixed
+- **Starting a chat no longer depends on winning a race against the widget's own
+  startup.** The widget renders its start-chat form immediately, but a visitor
+  session only exists after three sequential round-trips
+  (`/widget/config` -> `/visitor/chats/current` -> `/visitor/session`). Nothing
+  gated the form on that, so a visitor who submitted first sent
+  `POST /visitor/chats` with no cookie, got a `401`, and landed on a bare
+  "Visitor session required" alert. Reachable on a slow or high-latency link, for
+  a returning visitor whose cookie had expired, and whenever the API was briefly
+  slow — it reproduced deterministically with the session response delayed, and
+  failed outright under CI load. The bootstrap is now a single shared promise
+  (`bootstrapVisitorSession`) that both the widget's startup and the submit path
+  await, so an early submit waits for the *same* session instead of racing it or
+  minting a second one — a returning visitor's resumable chat is never orphaned.
+  If the write is still refused for want of a session (expired or revoked
+  server-side, #79), the widget mints a fresh session and retries exactly once; a
+  second refusal is a real failure and surfaces. `apiFetch` now throws a typed
+  `ApiRequestError` carrying the status, so that decision is made on the status
+  rather than by matching a message string. While the session is being
+  established the form is `aria-busy` and the wait is announced, so the submit
+  button is never a silently dead control (requirements.md §3). The visitor's
+  typed name and message were already preserved — the form keeps its own state
+  and stays mounted — and pressing "Start chat" again is the retry path.
+  ([#129])
+- **`zap-pr` is a working gate again instead of a permanently-red one.** It had
+  failed on every pull request and on `develop`, while the scan itself found
+  nothing at FAIL level (`FAIL-NEW: 0`, `WARN-NEW: 9`). Two causes. First, it
+  served `ui/dist` with `npx http-server` — but the console ships on nginx, and
+  `ui/nginx.conf` sets CSP, `X-Frame-Options`, `nosniff`, `Permissions-Policy`
+  and `Cache-Control` explicitly, so five of the nine findings existed only
+  because the scan target was a bare static file server. It now serves the
+  bundle through the shipped `ui/nginx.conf` on the same `nginx:1.27-alpine`
+  base the `ui/Dockerfile` runtime stage uses (plain nginx rather than the image
+  build, which needs private-registry credentials a header scan has no reason to
+  require — #130). Second, `fail_action: true` alone fails on *any* alert,
+  collapsing WARN into FAIL and defeating the three-tier model `rules.tsv`
+  documents; `-I` is now passed so a WARN warns and a FAIL still fails. The cost
+  of the old behaviour was not the red check but the blindness: with the job
+  always failing, nobody could tell "the usual nine" from "ten, and the new one
+  is real". Also tuned with reasons: `90005` (Sec-Fetch-Dest) is a _request_
+  header no server can set, now IGNORE; `10049` (cacheable static assets) is the
+  intent, now WARN.
+  `-I` alone would have replaced a permanently-red gate with a permanently-green
+  one — `zap-baseline` treats every rule as WARN unless the rules file names it
+  FAIL, and nothing was named. `rules.tsv` now has an explicit FAIL tier
+  (clickjacking, nosniff, CSP, server-version leak, cross-domain script), and
+  the gate was demonstrated end to end against the real nginx config rather than
+  assumed: shipped config exits 0, removing the console's clickjacking
+  protection exits 1 on rule 10020, restoring it exits 0. Removing only
+  `X-Frame-Options` correctly does _not_ fail, because CSP `frame-ancestors
+  'none'` still protects the page. ([#131])
+
+### Security
+- **Both nginx hosts stopped advertising their exact version.** `Server:
+  nginx/1.27.5` narrows a published nginx CVE into a targeted request.
+  `server_tokens off` in `ui/nginx.conf` and `widget/nginx.conf` leaves a bare
+  `Server: nginx`. Found by the ZAP baseline (rule 10036) on its first run
+  against the shipped config — the old `http-server` target could not have
+  surfaced it — and the rule is now FAIL-tier so it cannot come back quietly.
+  ([#131])
+- **The console is now cross-origin isolated.** ZAP rule 90004 was carried as a
+  WARN reading "COEP intentionally unset so the widget stays cross-origin
+  embeddable" — true of the widget, and never examined for the console. Split:
+  `ui/nginx.conf` sets `Cross-Origin-Embedder-Policy: require-corp`, which costs
+  nothing there because its CSP is `default-src 'self'` and it loads no
+  cross-origin subresources; `widget/nginx.conf` deliberately does not, because
+  the widget is loaded *into* customer pages where COEP would govern the host
+  page rather than protect the widget and `Cross-Origin-Resource-Policy:
+  cross-origin` is the header that matters. Verified in a browser against the
+  shipped config — `window.crossOriginIsolated === true`, the app mounts, no
+  console errors. `scripts/check-headers.mjs` now requires COEP on the console
+  and forbids it on the widget, so neither half can be silently undone.
+  Recorded in ADR-0012, which also picks up the stale `ADR-0011` references
+  in `rules.tsv` and `docs/security/zap.md`. ([#131])
+### Fixed
+- **The widget can work on a third-party site at all — the visitor session now
+  survives cross-site embedding.** The `livechat_visitor` cookie was
+  `SameSite=Lax`, so no browser sent it on the cross-site subresource requests
+  an embedded widget makes: every call after the bootstrap was unauthenticated
+  and the Socket.IO handshake carried no credential. This is the fix reviewed
+  and approved in PR #93, which never reached `develop` — it merged into
+  `fix/77-csrf` twelve minutes after that branch had itself merged, so the
+  branch was abandoned with the work on it. Re-applied here on top of the
+  consent work (ADR-0019) that has since moved the cookie options into a shared
+  helper. In production the cookie is now `SameSite=None; Secure; Partitioned`
+  (CHIPS); local dev stays `Lax`, since `None` requires `Secure` and a `Secure`
+  cookie is dropped on localhost HTTP. Because Safari (ITP) and Firefox (TCP)
+  block third-party cookies outright, the cookie alone is not enough: the
+  bootstrap endpoints also return the signed session as `sessionToken`, the
+  widget persists it in first-party storage and resends it as
+  `X-Visitor-Session` (allow-listed in CORS, passed as `auth.cookie` on the
+  socket handshake), and the API resolves the session from that header first
+  and the cookie second through one shared helper. The header path is still
+  CSRF-gated, and cannot be set cross-site without a preflight the per-tenant
+  CORS layer (#74) already gates. Also fixed on the way through: `clearCookie`
+  on "forget me" now repeats the cookie's attributes, without which a
+  `SameSite=None; Secure; Partitioned` cookie is never cleared (#79), and the
+  privacy router resolves its subject through the same helper so a
+  cookie-blocked visitor can still read, record and withdraw consent (#56). The
+  security-regression suite pinned `SameSite=Lax` in production and now pins
+  `SameSite=None; Secure; Partitioned`. See [ADR-0021]. ([#75])
 - **The local quality gate can be run again.** `npm run check:all` — the
   pre-push gate — failed for reasons unrelated to any code under review, so
   changes were going out under `--no-verify` with CI as the only check. Two
@@ -84,6 +296,37 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   `messages_synced` (de-duplicating optimistic sends), and a reconnect is
   surfaced programmatically, visibly, and audibly (widget banner + live-region
   announcement; console live-region announcement). ([#69])
+### Security
+
+- **Global Privacy Control is now detected and honored.** `navigator.globalPrivacyControl`
+  was never read and no universal opt-out signal was honored anywhere. Now: ([#55])
+  - The widget reads `navigator.globalPrivacyControl` and sends it to
+    `POST /visitor/session`; the API also honors the `Sec-GPC: 1` request header.
+    Either source counts.
+  - A detected signal feeds the policy engine as a universal opt-out: it
+    suppresses presence/analytics in every jurisdiction, so **no tracked session
+    is created** — and it stops ambient tracking for an already-tracked returning
+    visitor too, not just a first-time one.
+  - The signal is recorded as a `gpc`-sourced consent record (`legal_basis:
+    opt_out`) and audited as `privacy.gpc_detected` + `privacy.gpc_applied`.
+  - Tests: GPC via header and via the widget signal both yield no tracking plus
+    an audited opt-out record; the effective-state GPC true/false paths are unit
+    tested in `consent-policy.test.ts`.
+- **Visitor presence tracking is now gated behind a consent decision.**
+  Previously the widget created a `visitor_sessions` row — capturing IP, user
+  agent, current URL, and referrer — for every visitor on page load, in every
+  jurisdiction, with no consent gate (behavioral tracking of visitors who never
+  engaged). Page load now runs the consent gate first: ([#53])
+  - In opt-in (EU/EEA/UK) and Unknown-location modes, **no tracked session is
+    created and no IP/geo/URL is captured** until the visitor consents or
+    actively starts a chat. `POST /visitor/session` returns `sessionId: null`
+    and the widget keeps the presence socket closed.
+  - In US opt-out modes, presence tracking proceeds by default unless the
+    visitor has opted out (or GPC is present — see #55).
+  - **Functional use is never blocked.** The widget still renders and a visitor
+    can always start a chat; opening a chat is strictly necessary and lazily
+    creates the session at that point. New widget use case
+    `functional-without-consent.uc.yaml` covers this.
 
 ### Added
 
@@ -456,6 +699,17 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 [#57]: https://github.com/AFixt/livechat/issues/57
 [#121]: https://github.com/AFixt/livechat/issues/121
+[#123]: https://github.com/AFixt/livechat/issues/123
+[#119]: https://github.com/AFixt/livechat/issues/119
+[#125]: https://github.com/AFixt/livechat/issues/125
+[#129]: https://github.com/AFixt/livechat/issues/129
+[#131]: https://github.com/AFixt/livechat/issues/131
+[#130]: https://github.com/AFixt/livechat/issues/130
+[#53]: https://github.com/AFixt/livechat/issues/53
+[#55]: https://github.com/AFixt/livechat/issues/55
+[#56]: https://github.com/AFixt/livechat/issues/56
+[#75]: https://github.com/AFixt/livechat/issues/75
+[ADR-0021]: docs/adr/0021-visitor-session-third-party-cookie-fallback.md
 [#132]: https://github.com/AFixt/livechat/issues/132
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68

@@ -1,0 +1,38 @@
+id: support-end-visitor-session
+title: "Operator ends a visitor's session from the console"
+type: positive
+description: |
+  §5.1.5 (operator side) / issue #123 — with a visitor present in the
+  "Visitors on site" list, the operator ends that visitor's session. The
+  server hard-deletes the session row, so the visitor's cookie stops working
+  on both the HTTP routes and the socket handshake, and any live socket is
+  closed immediately.
+
+  The row carries two independent controls: activating the row starts a chat
+  with the visitor, while "End session" revokes them. They are siblings rather
+  than nested, so both are reachable by keyboard and both carry a name that
+  identifies which visitor they act on.
+
+  Because ending a session removes the row, the outcome is announced in a
+  named live region — a row silently vanishing is not perceivable to someone
+  who was focused on it.
+
+start_location: "http://localhost:5174/"
+
+expected_result: >-
+  The visitor is removed from the visitors list and the console announces that
+  the session was ended, naming the visitor.
+
+preconditions:
+  - A staff user is authenticated (see support-login.uc.yaml).
+  - At least one visitor is present on the site, so the visitors list is not
+    empty (established over sockets — see the e2e journey suite).
+
+data: {}
+
+steps:
+  - locate: heading "Visitors on site"
+  - locate: button "End the session for visitor"
+  - focus: button "End the session for visitor"
+  - activate: button "End the session for visitor"
+  - verify: text "Session ended for visitor"

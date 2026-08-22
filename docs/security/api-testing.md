@@ -3,7 +3,8 @@
 The OpenAPI document at `/api/docs` is the contract for the REST API. This page
 covers the three things we do with it beyond serving Swagger UI:
 
-1. **Property-based fuzzing** with [Schemathesis](https://schemathesis.readthedocs.io/).
+1. **Property-based fuzzing** with
+   [Schemathesis](https://schemathesis.readthedocs.io/).
 2. **An active DAST scan** with the OWASP ZAP **API scan** (OpenAPI-driven),
    kept separate from the passive baseline scan.
 3. **Spec security validation** — a unit test asserting the document declares
@@ -34,23 +35,32 @@ API_URL=https://staging-api.afixt.com \
 The generated `servers[0].url` is `<API_URL>/api/v1`; point scanners at that
 same base.
 
-> **Current coverage gap.** Only `GET /health` currently registers an OpenAPI
-> path (`api/src/routes/health.ts`). The other routers serve traffic but do not
-> yet call `openApiRegistry.registerPath`, so they are absent from the document
-> and therefore invisible to the fuzzer and the ZAP API scan. Registering paths
-> (with request/response Zod schemas and a `security` requirement) for
-> `auth`, `visitor`, `chats`, `tenants`, `users`, `invitations`, and `admin` is
-> the follow-up that makes this tooling bite. Until then the harness is wired
-> and correct but exercises a single endpoint.
+> **Coverage.** The document describes **40 operations across 33 paths** —
+> `auth`, `visitor`, `chats`, `tenants`, `users`, `invitations`, `privacy`,
+> `widget` and `health` (#119). Registration lives in `api/src/routes/openapi/`,
+> one module per router, each side-effect-imported by the route module it
+> describes; `api/src/routes/openapi/support.ts` carries the
+> envelope/error/security helpers so an operation is a dozen readable lines.
 >
-> **Register paths at module top level.** The spec is assembled by _importing_
-> `api/src/routes/index.js` for its side effects — so a route only appears in the
-> document (and under the fuzzer, the ZAP scan, and the spec-security tripwire) if
-> its `openApiRegistry.registerPath(...)` call runs at **module load**, the way
-> `api/src/routes/health.ts` does it. A `registerPath` placed _inside_ a
-> `buildXRouter(deps)` factory is never executed by the import and stays silently
-> invisible to all three checks. Keep registration at the top level of each route
-> module.
+> Two tests keep this honest, and both belong to the same job — making sure the
+> scanners see the real surface:
+>
+> - `api/tests/unit/openapi-coverage.test.ts` walks every mounted router and
+>   fails on a route with no OpenAPI path, on an OpenAPI path with no route, and
+>   on a router that is mounted but missing from its own mount table. It also
+>   pins a floor on the number of operations compared, so a walk that silently
+>   returns nothing cannot pass vacuously.
+> - `api/src/config/swagger.security.test.ts` fails any operation that neither
+>   declares a `security` requirement nor appears in its public allowlist.
+>
+> **Register paths at module top level.** The spec is assembled by _importing_ >
+> `api/src/routes/index.js` for its side effects — so a route only appears in
+> the document (and under the fuzzer, the ZAP scan, and the spec-security
+> tripwire) if its `openApiRegistry.registerPath(...)` call runs at **module
+> load**, the way `api/src/routes/health.ts` does it. A `registerPath` placed
+> _inside_ a `buildXRouter(deps)` factory is never executed by the import and
+> stays silently invisible to all three checks. Keep registration at the top
+> level of each route module.
 
 ## 1. Schemathesis fuzzing
 
@@ -69,12 +79,12 @@ npm run security:api-fuzz
 
 Environment knobs:
 
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `API_TARGET_URL` | _(unset)_ | Base origin of a running API. When set, no local boot happens. |
-| `SCHEMATHESIS_MAX_EXAMPLES` | `50` | Hypothesis examples generated per operation. |
-| `SCHEMATHESIS_ARGS` | _(empty)_ | Extra args appended verbatim to `schemathesis run`. |
-| `BOOT_TIMEOUT_SECONDS` | `40` | How long to wait for a local boot's health probe. |
+| Variable                    | Default   | Meaning                                                        |
+| --------------------------- | --------- | -------------------------------------------------------------- |
+| `API_TARGET_URL`            | _(unset)_ | Base origin of a running API. When set, no local boot happens. |
+| `SCHEMATHESIS_MAX_EXAMPLES` | `50`      | Hypothesis examples generated per operation.                   |
+| `SCHEMATHESIS_ARGS`         | _(empty)_ | Extra args appended verbatim to `schemathesis run`.            |
+| `BOOT_TIMEOUT_SECONDS`      | `40`      | How long to wait for a local boot's health probe.              |
 
 Install: `pipx install schemathesis` (or `pip install schemathesis`).
 
@@ -121,14 +131,14 @@ a scheduled one, per the repo's no-scheduled-Actions policy) is:
 - name: ZAP API scan
   uses: zaproxy/action-api-scan@v0.9.0
   with:
-    target: https://<preview-or-staging-host>   # -O / OpenAPI server override
+    target: https://<preview-or-staging-host> # -O / OpenAPI server override
     format: openapi
     # The OpenAPI document to import. Generate it in a prior step to
     # <workspace>/openapi.json via api/src/scripts/generate-openapi.ts.
     api_definition: openapi.json
     rules_file_name: .github/zap/api-scan-rules.tsv
     fail_action: true
-    cmd_options: "-a"
+    cmd_options: '-a'
 ```
 
 > **Policy note.** `.github/workflows/zap.yml` (the baseline) currently uses a

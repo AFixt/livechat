@@ -98,9 +98,8 @@ testssl.sh prints a colorized, sectioned report to the console (protocols,
 cipher categories, vulnerabilities, certificate info). Each finding carries a
 severity — `INFO`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`. When reviewing:
 
-- Anything `HIGH`/`CRITICAL` fails the gate and must be fixed at the
-  terminating proxy / platform TLS config — it is never something the app code
-  can change.
+- Anything `HIGH`/`CRITICAL` fails the gate and must be fixed at the terminating
+  proxy / platform TLS config — it is never something the app code can change.
 - `MEDIUM` and below are informational here; review them, but they do not block.
 - The full machine-readable result is written to the temp JSON file named in the
   script's output for that run, so you can diff or archive it.

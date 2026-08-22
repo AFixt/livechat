@@ -87,11 +87,15 @@ describe('data-subject access and erasure (#121)', () => {
       .send({ tenantKey: 'dsr-t', purposes: { presence: 'granted' } })
       .expect(201);
 
-    return {
-      cookie,
-      sessionId: boot.body.data.sessionId as string,
-      chatId: chat.body.data.chat.id as string,
-    };
+    // `boot.body.data.sessionId` is null whenever the consent gate suppressed
+    // ambient tracking (#53) — the fail-safe Unknown jurisdiction, which is
+    // every visitor without a geo header. The row still exists, because
+    // starting a chat is a functional purpose and creates it; resolve the id
+    // through that chat rather than from the gate's response.
+    const chatId = chat.body.data.chat.id as string;
+    const created = await Chat.findByPk(chatId);
+    expect(created).not.toBeNull();
+    return { cookie, sessionId: created!.visitorSessionId, chatId };
   }
 
   test('an access request returns the subject’s own data', async () => {

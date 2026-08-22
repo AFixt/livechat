@@ -26,11 +26,10 @@ false-positive baseline.
 - **`scripts/secret-scan.sh <tier>`** wraps trufflehog:
   - `verified` (default) — `--results=verified --fail`. Unchanged behaviour;
     this is what `security:secrets`, `security`, `check:all`, and pre-push run.
-  - `suspected` — `--results=unverified,unknown`, **no** `--fail`; always exits
-    0. Wired as `security:secrets:suspected`.
-  Both apply the path exclusions in **`.trufflehog-exclude.txt`** (native
-  allow-list: test fixtures, lockfile, i18n strings — high-noise, no live
-  credentials).
+  - `suspected` — `--results=unverified,unknown`, **no** `--fail`; always
+    exits 0. Wired as `security:secrets:suspected`. Both apply the path
+    exclusions in **`.trufflehog-exclude.txt`** (native allow-list: test
+    fixtures, lockfile, i18n strings — high-noise, no live credentials).
 - **`.secrets.baseline`** (Yelp detect-secrets convention) records known
   candidate secrets at line granularity so the suspected tier surfaces only
   _new_ findings. **`scripts/detect-secrets.sh`** (`security:secrets:baseline`)
@@ -38,10 +37,10 @@ false-positive baseline.
   via `pipx`/`pip`, never as an npm dependency — the axe-core-banned Node tree
   is untouched.
 - **`.pre-commit-config.yaml`** wires the detect-secrets baseline hook and a
-  verified-tier trufflehog hook for contributors who use the Python
-  `pre-commit` framework. **husky remains THE enforced gate** (`npm install`
-  wires husky, not `pre-commit`); this file is an optional, parallel path and
-  the canonical home of the detect-secrets hook.
+  verified-tier trufflehog hook for contributors who use the Python `pre-commit`
+  framework. **husky remains THE enforced gate** (`npm install` wires husky, not
+  `pre-commit`); this file is an optional, parallel path and the canonical home
+  of the detect-secrets hook.
 - **`.husky/pre-commit`** now runs both tiers on staged files: verified
   (blocking) then suspected (warn, never aborts the commit).
 
@@ -62,8 +61,8 @@ mistaken allow-list entry can never hide a _confirmed-live_ secret.
   `secret-scan.yml` workflow) without turning into a blocking, noisy gate.
 - A committed baseline needs occasional re-auditing as fixtures change; drift is
   a warning, not a failure, so it never blocks a merge.
-- Two secret tools now coexist by role: trufflehog for verification-based
-  tiers, detect-secrets for the line-level false-positive baseline. Extends (not
+- Two secret tools now coexist by role: trufflehog for verification-based tiers,
+  detect-secrets for the line-level false-positive baseline. Extends (not
   supersedes) ADR-0008.
 
 ## Alternatives considered
@@ -71,8 +70,8 @@ mistaken allow-list entry can never hide a _confirmed-live_ secret.
 - **detect-secrets everywhere, dropping trufflehog** — rejected; trufflehog's
   live-verification is what makes the blocking tier near-zero-FP (ADR-0008).
 - **trufflehog `--exclude-paths` only, no detect-secrets baseline** — rejected;
-  whole-path exclusion is coarse, and the issue calls for a recorded,
-  auditable, line-level baseline that a human reviews.
+  whole-path exclusion is coarse, and the issue calls for a recorded, auditable,
+  line-level baseline that a human reviews.
 - **Make the suspected tier blocking** — rejected; unverified hits are noisy by
   nature, and a blocking noisy gate trains people to bypass it.
 

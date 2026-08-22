@@ -35,6 +35,13 @@ export type VisitorSessionSafe = z.infer<typeof visitorSessionSafeSchema>;
 
 /**
  * Input schema for `POST /visitor/session` — widget init call.
+ *
+ * `gpc` is the widget's `navigator.globalPrivacyControl` reading, which feeds
+ * the consent gate. There is deliberately no `country`/`region` here:
+ * jurisdiction decides whether tracking is opt-in or opt-out, so it is resolved
+ * server-side from a trusted edge header (`GEO_COUNTRY_HEADER`), never from a
+ * body the embedding page controls. A client signal that can only *deny*
+ * tracking (GPC) is safe to accept; one that could *grant* it is not.
  */
 export const initVisitorSessionInputSchema = z.object({
   tenantKey: z.string().min(1).max(255),
@@ -42,11 +49,46 @@ export const initVisitorSessionInputSchema = z.object({
   currentUrl: z.string().max(2048).optional(),
   referrer: z.string().max(2048).optional(),
   language: z.string().max(16).optional(),
+  gpc: z.boolean().optional(),
 });
 /**
  * Input for initializing a visitor session from the widget.
  */
 export type InitVisitorSessionInput = z.infer<typeof initVisitorSessionInputSchema>;
+
+/**
+ * Response shape for `POST /visitor/session`. `sessionId` is `null` when the
+ * consent gate suppressed tracking (no `visitor_sessions` row was created); the
+ * widget uses `tracking.presence` to decide whether to open the presence socket.
+ */
+export const initVisitorSessionResultSchema = z.object({
+  sessionId: z.uuid().nullable(),
+  tenantId: z.uuid(),
+  /**
+   * Per-cookie CSRF token (#77). Issued regardless of the tracking decision —
+   * a consent-gated visitor can still start a chat, which is a CSRF-protected
+   * write, so the widget always needs this.
+   */
+  csrfToken: z.string(),
+  /**
+   * The signed session value, echoed so the widget can persist it and resend it
+   * as `X-Visitor-Session` when the browser blocks the third-party cookie
+   * (#75). Issued alongside `csrfToken` and for the same reason: a gated
+   * visitor can still start a chat.
+   */
+  sessionToken: z.string(),
+  jurisdiction: z.string(),
+  gpc: z.boolean(),
+  tracking: z.object({
+    functional: z.enum(['granted', 'denied']),
+    presence: z.enum(['granted', 'denied']),
+    analytics: z.enum(['granted', 'denied']),
+  }),
+});
+/**
+ * Result of initializing a visitor session.
+ */
+export type InitVisitorSessionResult = z.infer<typeof initVisitorSessionResultSchema>;
 
 /**
  * Input schema for `POST /visitor/heartbeat` — updates `current_url`, keeps

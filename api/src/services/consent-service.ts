@@ -1,5 +1,7 @@
 import { createHmac, randomUUID } from 'node:crypto';
 
+import { CONSENT_PURPOSES } from '@livechat/shared';
+
 import { Chat, ChatMessage, ConsentRecord, VisitorSession } from '../models/index.js';
 
 import { RULE_VERSION, decide, resolveJurisdiction } from './consent-policy.js';
@@ -37,6 +39,15 @@ interface DecideAndRecordParams {
   explicitConsent?: ExplicitConsent | null;
   /** Force the recorded legal basis (e.g. `withdrawn`). */
   legalBasisOverride?: LegalBasis;
+  /**
+   * Skip persisting when the effective decision is identical to the subject's
+   * most recent record. Used by the automatic (`source: 'default'`) page-load
+   * gate so a returning visitor does not append a consent record and a fresh
+   * batch of audit rows on *every* page view — the trail records decisions and
+   * changes, not impressions. Explicit banner actions never set this: a
+   * deliberate re-affirmation is itself an event worth recording.
+   */
+  skipIfUnchanged?: boolean;
 }
 
 interface ResolveParams {
@@ -128,6 +139,46 @@ export function createConsentService(deps: ConsentServiceDeps) {
   }
 
   /**
+   * The visitor's most recent consent record, or null.
+   * @param subjectKey - The visitor subject key.
+   * @returns The latest record or null.
+   */
+  async function latestFor(subjectKey: string): Promise<ConsentRecord | null> {
+    return ConsentRecord.findOne({
+      where: { subjectKey },
+      order: [['created_at', 'DESC']],
+    });
+  }
+
+  /**
+   * Whether a freshly-computed decision is materially identical to the one
+   * already on record — same jurisdiction, GPC signal, ruleset, per-purpose
+   * outcome, legal basis, and session linkage. Only then is re-persisting it
+   * pure noise.
+   * @param previous - The subject's latest stored record.
+   * @param next - The freshly-computed decision context.
+   * @returns True when nothing material changed.
+   */
+  function isUnchanged(
+    previous: ConsentRecord,
+    next: {
+      jurisdiction: string;
+      legalBasis: LegalBasis;
+      state: EffectiveConsentState;
+      params: DecideAndRecordParams;
+    },
+  ): boolean {
+    return (
+      previous.jurisdiction === next.jurisdiction &&
+      previous.gpc === next.params.gpc &&
+      previous.ruleVersion === RULE_VERSION &&
+      previous.legalBasis === next.legalBasis &&
+      previous.visitorSessionId === (next.params.visitorSessionId ?? null) &&
+      CONSENT_PURPOSES.every((p) => previous.purposes[p] === next.state.purposes[p])
+    );
+  }
+
+  /**
    * Decide the effective state, persist a consent record, and emit the §19
    * privacy decision events to the audit trail.
    * @param params - Full decision context.
@@ -141,6 +192,13 @@ export function createConsentService(deps: ConsentServiceDeps) {
     const explicit = { ...stored, ...(params.explicitConsent ?? {}) };
     const state = decide({ jurisdiction, gpc: params.gpc, consent: explicit });
     const legalBasis = params.legalBasisOverride ?? state.legalBasis;
+
+    if (params.skipIfUnchanged === true) {
+      const previous = await latestFor(params.subjectKey);
+      if (previous !== null && isUnchanged(previous, { jurisdiction, legalBasis, state, params })) {
+        return { record: previous, state: { ...state, legalBasis } };
+      }
+    }
 
     const record = await ConsentRecord.create({
       tenantId: params.tenantId,
@@ -209,17 +267,7 @@ export function createConsentService(deps: ConsentServiceDeps) {
     resolveState,
     decideAndRecord,
 
-    /**
-     * The visitor's most recent consent record, or null.
-     * @param subjectKey - The visitor subject key.
-     * @returns The latest record or null.
-     */
-    async latestFor(subjectKey: string): Promise<ConsentRecord | null> {
-      return ConsentRecord.findOne({
-        where: { subjectKey },
-        order: [['created_at', 'DESC']],
-      });
-    },
+    latestFor,
 
     /**
      * Fulfil a data-subject request — access (export) or erasure (#121).

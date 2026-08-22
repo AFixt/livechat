@@ -7,6 +7,7 @@ import { createSequelize } from './config/mysql.js';
 import { createRedis } from './config/redis.js';
 import { createSocketRedisAdapter, type AdapterHealth } from './io/adapter.js';
 import { attachIo } from './io/index.js';
+import { createIoRef } from './io/io-ref.js';
 import { createShutdownHandler } from './lifecycle/graceful-shutdown.js';
 import { initModels } from './models/index.js';
 import { createServices } from './services/index.js';
@@ -27,16 +28,21 @@ const socketAdapter = createSocketRedisAdapter({ redis, logger, health: socketAd
 // In test (e2e) the auth limiter's `max: 5` would trip across repeated
 // logins and CI retries; NODE_ENV is only ever 'test' for the e2e stack,
 // never a deployed server, so this is safe.
+// Filled in immediately after `attachIo` below — the app must exist first,
+// because Socket.IO attaches to the HTTP server that wraps it (#123).
+const ioRef = createIoRef();
 const app = createApp({
   env,
   logger,
   redis,
   services,
   socketAdapterHealth,
+  ioRef,
   ...(env.NODE_ENV === 'test' && { skipRateLimit: true }),
 });
 const server = createServer(app);
 const io = attachIo(server, { env, logger, redis, services, adapter: socketAdapter.adapter });
+ioRef.current = io;
 
 // A port clash otherwise surfaces as an unhandled EADDRINUSE stack trace (#81).
 server.on('error', (err: NodeJS.ErrnoException) => {

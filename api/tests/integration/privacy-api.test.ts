@@ -69,7 +69,8 @@ describe('privacy API (integration)', () => {
 
     const res = await request(app)
       .post('/api/v1/privacy/consent')
-      .send({ tenantKey: tenant.slug, country: 'DE', purposes: { presence: 'granted' } });
+      .set('x-geo-country', 'DE')
+      .send({ tenantKey: tenant.slug, purposes: { presence: 'granted' } });
     expect(res.status).toBe(201);
     expect(res.body.data.jurisdiction).toBe('EU');
     expect(res.body.data.purposes.presence).toBe('granted');
@@ -97,13 +98,15 @@ describe('privacy API (integration)', () => {
 
     const grant = await agent
       .post('/api/v1/privacy/consent')
-      .send({ tenantKey: tenant.slug, country: 'US', purposes: { presence: 'denied' } });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug, purposes: { presence: 'denied' } });
     expect(grant.status).toBe(201);
     expect(grant.body.data.purposes.presence).toBe('denied');
 
     const read = await agent
       .get('/api/v1/privacy/consent')
-      .query({ tenantKey: tenant.slug, country: 'US' });
+      .set('x-geo-country', 'US')
+      .query({ tenantKey: tenant.slug });
     // The prior explicit opt-out must survive the next decision.
     expect(read.body.data.purposes.presence).toBe('denied');
     expect(read.body.data.purposes.analytics).toBe('granted');
@@ -119,7 +122,8 @@ describe('privacy API (integration)', () => {
     // granted purely by the jurisdiction default — never an explicit choice.
     const optOut = await agent
       .post('/api/v1/privacy/consent')
-      .send({ tenantKey: tenant.slug, country: 'US', purposes: { analytics: 'denied' } });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug, purposes: { analytics: 'denied' } });
     expect(optOut.status).toBe(201);
     expect(optOut.body.data.jurisdiction).toBe('US');
     expect(optOut.body.data.purposes.presence).toBe('granted'); // default-granted, not explicit
@@ -139,7 +143,8 @@ describe('privacy API (integration)', () => {
     // presence must NOT carry over as consent — there was no real grant.
     const optIn = await agent
       .get('/api/v1/privacy/consent')
-      .query({ tenantKey: tenant.slug, country: 'DE' });
+      .set('x-geo-country', 'DE')
+      .query({ tenantKey: tenant.slug });
     expect(optIn.status).toBe(200);
     expect(optIn.body.data.jurisdiction).toBe('EU');
     expect(optIn.body.data.purposes.presence).toBe('denied');
@@ -155,10 +160,12 @@ describe('privacy API (integration)', () => {
 
     await agent
       .post('/api/v1/privacy/consent')
-      .send({ tenantKey: tenant.slug, country: 'US', purposes: { presence: 'granted' } });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug, purposes: { presence: 'granted' } });
     const res = await agent
       .post('/api/v1/privacy/consent/withdraw')
-      .send({ tenantKey: tenant.slug, country: 'US' });
+      .set('x-geo-country', 'US')
+      .send({ tenantKey: tenant.slug });
     expect(res.status).toBe(200);
     expect(res.body.data.purposes.presence).toBe('denied');
     expect(res.body.data.purposes.analytics).toBe('denied');
@@ -176,7 +183,8 @@ describe('privacy API (integration)', () => {
     const res = await request(app)
       .get('/api/v1/privacy/consent')
       .set('Sec-GPC', '1')
-      .query({ tenantKey: tenant.slug, country: 'US' });
+      .set('x-geo-country', 'US')
+      .query({ tenantKey: tenant.slug });
     expect(res.status).toBe(200);
     expect(res.body.data.gpc).toBe(true);
     expect(res.body.data.purposes.presence).toBe('denied');

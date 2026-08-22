@@ -50,8 +50,8 @@ curl -s https://api.livechat.afixt.com/api/v1/health
 ### Post-deploy verification
 
 After every deploy that changes the edge/TLS configuration (and at least once
-per environment), verify the transport security of each public host with the
-TLS harness:
+per environment), verify the transport security of each public host with the TLS
+harness:
 
 ```bash
 TLS_TARGET_URL=https://api.livechat.afixt.com npm run security:tls
@@ -60,11 +60,12 @@ TLS_TARGET_URL=https://widget.livechat.afixt.com npm run security:tls
 ```
 
 It fails (non-zero exit) if a host still offers TLS 1.0/1.1, presents weak
-ciphers or an invalid chain (via `testssl.sh`), does not redirect HTTP→HTTPS,
-is missing HSTS, or sets a cookie without `Secure`/`HttpOnly`/`SameSite`. With
-no `TLS_TARGET_URL` set it no-ops, so it is safe in the local `npm run security`
-aggregate. See [`docs/security/tls-verification.md`](security/tls-verification.md)
-for what each check means and how to read `testssl.sh` output.
+ciphers or an invalid chain (via `testssl.sh`), does not redirect HTTP→HTTPS, is
+missing HSTS, or sets a cookie without `Secure`/`HttpOnly`/`SameSite`. With no
+`TLS_TARGET_URL` set it no-ops, so it is safe in the local `npm run security`
+aggregate. See
+[`docs/security/tls-verification.md`](security/tls-verification.md) for what
+each check means and how to read `testssl.sh` output.
 
 ### Every subsequent deploy
 

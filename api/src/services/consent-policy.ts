@@ -46,9 +46,36 @@ export const RULES: Record<Jurisdiction, Record<ConsentPurpose, PurposeMode>> = 
 
 /** ISO 3166-1 alpha-2 codes of EU/EEA member states (opt-in regime). */
 const EU_EEA = new Set([
-  'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU',
-  'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES',
-  'SE', 'IS', 'LI', 'NO',
+  'AT',
+  'BE',
+  'BG',
+  'HR',
+  'CY',
+  'CZ',
+  'DK',
+  'EE',
+  'FI',
+  'FR',
+  'DE',
+  'GR',
+  'HU',
+  'IE',
+  'IT',
+  'LV',
+  'LT',
+  'LU',
+  'MT',
+  'NL',
+  'PL',
+  'PT',
+  'RO',
+  'SK',
+  'SI',
+  'ES',
+  'SE',
+  'IS',
+  'LI',
+  'NO',
 ]);
 
 /**
@@ -117,8 +144,7 @@ function pickLegalBasis(
   effective: PurposeState,
 ): LegalBasis {
   if (gpc) return 'opt_out';
-  const nonEssentialGranted =
-    effective.presence === 'granted' || effective.analytics === 'granted';
+  const nonEssentialGranted = effective.presence === 'granted' || effective.analytics === 'granted';
   const isOptIn = RULES[jurisdiction].presence === 'opt_in';
   if (!nonEssentialGranted) return isOptIn ? 'none' : 'opt_out';
   return isOptIn ? 'consent' : 'legitimate_interest';
