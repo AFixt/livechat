@@ -85,6 +85,25 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   HIGH or CRITICAL findings at all. ([#132])
 
 ### Added
+- **Data-subject access and erasure are actually implemented.**
+  `POST /api/v1/privacy/data-request` returned a `requestId` and audited the
+  request, but exported nothing and erased nothing — the endpoint answered
+  "queued" to a request no queue would ever pick up. It now fulfils
+  synchronously and returns `200` (not `202` — nothing is left outstanding by
+  the time it returns). An access request exports the subject's visitor
+  sessions, chats, messages and consent records; an erasure request disposes of
+  them following the deployment's configured retention strategy, so on-demand
+  and scheduled disposal behave identically (#57): `anonymize` clears every PII
+  column but keeps the row so transcripts stay referentially intact, `delete`
+  hard-deletes the session and the cascade takes its chats and messages. The
+  PII column list moved to `services/visitor-pii.ts` and is shared by both
+  paths, so a new personal-data column cannot be handled by the retention sweep
+  but missed by a data-subject request. Consent records for the subject are
+  erased too, while the `audit_logs` entry survives — that is what records the
+  request happened without retaining what it was about. Synchronous because the
+  subject is one visitor's worth of rows: a queue plus a status endpoint would
+  add a window in which the request is accepted but not honoured, without the
+  answer arriving sooner. ([#121])
 - **Staff can end a visitor's session from the console.** #79 (PR #94) delivered
   server-side expiry and a visitor-initiated "forget me", but deferred the
   issue's "at minimum, staff can end a session" clause, so an operator had no
@@ -679,6 +698,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   payload slice body-parser puts in `err.message` is never echoed).
 
 [#57]: https://github.com/AFixt/livechat/issues/57
+[#121]: https://github.com/AFixt/livechat/issues/121
 [#123]: https://github.com/AFixt/livechat/issues/123
 [#119]: https://github.com/AFixt/livechat/issues/119
 [#125]: https://github.com/AFixt/livechat/issues/125

@@ -95,10 +95,21 @@ supersede this section, not a rewrite of the engine.
   response when the request carries none (session establishment, not tracking).
 - `POST /privacy/consent` — record a banner grant/deny.
 - `POST /privacy/consent/withdraw` — deny all non-essential purposes.
-- `POST /privacy/data-request` — data-subject export/delete. **Documented
-  stub:** it audits and queues the request (returns a `requestId`) rather than
-  performing erasure/export inline. Fulfilment is out-of-band and tracked
-  separately.
+- `POST /privacy/data-request` — data-subject access (export) and erasure.
+  Fulfilled **synchronously** and returns `200` with the outcome (#121). The
+  subject is a single visitor — one session row, its chats, their messages, its
+  consent history — which is small and bounded, so a queue plus a status
+  endpoint would add moving parts and a window in which the request is accepted
+  but not yet honoured, without the answer arriving any sooner. The subject key
+  doubles as the lookup: it is `hashSessionId(sessionId, COOKIE_SECRET)`, the
+  same value stored as `visitor_sessions.session_cookie_hash`. Erasure follows
+  the deployment's configured retention strategy so on-demand and scheduled
+  disposal behave identically (#57): `anonymize` clears every PII column but
+  keeps the row, so transcripts stay referentially intact; `delete` hard-deletes
+  the session and the cascade takes its chats and messages. The subject's
+  consent records go either way — they are keyed to that subject and hold a
+  minimized IP — while the `audit_logs` row survives, which is what records that
+  the request happened without retaining the data it was about.
 
 ### 5. Decision audit trail on `audit_logs`
 

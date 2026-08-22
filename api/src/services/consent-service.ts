@@ -2,9 +2,10 @@ import { createHmac, randomUUID } from 'node:crypto';
 
 import { CONSENT_PURPOSES } from '@livechat/shared';
 
-import { ConsentRecord } from '../models/index.js';
+import { Chat, ChatMessage, ConsentRecord, VisitorSession } from '../models/index.js';
 
 import { RULE_VERSION, decide, resolveJurisdiction } from './consent-policy.js';
+import { visitorPiiNulls } from './visitor-pii.js';
 
 import type { AuditService } from './audit-service.js';
 import type { Env } from '../config/env.js';
@@ -55,6 +56,34 @@ interface ResolveParams {
   region?: string | null;
   gpc: boolean;
 }
+
+/**
+ * Build a consent service over `consent_records` + the audit trail.
+ * @param deps - Env (cookie secret for IP minimization) + audit service.
+ * @returns The consent service.
+ */
+/**
+ * Outcome of a data-subject request (#121). An access request carries the
+ * exported payload; an erasure request reports what was removed.
+ */
+export type DataRequestResult =
+  | {
+      requestId: string;
+      type: 'export';
+      status: 'completed';
+      data: {
+        visitorSessions: unknown[];
+        chats: unknown[];
+        messages: unknown[];
+        consentRecords: unknown[];
+      };
+    }
+  | {
+      requestId: string;
+      type: 'delete';
+      status: 'completed';
+      erased: { strategy: string; sessions: number; consentRecords: number };
+    };
 
 /**
  * Build a consent service over `consent_records` + the audit trail.
@@ -241,17 +270,65 @@ export function createConsentService(deps: ConsentServiceDeps) {
     latestFor,
 
     /**
-     * Record a data-subject request (export/delete) as an audited stub. The
-     * request is queued for out-of-band handling — see ADR-0019.
-     * @param params - Tenant, subject, and request type.
-     * @returns A queued acknowledgement with a request id.
+     * Fulfil a data-subject request — access (export) or erasure (#121).
+     *
+     * Fulfilled synchronously. The subject is a single visitor: one session
+     * row, its chats, their messages, and its consent history. That is small
+     * and bounded, so a queue plus a status endpoint would add moving parts and
+     * a window in which the request is accepted but not yet honoured, without
+     * making the answer arrive sooner.
+     *
+     * The subject key doubles as the lookup: it is `hashSessionId(sessionId,
+     * COOKIE_SECRET)`, the same value stored as
+     * `visitor_sessions.session_cookie_hash`, so a subject resolves to their
+     * session without any extra join table.
+     *
+     * Erasure follows the tenant's configured retention strategy so the two
+     * paths dispose of data the same way (#57): `anonymize` clears every PII
+     * column but keeps the row, so transcripts stay referentially intact;
+     * `delete` hard-deletes the session and lets the cascade take its chats and
+     * messages.
+     * @param params - Tenant, subject, request type, and erasure strategy.
+     * @returns The request id, what was done, and the export payload for an
+     *   access request.
      */
-    async queueDataRequest(params: {
+    async fulfilDataRequest(params: {
       tenantId: string;
       subjectKey: string;
       type: 'export' | 'delete';
-    }): Promise<{ requestId: string; status: 'queued' }> {
+      strategy?: 'anonymize' | 'delete';
+    }): Promise<DataRequestResult> {
       const requestId = randomUUID();
+      const sessions = await VisitorSession.findAll({
+        where: { tenantId: params.tenantId, sessionCookieHash: params.subjectKey },
+      });
+      const sessionIds = sessions.map((s) => s.id);
+      const chats =
+        sessionIds.length === 0
+          ? []
+          : await Chat.findAll({ where: { visitorSessionId: sessionIds } });
+      const chatIds = chats.map((c) => c.id);
+      const messages =
+        chatIds.length === 0 ? [] : await ChatMessage.findAll({ where: { chatId: chatIds } });
+      const consents = await ConsentRecord.findAll({
+        where: { tenantId: params.tenantId, subjectKey: params.subjectKey },
+      });
+
+      const result: DataRequestResult =
+        params.type === 'export'
+          ? {
+              requestId,
+              type: 'export',
+              status: 'completed',
+              data: {
+                visitorSessions: sessions.map((s) => s.toJSON()),
+                chats: chats.map((c) => c.toJSON()),
+                messages: messages.map((m) => m.toJSON()),
+                consentRecords: consents.map((c) => c.toJSON()),
+              },
+            }
+          : { requestId, type: 'delete', status: 'completed', erased: await erase() };
+
       await deps.audit.record({
         tenantId: params.tenantId,
         action: 'privacy.data_request',
@@ -259,10 +336,44 @@ export function createConsentService(deps: ConsentServiceDeps) {
         resourceId: requestId,
         metadata: {
           type: params.type,
+          status: 'completed',
           subjectKeyPrefix: params.subjectKey.slice(0, 12),
+          sessions: sessions.length,
+          chats: chats.length,
+          messages: messages.length,
+          consentRecords: consents.length,
+          ...(params.type === 'delete' && { strategy: params.strategy ?? 'anonymize' }),
         },
       });
-      return { requestId, status: 'queued' };
+      return result;
+
+      /**
+       * Apply the erasure, honouring the configured strategy.
+       * @returns What was erased.
+       */
+      async function erase(): Promise<{
+        strategy: string;
+        sessions: number;
+        consentRecords: number;
+      }> {
+        const strategy = params.strategy ?? 'anonymize';
+        if (sessionIds.length > 0) {
+          if (strategy === 'delete') {
+            await VisitorSession.destroy({ where: { id: sessionIds }, force: true });
+          } else {
+            await VisitorSession.update(visitorPiiNulls(), { where: { id: sessionIds } });
+          }
+        }
+        // Consent records are erased either way. They are the audit trail of a
+        // decision, but they are keyed to this subject and hold a minimized IP,
+        // so an erasure request covers them; the immutable audit_logs entry
+        // above is what preserves the fact that the request happened.
+        const consentRecords = await ConsentRecord.destroy({
+          where: { tenantId: params.tenantId, subjectKey: params.subjectKey },
+          force: true,
+        });
+        return { strategy, sessions: sessionIds.length, consentRecords };
+      }
     },
   };
 }

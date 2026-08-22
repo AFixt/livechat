@@ -72,15 +72,27 @@ openApiRegistry.registerPath({
   path: '/privacy/data-request',
   summary: 'Raise a data-subject access or erasure request',
   description:
-    `${subjectNote} Accepted and audited; fulfilment is asynchronous and ` +
-    'currently a stub — see #121.',
+    `${subjectNote} Fulfilled synchronously (#121): an access request returns ` +
+    'the subject’s visitor sessions, chats, messages and consent records; an ' +
+    'erasure request disposes of them following the deployment’s configured ' +
+    'retention strategy, so on-demand and scheduled disposal behave identically ' +
+    '(#57). The audit row survives an erasure — it records that the request ' +
+    'happened without retaining what it was about.',
   tags: ['privacy'],
   security: visitorSecurity(),
   request: { body: body(dataSubjectRequestInputSchema) },
   responses: {
-    202: json(
-      'Request accepted for processing.',
-      envelope(z.object({ requestId: z.string(), type: z.string() })),
+    // 200, not 202: nothing is left outstanding by the time this returns, so
+    // "accepted for processing" would overstate it.
+    200: json(
+      'Request fulfilled.',
+      envelope(
+        z.object({
+          requestId: z.string(),
+          type: z.enum(['export', 'delete']),
+          status: z.literal('completed'),
+        }),
+      ),
     ),
     ...errors(400),
   },
