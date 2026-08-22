@@ -38,6 +38,18 @@ function visitorPresenceKey(tenantId: string): string {
   return `presence:visitors:${tenantId}`;
 }
 
+/**
+ * Redis set of tenant ids that currently have at least one present visitor.
+ *
+ * Socket.IO's `adapter.rooms` only ever describes the *local* node, so it
+ * cannot answer this question once the Redis adapter (#73) spreads visitors
+ * across processes. This set is the cluster-wide answer (#125). It is written
+ * alongside the per-tenant presence hash and pruned lazily on read, because the
+ * hash carries a TTL and can expire without anything running to clean up
+ * after it.
+ */
+const VISITOR_TENANTS_KEY = 'presence:visitor-tenants';
+
 interface PresenceDeps {
   redis: Redis;
 }
@@ -180,6 +192,8 @@ export function createPresenceService(deps: PresenceDeps) {
       const key = visitorPresenceKey(tenantId);
       await deps.redis.hset(key, visitorSessionId, JSON.stringify(payload));
       await deps.redis.expire(key, VISITOR_PRESENCE_TTL_S);
+      // Cluster-wide index of "which tenants have someone watching" (#125).
+      await deps.redis.sadd(VISITOR_TENANTS_KEY, tenantId);
     },
 
     /**
@@ -189,6 +203,37 @@ export function createPresenceService(deps: PresenceDeps) {
      */
     async removeVisitor(tenantId: string, visitorSessionId: string): Promise<void> {
       await deps.redis.hdel(visitorPresenceKey(tenantId), visitorSessionId);
+    },
+
+    /**
+     * Tenant ids that currently have at least one connected visitor, across the
+     * whole cluster.
+     *
+     * Reads the index set, then drops any member whose presence hash is gone —
+     * the hash expires on its own TTL, so the set would otherwise accumulate
+     * tenants nobody is watching any more and widen the fan-out it exists to
+     * bound. Self-healing rather than requiring a sweeper.
+     * @returns Distinct tenant ids with a live visitor.
+     */
+    async tenantsWithVisitors(): Promise<string[]> {
+      const members = await deps.redis.smembers(VISITOR_TENANTS_KEY);
+      if (members.length === 0) return [];
+      const probe = deps.redis.pipeline();
+      for (const tenantId of members) probe.exists(visitorPresenceKey(tenantId));
+      const results = await probe.exec();
+
+      const live: string[] = [];
+      const stale: string[] = [];
+      members.forEach((tenantId, i) => {
+        // A pipeline entry is [error, value]; treat an errored probe as live so
+        // a transient Redis hiccup narrows the fan-out rather than pruning a
+        // tenant that is actually being watched.
+        const entry = results?.[i];
+        if (entry?.[0] != null || entry?.[1] === 1) live.push(tenantId);
+        else stale.push(tenantId);
+      });
+      if (stale.length > 0) await deps.redis.srem(VISITOR_TENANTS_KEY, ...stale);
+      return live;
     },
 
     /**

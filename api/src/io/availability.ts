@@ -68,28 +68,6 @@ export async function broadcastTenantAvailability(deps: BroadcastDeps): Promise<
   return available;
 }
 
-/**
- * Tenant ids that currently have at least one connected visitor, read from the
- * `/visitor` namespace's room membership (`tenant:{id}` rooms). Used to bound
- * global-staff availability fan-out to tenants a live visitor could actually
- * observe a transition on.
- *
- * Note: with the default in-memory adapter this reflects the whole deployment
- * (single node). If a multi-node Redis adapter is later adopted, this only sees
- * this node's rooms — enumeration would need `adapter.allRooms()` even though
- * the room `emit` already fans out cluster-wide.
- * @param io - Socket.IO server.
- * @returns Distinct tenant ids with a connected visitor.
- */
-function tenantsWithConnectedVisitors(io: Server): string[] {
-  const prefix = 'tenant:';
-  const ids: string[] = [];
-  for (const room of io.of(VISITOR_NS).adapter.rooms.keys()) {
-    if (room.startsWith(prefix)) ids.push(room.slice(prefix.length));
-  }
-  return ids;
-}
-
 interface GlobalBroadcastDeps<T> {
   io: Server;
   presence: PresenceService;
@@ -110,13 +88,18 @@ interface GlobalBroadcastDeps<T> {
  * actually flips as a result of `apply` (computed before/after). A toggle that
  * changes nothing observable — e.g. another available agent already covers the
  * tenant — emits nothing.
+ *
+ * The "has a connected visitor" set comes from Redis-backed presence, not from
+ * Socket.IO room membership: `adapter.rooms` only describes the local node, so
+ * behind the Redis adapter (#73) a visitor connected to another process would
+ * be invisible here and never receive the push (#125).
  * @param deps - Socket.IO server, presence service, and the mutation to apply.
  * @returns Whatever `apply` returns (e.g. the persisted status).
  */
 export async function broadcastGlobalStaffAvailability<T>(
   deps: GlobalBroadcastDeps<T>,
 ): Promise<T> {
-  const tenantIds = tenantsWithConnectedVisitors(deps.io);
+  const tenantIds = await deps.presence.tenantsWithVisitors();
   const before = new Map<string, boolean>();
   for (const tenantId of tenantIds) {
     before.set(tenantId, await computeTenantAvailability(deps.presence, tenantId));
