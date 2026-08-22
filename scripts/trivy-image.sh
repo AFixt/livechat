@@ -45,7 +45,23 @@ IMAGES=(
   "widget:widget/Dockerfile"
 )
 
+# The ui and widget builds install workspace devDependencies, which include
+# private `@afixt/*` packages, so their `npm ci` needs registry auth (#130).
+# Pass the npmrc as a BuildKit secret — never a build arg, which would persist
+# in the image layers and `docker history`. `actions/setup-node` writes a
+# runner-local npmrc and points NPM_CONFIG_USERCONFIG at it; locally this is
+# the developer's own ~/.npmrc.
+NPMRC="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+build_secret=()
+if [[ -f "$NPMRC" ]]; then
+  build_secret=(--secret "id=npmrc,src=$NPMRC")
+else
+  echo "trivy-image: no npmrc at ${NPMRC} — the ui/widget builds will fail on" >&2
+  echo "            the private @afixt/* packages. api is unaffected." >&2
+fi
+
 status=0
+unbuilt=()
 for entry in "${IMAGES[@]}"; do
   name="${entry%%:*}"
   dockerfile="${entry##*:}"
@@ -53,7 +69,16 @@ for entry in "${IMAGES[@]}"; do
 
   if [[ "${TRIVY_IMAGE_SKIP_BUILD:-0}" != "1" ]]; then
     echo "trivy-image: building ${tag} from ${dockerfile}"
-    docker build -f "$dockerfile" -t "$tag" .
+    # A build failure must not abort the run: under `set -e` the first
+    # unbuildable image would silently deny every later image a scan, which is
+    # how ui and widget went unscanned for so long behind a known-red api
+    # build (#130). Record it, keep going, and fail at the end.
+    if ! DOCKER_BUILDKIT=1 docker build "${build_secret[@]}" -f "$dockerfile" -t "$tag" .; then
+      echo "trivy-image: BUILD FAILED for ${tag} — not scanned." >&2
+      unbuilt+=("$name")
+      status=1
+      continue
+    fi
   fi
 
   echo "trivy-image: scanning ${tag} (report: HIGH+CRITICAL; gate: CRITICAL)"
@@ -70,5 +95,12 @@ for entry in "${IMAGES[@]}"; do
     status=1
   fi
 done
+
+# Never let a build failure read as a clean scan: say plainly which images were
+# not covered, so a red run cannot be mistaken for "the gate passed for what
+# matters".
+if (( ${#unbuilt[@]} > 0 )); then
+  echo "trivy-image: NOT SCANNED (build failed): ${unbuilt[*]}" >&2
+fi
 
 exit "$status"

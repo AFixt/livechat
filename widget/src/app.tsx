@@ -74,8 +74,15 @@ export function App(props: AppProps): preact.JSX.Element {
 
   useEffect(() => {
     // Object property (not a local) so its value survives the async closure
-    // for the cleanup to flip without tripping no-unnecessary-condition.
+    // for the cleanup to flip. Read through `isLive()` so control-flow
+    // narrowing does not make a later re-check look statically unreachable.
     const live = { current: true };
+    const isLive = (): boolean => live.current;
+    // `getVisitorSocket()` *lazily connects*, so calling it is not free: for a
+    // gated visitor it would open the very presence socket the gate exists to
+    // keep closed. Track whether we actually attached, so the cleanup below
+    // only touches a socket that already exists.
+    const presenceAttached = { current: false };
     const onSupportInitiated = (p: { chatId: string }): void => {
       dispatch({ type: 'support_initiated', chatId: p.chatId });
       announceLiveMessage('A support agent wants to chat');
@@ -95,7 +102,7 @@ export function App(props: AppProps): preact.JSX.Element {
     const loadInitialConfig = async (): Promise<void> => {
       try {
         const config = await fetchWidgetConfig(props.tenantKey);
-        if (!live.current) return;
+        if (!isLive()) return;
         setSupportHoursText(config.supportHoursText ?? undefined);
         dispatch({ type: 'support_available', available: config.supportAvailable });
       } catch {
@@ -110,27 +117,43 @@ export function App(props: AppProps): preact.JSX.Element {
       // the resume/socket path below is guarded too, so an unmount during the
       // consent wait is handled without an extra early return here.
       await loadInitialConfig();
-      // Reuse an existing session when the visitor already has one — a page
-      // reload must not mint a fresh session, which would orphan a prior chat
-      // and break the returning-visitor (restart) flow. Probing the resumable
-      // chat doubles as the "do I have a session?" check.
+      // Server-side consent gate (#53). This resolves the visitor's
+      // jurisdiction, applies the rules, and only creates a tracked session
+      // (returning its id) when ambient presence tracking is permitted. Since
+      // #55 the decision is applied first, so a suppressed visitor gets
+      // `sessionId: null` even when a row already exists — the id is a
+      // statement about *ambient tracking*, not about whether this visitor has
+      // a chat.
+      let gate: Awaited<ReturnType<typeof initVisitorSession>>;
+      try {
+        gate = await initVisitorSession(props.tenantKey);
+      } catch {
+        if (isLive()) dispatch({ type: 'error', message: 'Unable to start a session.' });
+        return;
+      }
+      if (!isLive()) return;
+      // Probe for a resumable chat regardless of the tracking decision.
+      // Resuming a conversation the visitor themselves started is the same
+      // first-party, strictly-necessary interaction as starting one (#53), so
+      // gating it would strand a chat the gate expressly allowed them to open —
+      // and with no geo hint every visitor resolves to UNKNOWN, so that would
+      // be every visitor. This only *reads* an existing row; it starts no
+      // tracking. A 401 simply means there is no session to resume.
       let resume: Awaited<ReturnType<typeof fetchCurrentChat>> | null = null;
       try {
         resume = await fetchCurrentChat();
       } catch {
-        // No existing session (401) or unreachable — start a fresh session.
-        try {
-          await initVisitorSession(props.tenantKey);
-        } catch {
-          if (live.current) dispatch({ type: 'error', message: 'Unable to start a session.' });
-          return;
-        }
+        // No resumable chat, or a transient error — nothing to restore.
       }
-      if (!live.current) return;
-      // A session now exists — connect the socket so this visitor shows up in
-      // the console's presence list and can receive proactive support events.
-      getVisitorSocket().on('support:initiated', onSupportInitiated);
-      getVisitorSocket().on('support:availability_changed', onAvailabilityChanged);
+      if (!isLive()) return;
+      // Ambient presence tracking, on the other hand, is exactly what the gate
+      // suppresses: open the presence socket only when it permitted tracking.
+      // Everything below this point is the ambient path.
+      if (gate.sessionId !== null) {
+        presenceAttached.current = true;
+        getVisitorSocket().on('support:initiated', onSupportInitiated);
+        getVisitorSocket().on('support:availability_changed', onAvailabilityChanged);
+      }
       // Returning visitor with an unfinished chat? Offer to resume it.
       if (resume !== null && resume.chat !== null) {
         dispatch({
@@ -143,6 +166,10 @@ export function App(props: AppProps): preact.JSX.Element {
     })();
     return () => {
       live.current = false;
+      // Only if we attached: an unconditional `getVisitorSocket()` here would
+      // *create and connect* a socket purely to detach listeners from it,
+      // opening a presence connection for a visitor the gate kept untracked.
+      if (!presenceAttached.current) return;
       getVisitorSocket().off('support:initiated', onSupportInitiated);
       getVisitorSocket().off('support:availability_changed', onAvailabilityChanged);
     };

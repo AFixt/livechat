@@ -9,10 +9,10 @@ in issue #54; the contract is specified in
 
 The widget recognizes two consent categories:
 
-| Category | Covers | Default |
-| --- | --- | --- |
-| `functional` | The chat itself — message transport and the strictly-necessary `livechat_visitor` session cookie. | Granted |
-| `analytics` | Visitor **presence/telemetry capture**: the session-init call that records current URL, referrer, language and (truncated) IP, and live presence in the support console. | Denied |
+| Category     | Covers                                                                                                                                                                   | Default |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| `functional` | The chat itself — message transport and the strictly-necessary `livechat_visitor` session cookie.                                                                        | Granted |
+| `analytics`  | Visitor **presence/telemetry capture**: the session-init call that records current URL, referrer, language and (truncated) IP, and live presence in the support console. | Denied  |
 
 When gating is enabled, the widget **holds its entire capture bootstrap** — the
 visitor-session init call (which sets the `livechat_visitor` cookie) and the
@@ -37,7 +37,10 @@ widget behaves as before (capture proceeds immediately) — the gate is opt-in.
 
 ```html
 <!-- Gated: nothing is captured until the CMP calls setConsent(). -->
-<afixt-livechat data-tenant-key="your-tenant-slug" data-require-consent></afixt-livechat>
+<afixt-livechat
+  data-tenant-key="your-tenant-slug"
+  data-require-consent
+></afixt-livechat>
 ```
 
 ## Granting / denying consent
@@ -91,8 +94,8 @@ window.addEventListener('afixt-livechat:consent', (e) => {
 
 Calling `setConsent({ analytics: false })` records the withdrawal and blocks
 future capture. (Data already captured under a prior grant is governed by the
-visitor data-retention / minimization policy — ADR-0011, landing with
-issue #57.)
+visitor data-retention / minimization policy — ADR-0011, landing with issue
+`#57`.)
 
 ## Relationship to the consent foundation (#56/#53/#55)
 

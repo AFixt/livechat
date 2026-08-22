@@ -88,6 +88,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The ui and widget image builds install workspace devDependencies, which
+      # include private @afixt/* packages. This writes a runner-local .npmrc and
+      # sets NPM_CONFIG_USERCONFIG; scripts/trivy-image.sh mounts that file into
+      # the builds as a BuildKit secret (#130). Without it those two builds 404
+      # and go unscanned.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Authenticate the runner npmrc
+        run: npm config set "//registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Install trivy
         run: |
           set -euo pipefail
