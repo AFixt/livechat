@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-import { Tenant, User, VisitorSession } from '../../src/models/index.js';
+import { Chat, Tenant, User, VisitorSession } from '../../src/models/index.js';
 
 import { probeHarness } from './setup.js';
 
@@ -84,7 +84,27 @@ async function bootVisitor(
   const res = await request(app).post('/api/v1/visitor/session').send({ tenantKey });
   expect(res.status).toBe(201);
   const cookie = (res.headers['set-cookie'] as unknown as string[])[0] ?? '';
-  return { cookie, id: res.body.data.sessionId as string };
+  const csrfToken = res.body.data.csrfToken as string;
+
+  // The consent gate (#53) means `POST /session` does not necessarily create a
+  // `visitor_sessions` row: under the fail-safe Unknown jurisdiction, ambient
+  // presence tracking is denied and only a subject cookie is issued. There is
+  // then nothing for staff to revoke. Starting a chat is a functional purpose,
+  // permitted regardless, and is what creates the row — so these tests boot a
+  // visitor who actually has a session to revoke.
+  const chat = await request(app)
+    .post('/api/v1/visitor/chats')
+    .set('Cookie', cookie)
+    .set('X-XSRF-TOKEN', csrfToken)
+    .send({ customerName: 'Vee', body: 'hello' });
+  expect(chat.status).toBe(201);
+
+  // Resolve the id through the chat that was just created, not by taking the
+  // most recent row: these suites share a database, so "newest session" could
+  // belong to another test running alongside this one.
+  const created = await Chat.findByPk(chat.body.data.chat.id as string);
+  expect(created).not.toBeNull();
+  return { cookie, id: created!.visitorSessionId };
 }
 
 describe('staff revocation of a visitor session (#123)', () => {
