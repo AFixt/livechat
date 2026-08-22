@@ -70,6 +70,13 @@ export const initVisitorSessionResultSchema = z.object({
    * write, so the widget always needs this.
    */
   csrfToken: z.string(),
+  /**
+   * The signed session value, echoed so the widget can persist it and resend it
+   * as `X-Visitor-Session` when the browser blocks the third-party cookie
+   * (#75). Issued alongside `csrfToken` and for the same reason: a gated
+   * visitor can still start a chat.
+   */
+  sessionToken: z.string(),
   jurisdiction: z.string(),
   gpc: z.boolean(),
   tracking: z.object({
