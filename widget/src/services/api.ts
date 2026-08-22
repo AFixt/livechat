@@ -7,6 +7,27 @@ interface JsonEnvelope<T> {
 }
 
 /**
+ * A non-2xx API response. Carries the status so callers can tell a recoverable
+ * "no session yet" (401) apart from a real failure, rather than string-matching
+ * the message (#129).
+ */
+export class ApiRequestError extends Error {
+  /** HTTP status of the failed response. */
+  readonly status: number;
+
+  /**
+   * Build a request error for a non-2xx response.
+   * @param status - HTTP status of the failed response.
+   * @param message - Server-supplied message, or a generated fallback.
+   */
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+  }
+}
+
+/**
  * CSRF token for cookie-authenticated writes (#77). Held in memory only —
  * never a cookie — so a cross-site attacker carrying the ambient visitor
  * cookie cannot read or forge it. Seeded from the bootstrap responses.
@@ -97,7 +118,10 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   });
   const body = (await res.json().catch(() => ({}))) as JsonEnvelope<T>;
   if (!res.ok) {
-    throw new Error(body.message ?? `Request failed: ${res.status.toString()}`);
+    throw new ApiRequestError(
+      res.status,
+      body.message ?? `Request failed: ${res.status.toString()}`,
+    );
   }
   return body;
 }
@@ -170,10 +194,13 @@ function detectGpc(): boolean {
  * presence tracking is permitted, boot a tracked visitor session. Sends the
  * browser's GPC signal so a universal opt-out suppresses tracking before it
  * starts.
+ *
+ * The raw call. Use {@link initVisitorSession}, which shares one in-flight
+ * request across callers.
  * @param tenantKey - Tenant slug from `data-tenant-key`.
  * @returns The gate decision plus the session summary.
  */
-export async function initVisitorSession(tenantKey: string): Promise<InitSessionResponse> {
+async function requestVisitorSession(tenantKey: string): Promise<InitSessionResponse> {
   const gpc = detectGpc();
   const body = await apiFetch<InitSessionResponse>('/visitor/session', {
     method: 'POST',
@@ -222,6 +249,44 @@ export async function initiateChat(
   return body.data;
 }
 
+/**
+ * Start a chat, establishing the visitor session first if the widget's own
+ * bootstrap has not finished yet (#129).
+ *
+ * The widget renders its start-chat form immediately, but a session only exists
+ * after several sequential round-trips. A visitor on a slow link — or one whose
+ * stored session has been expired or revoked server-side (#79) — could
+ * otherwise submit into a `401` and land on an error with their typed message
+ * still in the form and no explanation. So: make sure a session exists, and if
+ * the write is still rejected for want of one, mint a fresh session and retry
+ * exactly once. A second `401` is a real failure and propagates.
+ * @param tenantKey - Tenant slug from `data-tenant-key`.
+ * @param customerName - Name entered by the visitor.
+ * @param firstMessage - Initial message text.
+ * @param customerEmail - Optional email for transcript / fallback.
+ * @returns The new chat + first message + support availability.
+ */
+export async function startChat(
+  tenantKey: string,
+  customerName: string,
+  firstMessage: string,
+  customerEmail?: string,
+): Promise<InitiatedChat> {
+  await initVisitorSession(tenantKey);
+  try {
+    return await initiateChat(customerName, firstMessage, customerEmail);
+  } catch (err) {
+    if (!(err instanceof ApiRequestError) || err.status !== 401) throw err;
+    // The session we thought we had is gone (expired, revoked, or never
+    // finished being set). Establish a fresh one and retry — the visitor's
+    // typed input is still in hand, so this is invisible to them. Bypasses the
+    // shared promise deliberately: the cached one resolved to the session that
+    // just failed.
+    await requestVisitorSession(tenantKey);
+    return initiateChat(customerName, firstMessage, customerEmail);
+  }
+}
+
 interface CurrentChatMessage {
   id: string;
   body: string;
@@ -248,4 +313,35 @@ export async function fetchCurrentChat(): Promise<CurrentChat> {
   if (body.data?.csrfToken !== undefined) setCsrfToken(body.data.csrfToken);
   if (body.data?.sessionToken !== undefined) setSessionToken(body.data.sessionToken);
   return body.data ?? { chat: null, messages: [] };
+}
+
+/**
+ * The one in-flight (or completed) consent-gate call for this page load.
+ *
+ * Shared so the widget's own startup and a visitor who submits the start-chat
+ * form mid-startup converge on the same session instead of racing (#129). It
+ * also stops a second `POST /visitor/session` being issued, which would ask the
+ * consent gate to decide twice for one page view.
+ */
+let sessionPromise: Promise<InitSessionResponse> | null = null;
+
+/**
+ * Run the consent gate and establish the visitor session, exactly once per page
+ * load. Every caller shares one request, so a visitor who submits the start-chat
+ * form before startup finishes waits for the *same* session rather than sending
+ * a chat write with no cookie and getting a 401 (#129).
+ *
+ * A rejected call is not cached, so a later attempt retries rather than
+ * inheriting the failure.
+ * @param tenantKey - Tenant slug from `data-tenant-key`.
+ * @returns The gate decision plus the session summary.
+ */
+export async function initVisitorSession(tenantKey: string): Promise<InitSessionResponse> {
+  sessionPromise ??= requestVisitorSession(tenantKey);
+  try {
+    return await sessionPromise;
+  } catch (err) {
+    sessionPromise = null;
+    throw err;
+  }
 }
