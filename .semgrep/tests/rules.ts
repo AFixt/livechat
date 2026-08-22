@@ -31,7 +31,10 @@ declare const env: { APP_URL: string; WIDGET_ORIGIN: string };
 declare const allow: string[];
 
 // --- Rule 1: chat-lookup-must-go-through-scoped-service ----------------------
-declare const Chat: { findByPk: (...a: unknown[]) => unknown; findOne: (...a: unknown[]) => unknown };
+declare const Chat: {
+  findByPk: (...a: unknown[]) => unknown;
+  findOne: (...a: unknown[]) => unknown;
+};
 declare const ChatMessage: { findAll: (...a: unknown[]) => unknown };
 declare const chatService: { getChatForVisitor: (...a: unknown[]) => unknown };
 

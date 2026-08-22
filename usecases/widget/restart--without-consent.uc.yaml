@@ -1,0 +1,43 @@
+id: widget-restart-without-consent
+title: "Returning visitor resumes a prior conversation while untracked"
+type: extension
+description: |
+  §5.1.8 / issues #53 and #55 — the consent gate must not strand a chat it
+  expressly allowed the visitor to open.
+
+  Starting a chat is a first-party, strictly-necessary interaction, so it is
+  permitted in every jurisdiction and lazily creates the visitor session.
+  Resuming that same conversation is the continuation of it, so it has to be
+  permitted on the same basis. Otherwise a visitor who opens a chat and then
+  reloads the page loses it — and since the widget sends no geo hint, every
+  visitor resolves to Unknown Location Mode, so that would be every visitor.
+
+  The distinction the gate draws is between this and *ambient* tracking: the
+  presence socket stays closed and no heartbeat runs for an untracked visitor,
+  even while the resume offer is shown. `POST /visitor/session` returns
+  `sessionId: null` here — that is a statement about ambient tracking, not
+  about whether this visitor has a chat.
+
+  The tracked variant of this surface is `restart.uc.yaml`; this file covers
+  the untracked one. The server-side assertion that no presence row is created
+  lives in the api integration tests.
+
+start_location: "http://localhost:5175/"
+
+expected_result: >-
+  A returning visitor whose ambient tracking is suppressed is still offered to
+  resume their prior conversation, with the resume control keyboard-reachable.
+  The cross-ends journey suite asserts the transcript that follows (ADR-0007).
+
+preconditions:
+  - The visitor has a prior, unfinished chat in the same session.
+  - The visitor has not granted presence consent, so no tracked visitor
+    session exists and the presence socket is closed.
+
+data: {}
+
+steps:
+  - locate: text "Welcome back. Continue your conversation?"
+  - locate: button "Resume chat"
+  - focus: button "Resume chat"
+  - activate: button "Resume chat"

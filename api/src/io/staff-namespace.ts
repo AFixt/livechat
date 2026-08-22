@@ -241,8 +241,7 @@ export function registerStaffNamespace(deps: StaffDeps): StaffNamespace {
           await broadcastGlobalStaffAvailability({
             io: deps.io,
             presence: deps.services.presence,
-            apply: () =>
-              deps.services.presence.setAvailability(userId, availabilityTenant, status),
+            apply: () => deps.services.presence.setAvailability(userId, availabilityTenant, status),
           });
         } else {
           await deps.services.presence.setAvailability(userId, availabilityTenant, status);

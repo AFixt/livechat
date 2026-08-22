@@ -50,6 +50,20 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   ones — 2 CRITICALs failed the gate while 33 HIGHs did not, which is exactly
   the documented behaviour. ([#130])
 ### Security
+- **Jurisdiction is now resolved server-side from a trusted edge header, not the
+  request body.** The consent gate decided opt-in vs opt-out from a `country` /
+  `region` the client sent, but the widget runs on the client's own site — so an
+  embedding page could have declared `US` for an EU visitor and turned an opt-in
+  jurisdiction into an opt-out one. Those fields are gone from
+  `POST /visitor/session` and from the `/privacy/*` bodies and query; the value
+  now comes only from the header named by `GEO_COUNTRY_HEADER` /
+  `GEO_REGION_HEADER`, which the CDN or load balancer injects and must strip
+  from client input. GPC stays client-readable on purpose — a signal that can
+  only ever *deny* tracking is safe to accept, one that could *grant* it is not.
+  With no header configured every visitor resolves to Unknown Location Mode,
+  which denies presence: the fail-safe, and the honest description of what the
+  gate could already determine, since the widget never sent a country. ([#53])
+
 - **The api image no longer ships a package manager, clearing a CRITICAL CVE.**
   `trivy image` was failing the gate on `CVE-2026-59873` (node-tar DoS via a
   crafted gzip bomb) plus seven HIGHs in `brace-expansion`, `ip-address`,
@@ -71,6 +85,32 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   HIGH or CRITICAL findings at all. ([#132])
 
 ### Fixed
+- **The widget can work on a third-party site at all — the visitor session now
+  survives cross-site embedding.** The `livechat_visitor` cookie was
+  `SameSite=Lax`, so no browser sent it on the cross-site subresource requests
+  an embedded widget makes: every call after the bootstrap was unauthenticated
+  and the Socket.IO handshake carried no credential. This is the fix reviewed
+  and approved in PR #93, which never reached `develop` — it merged into
+  `fix/77-csrf` twelve minutes after that branch had itself merged, so the
+  branch was abandoned with the work on it. Re-applied here on top of the
+  consent work (ADR-0019) that has since moved the cookie options into a shared
+  helper. In production the cookie is now `SameSite=None; Secure; Partitioned`
+  (CHIPS); local dev stays `Lax`, since `None` requires `Secure` and a `Secure`
+  cookie is dropped on localhost HTTP. Because Safari (ITP) and Firefox (TCP)
+  block third-party cookies outright, the cookie alone is not enough: the
+  bootstrap endpoints also return the signed session as `sessionToken`, the
+  widget persists it in first-party storage and resends it as
+  `X-Visitor-Session` (allow-listed in CORS, passed as `auth.cookie` on the
+  socket handshake), and the API resolves the session from that header first
+  and the cookie second through one shared helper. The header path is still
+  CSRF-gated, and cannot be set cross-site without a preflight the per-tenant
+  CORS layer (#74) already gates. Also fixed on the way through: `clearCookie`
+  on "forget me" now repeats the cookie's attributes, without which a
+  `SameSite=None; Secure; Partitioned` cookie is never cleared (#79), and the
+  privacy router resolves its subject through the same helper so a
+  cookie-blocked visitor can still read, record and withdraw consent (#56). The
+  security-regression suite pinned `SameSite=Lax` in production and now pins
+  `SameSite=None; Secure; Partitioned`. See [ADR-0021]. ([#75])
 - **The local quality gate can be run again.** `npm run check:all` — the
   pre-push gate — failed for reasons unrelated to any code under review, so
   changes were going out under `--no-verify` with CI as the only check. Two
@@ -104,6 +144,37 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   `messages_synced` (de-duplicating optimistic sends), and a reconnect is
   surfaced programmatically, visibly, and audibly (widget banner + live-region
   announcement; console live-region announcement). ([#69])
+### Security
+
+- **Global Privacy Control is now detected and honored.** `navigator.globalPrivacyControl`
+  was never read and no universal opt-out signal was honored anywhere. Now: ([#55])
+  - The widget reads `navigator.globalPrivacyControl` and sends it to
+    `POST /visitor/session`; the API also honors the `Sec-GPC: 1` request header.
+    Either source counts.
+  - A detected signal feeds the policy engine as a universal opt-out: it
+    suppresses presence/analytics in every jurisdiction, so **no tracked session
+    is created** — and it stops ambient tracking for an already-tracked returning
+    visitor too, not just a first-time one.
+  - The signal is recorded as a `gpc`-sourced consent record (`legal_basis:
+    opt_out`) and audited as `privacy.gpc_detected` + `privacy.gpc_applied`.
+  - Tests: GPC via header and via the widget signal both yield no tracking plus
+    an audited opt-out record; the effective-state GPC true/false paths are unit
+    tested in `consent-policy.test.ts`.
+- **Visitor presence tracking is now gated behind a consent decision.**
+  Previously the widget created a `visitor_sessions` row — capturing IP, user
+  agent, current URL, and referrer — for every visitor on page load, in every
+  jurisdiction, with no consent gate (behavioral tracking of visitors who never
+  engaged). Page load now runs the consent gate first: ([#53])
+  - In opt-in (EU/EEA/UK) and Unknown-location modes, **no tracked session is
+    created and no IP/geo/URL is captured** until the visitor consents or
+    actively starts a chat. `POST /visitor/session` returns `sessionId: null`
+    and the widget keeps the presence socket closed.
+  - In US opt-out modes, presence tracking proceeds by default unless the
+    visitor has opted out (or GPC is present — see #55).
+  - **Functional use is never blocked.** The widget still renders and a visitor
+    can always start a chat; opening a chat is strictly necessary and lazily
+    creates the session at that point. New widget use case
+    `functional-without-consent.uc.yaml` covers this.
 
 ### Added
 
@@ -476,6 +547,11 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 [#57]: https://github.com/AFixt/livechat/issues/57
 [#130]: https://github.com/AFixt/livechat/issues/130
+[#53]: https://github.com/AFixt/livechat/issues/53
+[#55]: https://github.com/AFixt/livechat/issues/55
+[#56]: https://github.com/AFixt/livechat/issues/56
+[#75]: https://github.com/AFixt/livechat/issues/75
+[ADR-0021]: docs/adr/0021-visitor-session-third-party-cookie-fallback.md
 [#132]: https://github.com/AFixt/livechat/issues/132
 [#66]: https://github.com/AFixt/livechat/issues/66
 [#68]: https://github.com/AFixt/livechat/issues/68

@@ -1,0 +1,41 @@
+id: widget-functional-without-consent
+title: "Visitor can chat without ambient presence tracking (consent gate)"
+type: extension
+description: |
+  §16.2 / issue #53 — the consent gate must never block the widget's
+  functional path. When a visitor's jurisdiction resolves to an opt-in (or
+  Unknown) mode, ambient presence tracking stays off and no tracked visitor
+  session is created on page load — but the widget still renders its trigger,
+  opens, and lets the visitor start a chat (a first-party, strictly-necessary
+  interaction). Starting the chat is what lazily creates the session server-
+  side; from the visitor's point of view the experience is unchanged.
+
+  This case asserts the visible functional path is intact under the gate. The
+  server-side assertion that no presence row exists pre-consent lives in the
+  api integration test `visitor-consent-gate.test.ts`.
+
+start_location: "http://localhost:5175/"
+
+preconditions:
+  - The API stack is running with an "acme" tenant.
+  - At least one support agent is available (the widget harness seeds this).
+  - The visitor has not granted presence/analytics consent — the widget
+    operates in functional-only mode.
+
+data:
+  visitor_name: "Jordan Visitor"
+  first_message: "Can you help me place an order?"
+
+steps:
+  - locate: button "Chat with support"
+  - focus: button "Chat with support"
+  - activate: button "Chat with support"
+  - locate: heading "Chat with support"
+  - locate: field "Your name"
+  - enter: field "Your name" value "{{ visitor_name }}"
+  - locate: field "How can we help?"
+  - enter: field "How can we help?" value "{{ first_message }}"
+  - locate: button "Start chat"
+  - focus: button "Start chat"
+  - activate: button "Start chat"
+  - verify: text "{{ first_message }}"

@@ -39,26 +39,26 @@ product purpose (abuse handling, geo routing, presence):
 
 **What is kept vs dropped for the planned geolocation feature:**
 
-| Signal | Stored? | Form |
-| --- | --- | --- |
-| Country | Yes | ISO country code/name |
-| City / region | No | dropped at capture |
-| Precise coordinates | No | never captured |
-| Full IP | No | truncated `/24` (v4) or `/48` (v6) |
-| Postal code | No | never captured |
+| Signal              | Stored? | Form                               |
+| ------------------- | ------- | ---------------------------------- |
+| Country             | Yes     | ISO country code/name              |
+| City / region       | No      | dropped at capture                 |
+| Precise coordinates | No      | never captured                     |
+| Full IP             | No      | truncated `/24` (v4) or `/48` (v6) |
+| Postal code         | No      | never captured                     |
 
 **Planned location record (§7.3).** When IP geolocation lands, the resolved
 location is recorded — alongside the country stored on the session — as a
 minimized record so a support agent can see _how confident_ the location is
 without any precise-location data being retained:
 
-| Field | Purpose |
-| --- | --- |
-| `country` | ISO country code — the only geographic granularity stored. |
-| `detection_method` | How it was resolved: `ip-geolocation`, `browser-locale` (weak), or `unknown`. |
-| `confidence` | Resolver confidence (0–1), for the §7.1/7.2 conflict/fallback rules. |
-| `rule_version` | Version of the resolution ruleset, so records stay interpretable as rules change. |
-| `resolved_at` | Timestamp of resolution. |
+| Field              | Purpose                                                                           |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `country`          | ISO country code — the only geographic granularity stored.                        |
+| `detection_method` | How it was resolved: `ip-geolocation`, `browser-locale` (weak), or `unknown`.     |
+| `confidence`       | Resolver confidence (0–1), for the §7.1/7.2 conflict/fallback rules.              |
+| `rule_version`     | Version of the resolution ruleset, so records stay interpretable as rules change. |
+| `resolved_at`      | Timestamp of resolution.                                                          |
 
 Precise coordinates are **opt-in only** (§4.6) and are out of scope here — this
 ADR fixes the storage model to country-level; the resolution hierarchy, the
@@ -105,8 +105,8 @@ compromise never exposes a precise visitor location or a whole IP.
   personal data at rest for up to the whole window and in every backup taken
   during it. Minimizing at capture is strictly stronger.
 - **Hash the IP instead of truncating** — rejected: a salted hash is still a
-  stable per-visitor identifier (re-identifiable by brute-forcing the small
-  IPv4 space) and loses the network-prefix utility truncation keeps.
+  stable per-visitor identifier (re-identifiable by brute-forcing the small IPv4
+  space) and loses the network-prefix utility truncation keeps.
 - **No retention job, rely on a soft-delete flag** — rejected: a soft delete
   only hides a row from the default query scope; the personal data stays in the
   table and in backups. Indefinite retention was the original defect, and only a
