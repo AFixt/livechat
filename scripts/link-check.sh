@@ -36,8 +36,11 @@ prune_undecided_rows() {
   # status is addressed from the end of the row, never as field 2.
   local pruned
   pruned=$(mktemp)
-  # shellcheck disable=SC2064  # expand $pruned now: it is gone by the time the trap fires
-  trap "rm -f '$pruned'" RETURN
+  # Single-quoted so $pruned is expanded when the trap fires, not now: quoting
+  # a path from $TMPDIR into the trap body would break on an exotic one. The
+  # trap only has work to do if awk fails — on success the mv below has already
+  # consumed the file.
+  trap 'rm -f "$pruned"' RETURN
 
   awk -F, 'NF >= 3 && $(NF - 1) != ""' "$CACHE" >"$pruned"
 
@@ -45,7 +48,7 @@ prune_undecided_rows() {
   before=$(wc -l <"$CACHE" | tr -d ' ')
   after=$(wc -l <"$pruned" | tr -d ' ')
 
-  cp "$pruned" "$CACHE"
+  mv "$pruned" "$CACHE"
 
   if [ "$before" != "$after" ]; then
     echo "link-check: dropped $((before - after)) undecided (timeout/connection) row(s) from $CACHE"
