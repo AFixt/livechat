@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
+## [Unreleased]
+
+### Fixed
+
+- **The pre-push gate no longer fails on a Node newer than the pinned one.**
+  Node 22.4+ ships its own Web Storage globals, and its `localStorage` is inert
+  unless the process was started with `--localstorage-file`. Vitest's jsdom
+  environment leaves an already-present global alone, so on Node 26 that inert
+  one shadowed jsdom's and `window.localStorage` came out `undefined` —
+  `ui/src/store/auth.test.ts` died in `beforeEach` before a single assertion
+  ran. Because `.husky/pre-push` runs `check:all` → `test:ci` → `test:ui`, that
+  blocked **every** push regardless of what it changed, and `--no-verify` was
+  the only way through, which is precisely how a gate stops catching the
+  failures it exists for. The ui and widget test workers now start with
+  `--no-experimental-webstorage`, handing the name back to jsdom's working
+  implementation, so the suites keep real `Storage` semantics instead of a
+  hand-rolled stub. The flag is passed only when Node reports it as accepted
+  (`process.allowedNodeEnvironmentFlags`) rather than inferred from the presence
+  of the globals: an unrecognized option kills every worker with `Worker exited
+  unexpectedly`, naming neither the flag nor storage, so a runtime that predates
+  the option — or a future one that drops it in favour of `--webstorage` — is
+  left alone and fails in the named guard instead. Node 22 remains the supported
+  runtime. ([#153])
+
 ## [0.3.0] - 2026-08-22
 
 ### Security
@@ -975,3 +999,4 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
 [#38]: https://github.com/AFixt/livechat/pull/38
 [#39]: https://github.com/AFixt/livechat/pull/39
 [#40]: https://github.com/AFixt/livechat/pull/40
+[#153]: https://github.com/AFixt/livechat/issues/153
