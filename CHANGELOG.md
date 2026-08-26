@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
-## [Unreleased]
+## [0.3.1] - 2026-08-26
 
 ### Fixed
 
@@ -992,7 +992,9 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
   ships with Node 22, and effective on toolchain upgrade.
 - `body-parser` bumped to 2.3.0, clearing OSV `GHSA-v422-hmwv-36x6`.
 
-[Unreleased]: https://github.com/AFixt/livechat/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/AFixt/livechat/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/AFixt/livechat/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/AFixt/livechat/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AFixt/livechat/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/AFixt/livechat/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/AFixt/livechat/compare/v0.1.0...v0.1.1
