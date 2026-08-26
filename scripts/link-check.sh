@@ -27,8 +27,8 @@ set -euo pipefail
 
 CACHE=".lycheecache"
 
-# Prune first: an earlier interrupted run can leave a poisoned row behind, and
-# a stale one must not decide this run.
+# Drop the rows lychee could not decide — a timeout or a connection failure is
+# the case it writes with an empty status field.
 prune_undecided_rows() {
   [ -f "$CACHE" ] || return 0
 
@@ -36,30 +36,43 @@ prune_undecided_rows() {
   # status is addressed from the end of the row, never as field 2.
   local pruned
   pruned=$(mktemp)
+  # shellcheck disable=SC2064  # expand $pruned now: it is gone by the time the trap fires
+  trap "rm -f '$pruned'" RETURN
+
   awk -F, 'NF >= 3 && $(NF - 1) != ""' "$CACHE" >"$pruned"
 
   local before after
   before=$(wc -l <"$CACHE" | tr -d ' ')
   after=$(wc -l <"$pruned" | tr -d ' ')
 
-  mv "$pruned" "$CACHE"
+  cp "$pruned" "$CACHE"
 
   if [ "$before" != "$after" ]; then
     echo "link-check: dropped $((before - after)) undecided (timeout/connection) row(s) from $CACHE"
   fi
 }
 
+# Prune before the run, not only after it: the cache is shared with anyone who
+# invokes lychee directly, and with any cache written before this script existed
+# — which is exactly how the poisoned row that prompted #155 got there. A stale
+# undecided row must never decide this run.
 prune_undecided_rows
 
+# "$@" so `npm run links -- --verbose` still reaches lychee. lychee's own
+# output points at that flag ("Run lychee in verbose mode ... to see details
+# about the redirections"), and wrapping the command silently swallowed it.
 status=0
-lychee --no-progress '**/*.md' || status=$?
+lychee --no-progress '**/*.md' "$@" || status=$?
 
 # Prune again, so a timeout in THIS run cannot decide the next one.
 prune_undecided_rows
 
+# lychee answers 2 for a broken link AND for a usage error, and 1 for a missing
+# input file, so the exit code alone cannot say which happened. Report what is
+# actually known and let lychee's own output above name the cause.
 if [ "$status" -ne 0 ]; then
-  echo "link-check: lychee reported unreachable links (exit $status)." >&2
-  echo "link-check: timeouts are not cached, so re-running re-checks them live." >&2
+  echo "link-check: lychee exited $status — see its output above." >&2
+  echo "link-check: no timeout was cached, so re-running re-checks live." >&2
 fi
 
 exit "$status"
