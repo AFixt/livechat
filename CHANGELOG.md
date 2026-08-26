@@ -11,6 +11,24 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Fixed
 
+- **A slow link no longer blocks pushes for two days.** The `links` step of
+  `check:all` failed on a `web.archive.org` URL in `README.md` that was
+  healthy — the host answered in 9.8s, then timed out past 60s, then answered
+  in 29.8s, all inside a minute. Worse than the flake was what followed: lychee
+  writes a timeout into `.lycheecache` with an **empty** status field, and
+  `--cache-exclude-status` only accepts codes between 100 and 999, so a timeout
+  cannot be excluded from the cache by configuration at all. With
+  `max_cache_age = "2d"` every later run then failed instantly with
+  `Error (cached)` — reported as a hard error rather than the timeout it was —
+  until the row was deleted by hand. `npm run links` now runs through
+  `scripts/link-check.sh`, which drops undecided (status-less) rows from the
+  cache before and after each run, so a transient failure costs one extra
+  request instead of a blocked gate; 5xx responses are excluded natively via
+  `cache_exclude_status`, which lychee *can* express. `web.archive.org` joins
+  `output.jsbin.com` in the exclusion list, on the same reasoning: a snapshot is
+  immutable by design, so checking one buys no signal. Raising `timeout` was
+  measured and rejected — no value makes that host reliable. ([#155])
+
 - **The pre-push gate no longer fails on a Node newer than the pinned one.**
   Node 22.4+ ships its own Web Storage globals, and its `localStorage` is inert
   unless the process was started with `--localstorage-file`. Vitest's jsdom
@@ -1000,3 +1018,4 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
 [#39]: https://github.com/AFixt/livechat/pull/39
 [#40]: https://github.com/AFixt/livechat/pull/40
 [#153]: https://github.com/AFixt/livechat/issues/153
+[#155]: https://github.com/AFixt/livechat/issues/155
