@@ -77,7 +77,7 @@
     "markdownlint": "markdownlint-cli2 \"**/*.md\" \"#**/node_modules/**\"",
     "markdownlint:fix": "markdownlint-cli2 --fix \"**/*.md\" \"#**/node_modules/**\"",
     "dupes": "jscpd",
-    "links": "lychee --no-progress '**/*.md'",
+    "links": "bash scripts/link-check.sh",
     "test": "npm-run-all -s test:shared test:api test:ui test:widget",
     "test:shared": "npm --workspace shared run test",
     "test:api": "npm --workspace api run test",
