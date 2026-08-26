@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
+## [0.3.1] - 2026-08-26
+
+### Fixed
+
+- **A CI gate that could never fail, now can.** `usecases-specs-in-sync` ran
+  `git diff --quiet -- '**/e2e/generated/'`. Without `:(glob)` magic, git's `*`
+  does not cross `/`, so the pathspec matched no file and the check was
+  structurally incapable of failing; and `git diff` never reports untracked
+  files, so a freshly generated spec was invisible under any pathspec at all.
+  Replaced with `scripts/check-generated-specs.sh`, which runs
+  `git status --porcelain` over the literal output directories of the
+  `usecases:generate:*` scripts and so catches modified, untracked **and**
+  deleted specs. `shared/tests/generated-specs-gate.test.ts` runs the real
+  script in a throwaway git repo and asserts each kind of drift fails — and
+  that a clean tree passes, so the test cannot be satisfied by a script that
+  always exits 1. Three specs that `usecases:generate` had produced since
+  v0.3.0, and that the broken gate never noticed were untracked, are now
+  committed. ([#149])
+
+- **Deleting a merged branch no longer runs the full pre-push gate.** The
+  hook already skipped a tag-only push on the reasoning that it introduces
+  no new commits. A branch deletion introduces none either and sends no
+  content at all, but it did not match `refs/tags/*`, so it fell through to
+  the whole `check:all` sweep — 10–15 minutes to remove a ref. It surfaced
+  sweeping 45 merged branches after v0.3.0: the first deletion timed out at
+  ten minutes and the rest had to go through `gh api`. The alternative on
+  offer was `--no-verify`, which is the habit a pre-push hook exists to
+  prevent. Git sends `(delete)` as the local ref and an all-zero local sha;
+  both are matched, and the zero sha is recognised by pattern — any non-zero
+  character disqualifies it — rather than by comparison against a hardcoded
+  40 zeros, which would have stopped matching under SHA-256's 64-character
+  shas. The skip stays conservative — it fires only when *every* ref in the
+  push introduces no commits, so a real branch pushed alongside a tag or a
+  deletion still runs the gate, and unrecognised input still runs it.
+  `shared/tests/pre-push-hook.test.ts` pins eleven cases against the real
+  shipped hook. ([#148])
+
+- **`osv-scanner` and `.lighthouseci` are ignored.** Reproducing the CI security
+  step locally leaves a 57 MB `osv-scanner` binary in the repo root, and
+  `lhci autorun` leaves `.lighthouseci/`. Neither was tracked; both are now
+  ignored, so a stray `git add -A` cannot commit them. ([#150])
+
+- **A slow link no longer blocks pushes for two days.** The `links` step of
+  `check:all` failed on a `web.archive.org` URL in `README.md` that was
+  healthy — the host answered in 9.8s, then timed out past 60s, then answered
+  in 29.8s, all inside a minute. Worse than the flake was what followed: lychee
+  writes a timeout into `.lycheecache` with an **empty** status field, and
+  `--cache-exclude-status` only accepts codes between 100 and 999, so a timeout
+  cannot be excluded from the cache by configuration at all. With
+  `max_cache_age = "2d"` every later run then failed instantly with
+  `Error (cached)` — reported as a hard error rather than the timeout it was —
+  until the row was deleted by hand. `npm run links` now runs through
+  `scripts/link-check.sh`, which drops undecided (status-less) rows from the
+  cache before and after each run, so a transient failure costs one extra
+  request instead of a blocked gate; 5xx responses are excluded natively via
+  `cache_exclude_status`, which lychee *can* express. `web.archive.org` joins
+  `output.jsbin.com` in the exclusion list, on the same reasoning: a snapshot is
+  immutable by design, so checking one buys no signal. Raising `timeout` was
+  measured and rejected — no value makes that host reliable. ([#155])
+
+- **The pre-push gate no longer fails on a Node newer than the pinned one.**
+  Node 22.4+ ships its own Web Storage globals, and its `localStorage` is inert
+  unless the process was started with `--localstorage-file`. Vitest's jsdom
+  environment leaves an already-present global alone, so on Node 26 that inert
+  one shadowed jsdom's and `window.localStorage` came out `undefined` —
+  `ui/src/store/auth.test.ts` died in `beforeEach` before a single assertion
+  ran. Because `.husky/pre-push` runs `check:all` → `test:ci` → `test:ui`, that
+  blocked **every** push regardless of what it changed, and `--no-verify` was
+  the only way through, which is precisely how a gate stops catching the
+  failures it exists for. The ui and widget test workers now start with
+  `--no-experimental-webstorage`, handing the name back to jsdom's working
+  implementation, so the suites keep real `Storage` semantics instead of a
+  hand-rolled stub. The flag is passed only when Node reports it as accepted
+  (`process.allowedNodeEnvironmentFlags`) rather than inferred from the presence
+  of the globals: an unrecognized option kills every worker with `Worker exited
+  unexpectedly`, naming neither the flag nor storage, so a runtime that predates
+  the option — or a future one that drops it in favour of `--webstorage` — is
+  left alone and fails in the named guard instead. Node 22 remains the supported
+  runtime. ([#153])
+
 ## [0.3.0] - 2026-08-22
 
 ### Security
@@ -950,7 +1030,9 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
   ships with Node 22, and effective on toolchain upgrade.
 - `body-parser` bumped to 2.3.0, clearing OSV `GHSA-v422-hmwv-36x6`.
 
-[Unreleased]: https://github.com/AFixt/livechat/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/AFixt/livechat/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/AFixt/livechat/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/AFixt/livechat/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AFixt/livechat/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/AFixt/livechat/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/AFixt/livechat/compare/v0.1.0...v0.1.1
@@ -975,3 +1057,8 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
 [#38]: https://github.com/AFixt/livechat/pull/38
 [#39]: https://github.com/AFixt/livechat/pull/39
 [#40]: https://github.com/AFixt/livechat/pull/40
+[#153]: https://github.com/AFixt/livechat/issues/153
+[#149]: https://github.com/AFixt/livechat/issues/149
+[#150]: https://github.com/AFixt/livechat/issues/150
+[#148]: https://github.com/AFixt/livechat/pull/148
+[#155]: https://github.com/AFixt/livechat/issues/155

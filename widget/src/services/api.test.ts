@@ -3,9 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as ApiModule from './api.js';
 
 /**
- * Install an in-memory `window.localStorage`. This jsdom environment provides
- * none, which is also a real browser condition (storage blocked in private
- * mode), so the module must tolerate both — see the last test.
+ * Install an in-memory `window.localStorage`, so each test starts from an empty
+ * store no matter what the previous one wrote.
  * @returns A restore function.
  */
 function installStorage(): () => void {
@@ -28,6 +27,21 @@ function installStorage(): () => void {
     if (original === undefined)
       delete (window as unknown as { localStorage?: unknown }).localStorage;
     else Object.defineProperty(window, 'localStorage', original);
+  };
+}
+
+/**
+ * Take `window.localStorage` away entirely — private mode, blocked storage, or
+ * a host page that has partitioned it off. Removing it explicitly, rather than
+ * leaning on whatever the environment happens to provide, keeps the degraded
+ * path under test on every runtime (issue #153).
+ * @returns A restore function.
+ */
+function removeStorage(): () => void {
+  const original = Object.getOwnPropertyDescriptor(window, 'localStorage');
+  delete (window as unknown as { localStorage?: unknown }).localStorage;
+  return () => {
+    if (original !== undefined) Object.defineProperty(window, 'localStorage', original);
   };
 }
 
@@ -121,9 +135,10 @@ describe('visitor session token — third-party-cookie fallback (#75)', () => {
   });
 
   it('still works for the page load when storage is unavailable', async () => {
-    // Drop storage entirely — private mode, blocked storage, or a host page
-    // that has partitioned it away. The widget must degrade to memory, not throw.
-    cleanups.pop()?.();
+    // Drop storage entirely. The widget must degrade to memory, not throw.
+    cleanups.push(removeStorage());
+    expect(window.localStorage).toBeUndefined();
+
     const api = await freshApi();
     expect(() => {
       api.setSessionToken('memory.only');
