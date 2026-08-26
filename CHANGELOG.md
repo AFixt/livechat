@@ -11,6 +11,42 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
 ### Fixed
 
+- **A CI gate that could never fail, now can.** `usecases-specs-in-sync` ran
+  `git diff --quiet -- '**/e2e/generated/'`. Without `:(glob)` magic, git's `*`
+  does not cross `/`, so the pathspec matched no file and the check was
+  structurally incapable of failing; and `git diff` never reports untracked
+  files, so a freshly generated spec was invisible under any pathspec at all.
+  Replaced with `scripts/check-generated-specs.sh`, which runs
+  `git status --porcelain` over the literal output directories of the
+  `usecases:generate:*` scripts and so catches modified, untracked **and**
+  deleted specs. `shared/tests/generated-specs-gate.test.ts` runs the real
+  script in a throwaway git repo and asserts each kind of drift fails — and
+  that a clean tree passes, so the test cannot be satisfied by a script that
+  always exits 1. Three specs that `usecases:generate` had produced since
+  v0.3.0, and that the broken gate never noticed were untracked, are now
+  committed. ([#149])
+
+- **Deleting a merged branch no longer runs the full pre-push gate.** The hook
+  already skipped a tag-only push on the reasoning that it introduces no new
+  commits. A branch deletion introduces none either and sends no content at
+  all, but it did not match `refs/tags/*`, so it fell through to the whole
+  `check:all` sweep — 10–15 minutes to remove a ref. It surfaced sweeping 45
+  merged branches after v0.3.0: the first deletion timed out at ten minutes and
+  the rest had to go through `gh api`. The alternative on offer was
+  `--no-verify`, which is the habit a pre-push hook exists to prevent. Git
+  sends `(delete)` as the local ref and an all-zero local sha; both are
+  matched, and the zero check is by length rather than a hardcoded 40, since a
+  sha is 64 characters under SHA-256. The skip stays conservative — it fires
+  only when *every* ref in the push introduces no commits, so a real branch
+  pushed alongside a tag or a deletion still runs the gate, and unrecognised
+  input still runs it. `shared/tests/pre-push-hook.test.ts` pins eleven cases
+  against the real shipped hook. ([#148])
+
+- **`osv-scanner` and `.lighthouseci` are ignored.** Reproducing the CI security
+  step locally leaves a 57 MB `osv-scanner` binary in the repo root, and
+  `lhci autorun` leaves `.lighthouseci/`. Neither was tracked; both are now
+  ignored, so a stray `git add -A` cannot commit them. ([#150])
+
 - **A slow link no longer blocks pushes for two days.** The `links` step of
   `check:all` failed on a `web.archive.org` URL in `README.md` that was
   healthy — the host answered in 9.8s, then timed out past 60s, then answered
@@ -1020,4 +1056,7 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
 [#39]: https://github.com/AFixt/livechat/pull/39
 [#40]: https://github.com/AFixt/livechat/pull/40
 [#153]: https://github.com/AFixt/livechat/issues/153
+[#149]: https://github.com/AFixt/livechat/issues/149
+[#150]: https://github.com/AFixt/livechat/issues/150
+[#148]: https://github.com/AFixt/livechat/pull/148
 [#155]: https://github.com/AFixt/livechat/issues/155
