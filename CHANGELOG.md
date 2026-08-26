@@ -26,21 +26,23 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   v0.3.0, and that the broken gate never noticed were untracked, are now
   committed. ([#149])
 
-- **Deleting a merged branch no longer runs the full pre-push gate.** The hook
-  already skipped a tag-only push on the reasoning that it introduces no new
-  commits. A branch deletion introduces none either and sends no content at
-  all, but it did not match `refs/tags/*`, so it fell through to the whole
-  `check:all` sweep — 10–15 minutes to remove a ref. It surfaced sweeping 45
-  merged branches after v0.3.0: the first deletion timed out at ten minutes and
-  the rest had to go through `gh api`. The alternative on offer was
-  `--no-verify`, which is the habit a pre-push hook exists to prevent. Git
-  sends `(delete)` as the local ref and an all-zero local sha; both are
-  matched, and the zero check is by length rather than a hardcoded 40, since a
-  sha is 64 characters under SHA-256. The skip stays conservative — it fires
-  only when *every* ref in the push introduces no commits, so a real branch
-  pushed alongside a tag or a deletion still runs the gate, and unrecognised
-  input still runs it. `shared/tests/pre-push-hook.test.ts` pins eleven cases
-  against the real shipped hook. ([#148])
+- **Deleting a merged branch no longer runs the full pre-push gate.** The
+  hook already skipped a tag-only push on the reasoning that it introduces
+  no new commits. A branch deletion introduces none either and sends no
+  content at all, but it did not match `refs/tags/*`, so it fell through to
+  the whole `check:all` sweep — 10–15 minutes to remove a ref. It surfaced
+  sweeping 45 merged branches after v0.3.0: the first deletion timed out at
+  ten minutes and the rest had to go through `gh api`. The alternative on
+  offer was `--no-verify`, which is the habit a pre-push hook exists to
+  prevent. Git sends `(delete)` as the local ref and an all-zero local sha;
+  both are matched, and the zero sha is recognised by pattern — any non-zero
+  character disqualifies it — rather than by comparison against a hardcoded
+  40 zeros, which would have stopped matching under SHA-256's 64-character
+  shas. The skip stays conservative — it fires only when *every* ref in the
+  push introduces no commits, so a real branch pushed alongside a tag or a
+  deletion still runs the gate, and unrecognised input still runs it.
+  `shared/tests/pre-push-hook.test.ts` pins eleven cases against the real
+  shipped hook. ([#148])
 
 - **`osv-scanner` and `.lighthouseci` are ignored.** Reproducing the CI security
   step locally leaves a 57 MB `osv-scanner` binary in the repo root, and
