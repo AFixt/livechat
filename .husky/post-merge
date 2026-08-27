@@ -22,5 +22,7 @@ if echo "$changed" | grep -q "package-lock.json"; then
     echo "post-merge: if package-lock.json comes back modified, that is the fallback, not your change (#161)." >&2
     npm install
   fi
-  npm audit --production --audit-level=high || true
+  # --omit=dev, not the legacy --production alias, which npm warns about on
+  # every run: identical output here (both: found 0 vulnerabilities).
+  npm audit --omit=dev --audit-level=high || true
 fi

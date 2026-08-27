@@ -140,7 +140,12 @@ function fixture(options: { touchLockfile: boolean; ciExit?: number }): string {
  * @returns The npm invocations it made, plus combined output.
  */
 function runHook(root: string): { calls: string[]; output: string } {
-  const run = spawnSync('bash', [HOOK], {
+  // `sh`, not `bash`: husky's `.husky/_/h` opens with `#!/usr/bin/env sh` and
+  // the hook files carry no shebang, so `sh` is what production uses. Running
+  // it under bash here would let a bashism pass this suite and break the hook
+  // for everyone (`pre-push-hook.test.ts` runs its hook under `sh` for the
+  // same reason).
+  const run = spawnSync('sh', [HOOK], {
     cwd: root,
     encoding: 'utf8',
     env: { ...GIT_ENV, PATH: `${join(root, 'stub')}:${process.env['PATH'] ?? ''}` },
@@ -168,8 +173,11 @@ describe('post-merge install hook (#161)', () => {
     // leaves nothing. A rewritten lockfile beats an unusable checkout.
     const { calls, output } = runHook(fixture({ touchLockfile: true, ciExit: 1 }));
 
-    expect(calls).toContain('npm ci');
+    // Order matters: `install` AFTER a failed `ci` is a fallback; the other way
+    // round, or unconditionally, is just a slow double install.
+    expect(calls[0]).toBe('npm ci');
     expect(calls).toContain('npm install');
+    expect(calls.indexOf('npm install')).toBeGreaterThan(calls.indexOf('npm ci'));
     expect(output).toContain('falling back');
   });
 
@@ -183,6 +191,15 @@ describe('post-merge install hook (#161)', () => {
 
   it('still runs the audit after a successful install', () => {
     const { calls } = runHook(fixture({ touchLockfile: true }));
+
+    expect(calls.some((call) => call.startsWith('npm audit'))).toBe(true);
+  });
+
+  it('still runs the audit when the fallback fired', () => {
+    // The audit sits outside the install branch on purpose. A restructure that
+    // pulled it inside would silently stop auditing exactly the runs that had
+    // trouble installing.
+    const { calls } = runHook(fixture({ touchLockfile: true, ciExit: 1 }));
 
     expect(calls.some((call) => call.startsWith('npm audit'))).toBe(true);
   });
