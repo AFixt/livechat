@@ -14,8 +14,9 @@
  * minimum, which is the one direction that can break at runtime on any code
  * path we do not happen to exercise.
  *
- * So this walks the installed tree, compares every declared range against the
- * version actually resolvable from that package, and classifies what it finds:
+ * So this walks the installed tree, compares every declared `dependencies` and
+ * non-optional `peerDependencies` range against the version actually resolvable
+ * from that package, and classifies what it finds:
  *
  *   OLDER-THAN-REQUIRED  the resolved version is below the range's minimum.
  *                        Always a failure. A package cannot call an API that
@@ -72,6 +73,15 @@ const ACCEPTED_MAJOR_JUMPS: Record<string, string> = {
   'sequelize:uuid': 'forced 8.x -> 11.x for advisories; only uuid.v4() is used (#165)',
 };
 
+interface PackageManifest {
+  name?: string;
+  version?: string;
+  dependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+  /** An optional peer that is absent is not a violation — npm treats it as satisfied. */
+  peerDependenciesMeta?: Record<string, { optional?: boolean }>;
+}
+
 interface Violation {
   kind: 'OLDER-THAN-REQUIRED' | 'MAJOR-JUMP';
   parent: string;
@@ -86,15 +96,9 @@ interface Violation {
  * @param dir - Directory holding the manifest.
  * @returns The parsed manifest, or null.
  */
-function readPkg(
-  dir: string,
-): { name?: string; version?: string; dependencies?: Record<string, string> } | null {
+function readPkg(dir: string): PackageManifest | null {
   try {
-    return JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as {
-      name?: string;
-      version?: string;
-      dependencies?: Record<string, string>;
-    };
+    return JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as PackageManifest;
   } catch {
     return null;
   }
@@ -119,16 +123,28 @@ function resolveFrom(fromDir: string, name: string): { version?: string } | null
 }
 
 /**
+ * How deep a nested node_modules chain this walk will follow. The tree bottoms
+ * out at 2 today, measured; the cap is a runaway guard, not a budget. It is
+ * reported rather than silently applied — a detector that quietly stops looking
+ * is the failure this whole test exists to prevent.
+ */
+const MAX_NESTING = 12;
+
+/** Deepest nesting actually reached, so the cap can be asserted against it. */
+let deepestSeen = 0;
+
+/**
  * Yield every installed package under a node_modules directory.
  * @param nmDir - A node_modules directory.
- * @param depth - Current nesting depth, bounded to keep the walk cheap.
+ * @param depth - Current nesting depth.
  * @yields Directory and manifest for each package found.
  */
 function* walkInstalled(
   nmDir: string,
   depth = 0,
 ): Generator<[string, NonNullable<ReturnType<typeof readPkg>>]> {
-  if (depth > 6 || !existsSync(nmDir)) return;
+  if (depth > MAX_NESTING || !existsSync(nmDir)) return;
+  if (depth > deepestSeen) deepestSeen = depth;
   for (const entry of readdirSync(nmDir)) {
     if (entry === '.bin' || entry.startsWith('.')) continue;
     const full = join(nmDir, entry);
@@ -150,7 +166,16 @@ function findViolations(): Violation[] {
   const found = new Map<string, Violation>();
 
   for (const [dir, pkg] of walkInstalled(join(REPO_ROOT, 'node_modules'))) {
-    for (const [dep, range] of Object.entries(pkg.dependencies ?? {})) {
+    const declared = [
+      ...Object.entries(pkg.dependencies ?? {}),
+      // Peers break at runtime just as hard, and cost nothing to include: there
+      // are none violated today, so this is coverage against tomorrow.
+      ...Object.entries(pkg.peerDependencies ?? {}).filter(
+        ([dep]) => pkg.peerDependenciesMeta?.[dep]?.optional !== true,
+      ),
+    ];
+
+    for (const [dep, range] of declared) {
       if (!semver.validRange(range)) continue;
 
       const resolved = resolveFrom(dir, dep)?.version;
@@ -217,6 +242,15 @@ describe('dependency ranges under the root overrides (#165)', () => {
       `major-version overrides with no entry in ACCEPTED_MAJOR_JUMPS:\n${describeAll(unexplained)}\n` +
         'Add one with the reason it is safe, or change the override.',
     ).toStrictEqual([]);
+  });
+
+  it('walked the whole tree rather than stopping at the nesting cap', () => {
+    // Without this the cap could truncate the scan and every other case here
+    // would still pass, reporting a clean tree it never finished reading.
+    expect(
+      deepestSeen,
+      `the walk reached the ${String(MAX_NESTING)} level cap, so packages below it went unchecked — raise MAX_NESTING`,
+    ).toBeLessThan(MAX_NESTING);
   });
 
   it('has no stale entries in the accepted list', () => {
