@@ -93,41 +93,58 @@ function git(cwd: string, ...args: string[]): void {
  * @param options.ciExit - Exit status the stubbed `npm ci` returns.
  * @returns The fixture directory.
  */
-function fixture(options: { touchLockfile: boolean; ciExit?: number }): string {
-  const { touchLockfile, ciExit = 0 } = options;
+function fixture(options: { touchLockfile: boolean; ciExit?: number; realGit?: boolean }): string {
+  const { touchLockfile, ciExit = 0, realGit = false } = options;
 
   const root = mkdtempSync(join(tmpdir(), 'post-merge-'));
   scratchDirs.push(root);
-
-  git(root, 'init', '-q', '-b', 'main');
-  git(root, 'config', 'user.email', 'test@example.com');
-  git(root, 'config', 'user.name', 'test');
 
   mkdirSync(join(root, '.husky'), { recursive: true });
   copyFileSync(join(REPO_ROOT, HOOK), join(root, HOOK));
   writeFileSync(join(root, 'package-lock.json'), '{"lockfileVersion":3}\n');
   writeFileSync(join(root, 'README.md'), 'seed\n');
-  git(root, 'add', '-A');
-  git(root, 'commit', '-q', '-m', 'seed');
 
-  // A second commit, so HEAD@{1} resolves. Whether it touches the lockfile is
-  // what the hook branches on.
-  writeFileSync(join(root, touchLockfile ? 'package-lock.json' : 'README.md'), 'changed\n');
-  git(root, 'add', '-A');
-  git(root, 'commit', '-q', '-m', 'second');
-
-  // Stub npm: record every invocation, and let `ci` fail on demand.
   const stubDir = join(root, 'stub');
   mkdirSync(stubDir, { recursive: true });
+
+  // Stub npm: record every invocation, and let `ci` fail on demand.
   writeFileSync(
     join(stubDir, 'npm'),
     [
-      '#!/usr/bin/env bash',
+      '#!/usr/bin/env sh',
       `echo "npm $*" >> "${join(root, 'npm-calls.log')}"`,
       `if [ "$1" = "ci" ]; then exit ${String(ciExit)}; fi`,
       'exit 0',
       '',
     ].join('\n'),
+    { mode: 0o755 },
+  );
+
+  if (realGit) {
+    // One case exercises real git, proving `git diff HEAD@{1} HEAD --name-only`
+    // actually reports what the branching assumes. It costs five subprocesses,
+    // so it is deliberately the only one that pays for them — see the note on
+    // its timeout.
+    git(root, 'init', '-q', '-b', 'main');
+    git(root, 'config', 'user.email', 'test@example.com');
+    git(root, 'config', 'user.name', 'test');
+    git(root, 'add', '-A');
+    git(root, 'commit', '-q', '-m', 'seed');
+    writeFileSync(join(root, touchLockfile ? 'package-lock.json' : 'README.md'), 'changed\n');
+    git(root, 'add', '-A');
+    git(root, 'commit', '-q', '-m', 'second');
+    return root;
+  }
+
+  // Everything else stubs git too. What is under test is how the hook BRANCHES
+  // on the changed-file list, not git's ability to produce one — and building a
+  // throwaway repo per case cost five subprocesses each, enough to push this
+  // file and its neighbours past vitest's 5s default and make the gate flaky.
+  writeFileSync(
+    join(stubDir, 'git'),
+    ['#!/usr/bin/env sh', `echo "${touchLockfile ? 'package-lock.json' : 'README.md'}"`, ''].join(
+      '\n',
+    ),
     { mode: 0o755 },
   );
 
@@ -194,6 +211,17 @@ describe('post-merge install hook (#161)', () => {
 
     expect(calls.some((call) => call.startsWith('npm audit'))).toBe(true);
   });
+
+  it('reads the changed-file list from real git, not just a stub', () => {
+    // The other cases stub git so the suite stays fast; this one proves the
+    // command the hook actually runs — `git diff HEAD@{1} HEAD --name-only` —
+    // reports the lockfile after a commit that touched it. Five git
+    // subprocesses, so it gets a timeout that reflects that rather than
+    // riding on vitest's 5s default and flaking under load.
+    const { calls } = runHook(fixture({ touchLockfile: true, realGit: true }));
+
+    expect(calls).toContain('npm ci');
+  }, 20_000);
 
   it('still runs the audit when the fallback fired', () => {
     // The audit sits outside the install branch on purpose. A restructure that
