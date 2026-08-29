@@ -22,7 +22,7 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   `api/tests/availability-gate.test.ts` pins both arms against a child vitest
   run pointed at dead ports. ([#170], [#171])
 
-- **The socket integration tests no longer race wall-clock sleeps.** Sixteen
+- **The socket integration tests no longer race wall-clock sleeps.** Seventeen
   fixed 150–300 ms sleeps across `visitor-socket`, `chat-flow` and
   `staff-availability` are replaced with waits keyed to the state each
   assertion actually consults: room membership via the adapter
