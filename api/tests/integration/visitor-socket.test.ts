@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { Tenant, User } from '../../src/models/index.js';
 
-import { probeLiveHarness, type LiveTestHarness } from './setup.js';
+import { integrationDbUp, probeLiveHarness, type LiveTestHarness } from './setup.js';
 
 const STAFF_PASSWORD = 'Staff!Password1';
 
@@ -108,7 +108,7 @@ function waitFor<T>(socket: Socket, event: string, timeoutMs = 3000): Promise<T>
   });
 }
 
-describe('visitor namespace + visitor routes (integration)', () => {
+describe.skipIf(!integrationDbUp)('visitor namespace + visitor routes (integration)', () => {
   let harness: LiveTestHarness | null = null;
 
   beforeAll(async () => {

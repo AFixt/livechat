@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { resetSchemaFromMigrations } from '../../src/db/migrator.js';
 
-import { probeHarness } from './setup.js';
+import { integrationDbUp, probeHarness } from './setup.js';
 
 import type { Sequelize } from 'sequelize';
 
@@ -74,7 +74,7 @@ async function introspect(sequelize: Sequelize): Promise<Record<string, TableSha
   return out;
 }
 
-describe('schema parity: migrations vs models (integration)', () => {
+describe.skipIf(!integrationDbUp)('schema parity: migrations vs models (integration)', () => {
   beforeAll(async () => {
     harness = await probeHarness();
     if (harness === null) {

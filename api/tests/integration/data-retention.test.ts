@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { Chat, ChatMessage, Tenant, VisitorSession } from '../../src/models/index.js';
 import { createDataRetentionService } from '../../src/services/data-retention-service.js';
 
-import { probeHarness, type TestHarness } from './setup.js';
+import { integrationDbUp, probeHarness, type TestHarness } from './setup.js';
 
 const logger = pino({ level: 'silent' });
 
@@ -74,7 +74,7 @@ async function seedSession(
   return session.id;
 }
 
-describe('data retention service', () => {
+describe.skipIf(!integrationDbUp)('data retention service', () => {
   let harness: TestHarness | null = null;
 
   beforeAll(async () => {

@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { createSocketRedisAdapter } from '../../src/io/adapter.js';
 
-import { testEnv } from './setup.js';
+import { integrationDbUp, testEnv } from './setup.js';
 
 const NS = '/adapter-test';
 
@@ -114,7 +114,7 @@ async function connectAndJoin(url: string, room: string): Promise<Socket> {
   return socket;
 }
 
-describe('socket.io redis adapter (integration)', () => {
+describe.skipIf(!integrationDbUp)('socket.io redis adapter (integration)', () => {
   let a: Instance | null = null;
   let b: Instance | null = null;
 

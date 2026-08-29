@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { Tenant } from '../../src/models/index.js';
 
-import { probeHarness } from './setup.js';
+import { integrationDbUp, probeHarness } from './setup.js';
 
 type Harness = Awaited<ReturnType<typeof probeHarness>>;
 
@@ -32,7 +32,7 @@ async function bootstrapVisitor(
   return { cookie, csrfToken: res.body.data.csrfToken as string };
 }
 
-describe('CSRF protection on visitor write routes (#77)', () => {
+describe.skipIf(!integrationDbUp)('CSRF protection on visitor write routes (#77)', () => {
   let harness: Harness;
 
   beforeAll(async () => {

@@ -81,9 +81,85 @@ export interface LiveTestHarness extends TestHarness {
 }
 
 /**
- * Probe for a live MySQL + Redis matching {@link testEnv}. Returns `null` if
- * either is unreachable — integration tests use this to auto-skip.
- * @returns A harness if the stack is up, else `null`.
+ * True when running without the stack was explicitly requested. This is the
+ * only condition under which an unreachable MySQL/Redis is tolerated — and
+ * then the tests are reported as skipped, never passed.
+ * @returns Whether `INTEGRATION_DB_OPTIONAL=1` is set.
+ */
+function stackIsOptional(): boolean {
+  return process.env['INTEGRATION_DB_OPTIONAL'] === '1';
+}
+
+/**
+ * The operator-facing explanation for an unreachable stack.
+ * @param env - The env whose endpoints were probed.
+ * @param cause - The underlying connection error.
+ * @returns A message naming the endpoints, the fix, and the opt-out.
+ */
+function unreachableMessage(env: Env, cause: unknown): string {
+  return (
+    'Integration stack unreachable — ' +
+    `MySQL ${env.DB_HOST}:${String(env.DB_PORT)}/${env.DB_NAME}, ` +
+    `Redis ${env.REDIS_HOST}:${String(env.REDIS_PORT)}. ` +
+    'Start it with `docker compose up -d mysql redis`, or set ' +
+    'INTEGRATION_DB_OPTIONAL=1 to run without it (integration tests are then ' +
+    'reported as skipped — never as passed). ' +
+    `Cause: ${cause instanceof Error ? cause.message : String(cause)}`
+  );
+}
+
+/**
+ * Connect to MySQL + Redis exactly as {@link probeHarness} would, then
+ * disconnect. Used once at module load so the result is known at collection
+ * time, where `describe.skipIf` can consult it.
+ * @returns Whether both are reachable.
+ * @throws When unreachable and running without the stack was not requested —
+ * absent infrastructure must read as a failure, not a pass (#170).
+ */
+async function probeStack(): Promise<boolean> {
+  const env = testEnv();
+  const logger = pino({ level: 'silent' });
+  const sequelize = createSequelize(env, logger);
+  const redis = new Redis({
+    host: env.REDIS_HOST,
+    port: env.REDIS_PORT,
+    lazyConnect: true,
+    maxRetriesPerRequest: 0,
+    connectTimeout: 1000,
+  });
+  try {
+    await sequelize.authenticate();
+    await redis.connect();
+    return true;
+  } catch (error) {
+    if (!stackIsOptional()) throw new Error(unreachableMessage(env, error));
+    return false;
+  } finally {
+    await sequelize.close().catch(() => undefined);
+    await redis.quit().catch(() => undefined);
+  }
+}
+
+/**
+ * Whether the integration stack was reachable at module load. Every
+ * integration test file gates its top-level `describe` on this via
+ * `describe.skipIf(!integrationDbUp)`, so a missing stack shows up in the run
+ * summary as skipped tests. Before this existed, per-test `harness === null`
+ * early returns reported the same condition as *passed* — a green run that
+ * asserted nothing (#170). Resolved with top-level await so the value is
+ * final before collection; when the stack is down and
+ * `INTEGRATION_DB_OPTIONAL=1` was not set, module evaluation throws instead
+ * and the whole file fails loudly.
+ */
+export const integrationDbUp: boolean = await probeStack();
+
+/**
+ * Probe for a live MySQL + Redis matching {@link testEnv} and build an app
+ * harness against it.
+ * @returns A harness if the stack is up; `null` only when
+ * `INTEGRATION_DB_OPTIONAL=1` and the stack went away after module load.
+ * @throws When the stack is unreachable and running without it was not
+ * requested.
  */
 export async function probeHarness(): Promise<TestHarness | null> {
   const env = testEnv();
@@ -102,20 +178,10 @@ export async function probeHarness(): Promise<TestHarness | null> {
   } catch (error) {
     await sequelize.close().catch(() => undefined);
     await redis.quit().catch(() => undefined);
-    if (process.env['REQUIRE_DB'] === '1') {
-      // Every integration test returns early on a null harness, so absent
-      // infrastructure otherwise reads as a pass — a green run that asserted
-      // nothing. CI sets REQUIRE_DB=1 so that can never be mistaken for
-      // coverage; locally the null path still skips so `npm test` works
-      // without docker.
-      throw new Error(
-        'REQUIRE_DB=1 but the integration stack is unreachable — ' +
-          `MySQL ${env.DB_HOST}:${String(env.DB_PORT)}/${env.DB_NAME}, ` +
-          `Redis ${env.REDIS_HOST}:${String(env.REDIS_PORT)}. ` +
-          'Start it with `docker compose up -d mysql redis`. ' +
-          `Cause: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    // The module-load gate above already decided reachability; landing here
+    // means the stack died between collection and this file's beforeAll. Same
+    // rule applies: only an explicit opt-out may swallow it.
+    if (!stackIsOptional()) throw new Error(unreachableMessage(env, error));
     return null;
   }
 

@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { AuditLog, Invitation, Tenant, User, UserSession } from '../../src/models/index.js';
 
-import { probeHarness } from './setup.js';
+import { integrationDbUp, probeHarness } from './setup.js';
 
 import type { Role, UserStatus } from '@livechat/shared';
 import type { Express } from 'express';
@@ -74,7 +74,7 @@ async function loginAsSuperAdmin(app: Express, email: string): Promise<string> {
   return res.body.data.accessToken as string;
 }
 
-describe('auth lifecycle (integration)', () => {
+describe.skipIf(!integrationDbUp)('auth lifecycle (integration)', () => {
   let harness: Harness;
 
   beforeAll(async () => {

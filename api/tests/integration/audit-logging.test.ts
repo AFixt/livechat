@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { AuditLog, Tenant, User } from '../../src/models/index.js';
 
-import { probeHarness } from './setup.js';
+import { integrationDbUp, probeHarness } from './setup.js';
 
 import type { Role } from '@livechat/shared';
 
@@ -98,7 +98,7 @@ function auditPath(row: AuditLog): string {
   return typeof meta.path === 'string' ? meta.path : '';
 }
 
-describe('audit logging (integration)', () => {
+describe.skipIf(!integrationDbUp)('audit logging (integration)', () => {
   beforeAll(async () => {
     harness = await probeHarness();
     if (harness === null) {

@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { Tenant } from '../../src/models/index.js';
 
-import { probeLiveHarness, type LiveTestHarness } from './setup.js';
+import { integrationDbUp, probeLiveHarness, type LiveTestHarness } from './setup.js';
 
 /**
  * Resolve with the first `connect_error` for a handshake that must be refused,
@@ -30,7 +30,7 @@ function expectRefused(socket: Socket, timeoutMs = 4000): Promise<Error> {
   });
 }
 
-describe('socket.io authorization abuse (integration)', () => {
+describe.skipIf(!integrationDbUp)('socket.io authorization abuse (integration)', () => {
   let harness: LiveTestHarness | null = null;
 
   beforeAll(async () => {

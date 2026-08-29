@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { Tenant, VisitorSession } from '../../src/models/index.js';
 
-import { probeLiveHarness, type LiveTestHarness } from './setup.js';
+import { integrationDbUp, probeLiveHarness, type LiveTestHarness } from './setup.js';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -58,7 +58,7 @@ async function socketRefused(baseUrl: string, cookie: string): Promise<boolean> 
   });
 }
 
-describe('visitor session expiry + revocation (#79)', () => {
+describe.skipIf(!integrationDbUp)('visitor session expiry + revocation (#79)', () => {
   let harness: LiveTestHarness | null = null;
 
   beforeAll(async () => {

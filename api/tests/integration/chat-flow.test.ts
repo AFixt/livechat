@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { Chat, Tenant, User } from '../../src/models/index.js';
 
-import { probeLiveHarness, type LiveTestHarness } from './setup.js';
+import { integrationDbUp, probeLiveHarness, type LiveTestHarness } from './setup.js';
 
 async function seedTenantAndStaff(
   tenantSlug: string,
@@ -86,7 +86,7 @@ function waitFor<T>(socket: Socket, event: string, timeoutMs = 3000): Promise<T>
   });
 }
 
-describe('chat flow (integration)', () => {
+describe.skipIf(!integrationDbUp)('chat flow (integration)', () => {
   let harness: LiveTestHarness | null = null;
 
   beforeAll(async () => {
