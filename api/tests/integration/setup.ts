@@ -206,6 +206,38 @@ export async function probeHarness(): Promise<TestHarness | null> {
 }
 
 /**
+ * Poll a namespace's adapter until `room` holds at least `size` members.
+ *
+ * Socket tests used to sleep a fixed 150ms after emitting a join-inducing
+ * event and hope the server handler had finished — a wall-clock race that
+ * loses on a loaded runner (`chat:accept` awaits a MySQL update before its
+ * `socket.join`, observed >4s on CI). Room membership is the exact state
+ * every room broadcast depends on, so waiting for it directly keys the test
+ * to structure instead of timing (#171 review follow-up).
+ * @param nsp - The namespace whose adapter to watch, e.g. `io.of('/staff')`.
+ * @param room - The room name, e.g. `chat:{id}` or `tenant:{id}`.
+ * @param size - Minimum member count to wait for.
+ * @param timeoutMs - Give-up threshold.
+ */
+export async function waitForRoomSize(
+  nsp: { adapter: { rooms: Map<string, Set<string>> } },
+  room: string,
+  size: number,
+  timeoutMs = 5000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if ((nsp.adapter.rooms.get(room)?.size ?? 0) >= size) return;
+    if (Date.now() > deadline) {
+      throw new Error(
+        `room ${room} did not reach ${String(size)} member(s) within ${String(timeoutMs)}ms`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
+
+/**
  * Probe + bind a real HTTP server on an ephemeral port, with Socket.IO
  * attached. Used by socket integration tests.
  * @returns A live harness or `null` if the stack isn't up.
