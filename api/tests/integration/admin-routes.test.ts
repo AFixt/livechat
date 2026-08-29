@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { Tenant, User } from '../../src/models/index.js';
 
-import { probeHarness } from './setup.js';
+import { integrationDbUp, probeHarness } from './setup.js';
 
 import type { Role } from '@livechat/shared';
 
@@ -80,7 +80,7 @@ async function login(email: string, password: string): Promise<string> {
   return res.body.data.accessToken as string;
 }
 
-describe('admin routes (integration)', () => {
+describe.skipIf(!integrationDbUp)('admin routes (integration)', () => {
   beforeAll(async () => {
     harness = await probeHarness();
     if (harness === null) {

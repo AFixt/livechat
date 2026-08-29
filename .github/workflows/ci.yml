@@ -47,10 +47,9 @@ jobs:
         with:
           args: --no-progress '**/*.md'
 
-      # The integration tests return early on a null harness, so without a
-      # database they pass while asserting nothing — a green check that means
-      # nothing. Bring the real stack up and set REQUIRE_DB=1 below so an
-      # unreachable stack fails loudly instead of silently skipping.
+      # An unreachable integration stack fails the suite by default (#170) —
+      # REQUIRE_DB is gone; failing loudly no longer needs opting into. Bring
+      # the real stack up so the integration tests actually run.
       - name: Start integration infrastructure
         run: |
           set -euo pipefail
@@ -70,8 +69,6 @@ jobs:
           docker exec livechat-redis redis-cli ping
 
       - run: npm run check:all
-        env:
-          REQUIRE_DB: "1"
 
   usecases-diff-gate:
     runs-on: ubuntu-latest

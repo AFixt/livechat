@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { ChatMessage, Tenant, User } from '../../src/models/index.js';
 
-import { probeLiveHarness, type LiveTestHarness } from './setup.js';
+import { integrationDbUp, probeLiveHarness, type LiveTestHarness } from './setup.js';
 
 /**
  * Sort a copy of a body list. `delivered_at` is whole-second precision, so
@@ -143,7 +143,7 @@ async function visitorTranscriptBodies(baseUrl: string, cookie: string): Promise
   return (res.body.data.messages as { body: string }[]).map((m) => m.body);
 }
 
-describe('socket reconnect (integration, #69)', () => {
+describe.skipIf(!integrationDbUp)('socket reconnect (integration, #69)', () => {
   let harness: LiveTestHarness | null = null;
 
   beforeAll(async () => {

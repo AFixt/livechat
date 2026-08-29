@@ -4,7 +4,12 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { Tenant, User } from '../../src/models/index.js';
 
-import { probeLiveHarness, type LiveTestHarness } from './setup.js';
+import {
+  integrationDbUp,
+  probeLiveHarness,
+  waitForRoomSize,
+  type LiveTestHarness,
+} from './setup.js';
 
 const STAFF_PASSWORD = 'Staff!Password1';
 
@@ -108,7 +113,7 @@ function waitFor<T>(socket: Socket, event: string, timeoutMs = 3000): Promise<T>
   });
 }
 
-describe('visitor namespace + visitor routes (integration)', () => {
+describe.skipIf(!integrationDbUp)('visitor namespace + visitor routes (integration)', () => {
   let harness: LiveTestHarness | null = null;
 
   beforeAll(async () => {
@@ -166,7 +171,7 @@ describe('visitor namespace + visitor routes (integration)', () => {
 
   test('chat:typing fans out to the chat room and the staff namespace', async () => {
     if (harness === null) return;
-    const { baseUrl } = harness;
+    const { baseUrl, io } = harness;
     await seedTenantAndStaff('typing', 'staff@typing.example');
     const accessToken = await loginAs(baseUrl, 'staff@typing.example', STAFF_PASSWORD);
     const { cookie: visitorCookie, csrfToken } = await initVisitor(baseUrl, 'typing');
@@ -197,7 +202,11 @@ describe('visitor namespace + visitor routes (integration)', () => {
     // chat:message) is not also mirrored to the tenant room, so without this
     // the staff socket never sees it.
     staffSocket.emit('chat:accept', { chatId });
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    // The accept handler awaits a MySQL assignment before its socket.join, so
+    // wait on the membership itself — the state the fan-out depends on —
+    // rather than on wall-clock time.
+    await waitForRoomSize(io.of('/staff'), `chat:${chatId}`, 1);
+    await waitForRoomSize(io.of('/visitor'), `chat:${chatId}`, 1);
 
     const otherVisitorSocket: Socket = ioClient(`${baseUrl}/visitor`, {
       path: '/api/socket.io',
@@ -207,7 +216,7 @@ describe('visitor namespace + visitor routes (integration)', () => {
     });
     await waitFor(otherVisitorSocket, 'connect');
     otherVisitorSocket.emit('chat:join', { chatId });
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await waitForRoomSize(io.of('/visitor'), `chat:${chatId}`, 2);
 
     const staffSeesTyping = waitFor<{ chatId: string; actor: string; isTyping: boolean }>(
       staffSocket,
@@ -231,7 +240,7 @@ describe('visitor namespace + visitor routes (integration)', () => {
 
   test('visitor chat:end ends the chat as customer and notifies staff', async () => {
     if (harness === null) return;
-    const { baseUrl } = harness;
+    const { baseUrl, io } = harness;
     await seedTenantAndStaff('vend', 'staff@vend.example');
     const accessToken = await loginAs(baseUrl, 'staff@vend.example', STAFF_PASSWORD);
     const { cookie: visitorCookie, csrfToken } = await initVisitor(baseUrl, 'vend');
@@ -259,7 +268,10 @@ describe('visitor namespace + visitor routes (integration)', () => {
     await Promise.all([waitFor(staffSocket, 'connect'), waitFor(visitorSocket, 'connect')]);
     visitorSocket.emit('chat:join', { chatId });
     staffSocket.emit('chat:accept', { chatId });
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    // chat:ended is emitted to the staff-namespace `chat:{id}` room, so the
+    // membership itself is the precondition to wait for.
+    await waitForRoomSize(io.of('/staff'), `chat:${chatId}`, 1);
+    await waitForRoomSize(io.of('/visitor'), `chat:${chatId}`, 1);
 
     const staffSeesEnd = waitFor<{ chatId: string; endedBy: string }>(staffSocket, 'chat:ended');
     visitorSocket.emit('chat:end', { chatId });
@@ -273,8 +285,8 @@ describe('visitor namespace + visitor routes (integration)', () => {
 
   test('visitor:page_changed fans out to the tenant staff room', async () => {
     if (harness === null) return;
-    const { baseUrl } = harness;
-    await seedTenantAndStaff('pagechange', 'staff@pagechange.example');
+    const { baseUrl, io } = harness;
+    const { tenantId } = await seedTenantAndStaff('pagechange', 'staff@pagechange.example');
     const accessToken = await loginAs(baseUrl, 'staff@pagechange.example', STAFF_PASSWORD);
     const { cookie: visitorCookie, sessionId } = await initVisitor(baseUrl, 'pagechange');
 
@@ -285,7 +297,9 @@ describe('visitor namespace + visitor routes (integration)', () => {
       forceNew: true,
     });
     await waitFor(staffSocket, 'connect');
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    // The fan-out targets the staff-namespace tenant room, which the staff
+    // connection handler joins asynchronously after the handshake completes.
+    await waitForRoomSize(io.of('/staff'), `tenant:${tenantId}`, 1);
 
     const visitorSocket: Socket = ioClient(`${baseUrl}/visitor`, {
       path: '/api/socket.io',
@@ -310,8 +324,8 @@ describe('visitor namespace + visitor routes (integration)', () => {
 
   test('visitor disconnect removes presence and notifies staff visitor:left', async () => {
     if (harness === null) return;
-    const { baseUrl } = harness;
-    await seedTenantAndStaff('leaving', 'staff@leaving.example');
+    const { baseUrl, io } = harness;
+    const { tenantId } = await seedTenantAndStaff('leaving', 'staff@leaving.example');
     const accessToken = await loginAs(baseUrl, 'staff@leaving.example', STAFF_PASSWORD);
     const { cookie: visitorCookie, sessionId } = await initVisitor(baseUrl, 'leaving');
 
@@ -322,8 +336,14 @@ describe('visitor namespace + visitor routes (integration)', () => {
       forceNew: true,
     });
     await waitFor(staffSocket, 'connect');
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    // Staff must be in the tenant room before the visitor connects, or the
+    // visitor:joined / visitor:left broadcasts have no one to reach.
+    await waitForRoomSize(io.of('/staff'), `tenant:${tenantId}`, 1);
 
+    // Register the visitor:joined listener before the visitor connects — the
+    // broadcast fires during the visitor's connection handler, and receiving
+    // it proves the handler ran and tenant-room delivery works end to end.
+    const staffSeesJoined = waitFor(staffSocket, 'visitor:joined');
     const visitorSocket: Socket = ioClient(`${baseUrl}/visitor`, {
       path: '/api/socket.io',
       auth: { cookie: visitorCookie },
@@ -331,7 +351,7 @@ describe('visitor namespace + visitor routes (integration)', () => {
       forceNew: true,
     });
     await waitFor(visitorSocket, 'connect');
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await staffSeesJoined;
 
     const staffSeesLeft = waitFor<{ tenantId: string; visitorSessionId: string }>(
       staffSocket,

@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { ConsentRecord, Tenant, VisitorSession } from '../../src/models/index.js';
 
-import { probeHarness } from './setup.js';
+import { integrationDbUp, probeHarness } from './setup.js';
 
 type Harness = Awaited<ReturnType<typeof probeHarness>>;
 
@@ -34,7 +34,7 @@ async function sessionCount(tenantId: string): Promise<number> {
   return VisitorSession.count({ where: { tenantId } });
 }
 
-describe('visitor consent gate (integration)', () => {
+describe.skipIf(!integrationDbUp)('visitor consent gate (integration)', () => {
   beforeAll(async () => {
     harness = await probeHarness();
     if (harness === null) console.warn('[integration] MySQL or Redis not reachable — skipping');

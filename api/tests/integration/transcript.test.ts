@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { Tenant } from '../../src/models/index.js';
 
-import { probeHarness } from './setup.js';
+import { integrationDbUp, probeHarness } from './setup.js';
 
 import type { Express } from 'express';
 
@@ -43,7 +43,7 @@ interface VisitorCreds {
   csrfToken: string;
 }
 
-describe('email transcript (#80)', () => {
+describe.skipIf(!integrationDbUp)('email transcript (#80)', () => {
   let harness: Harness;
 
   beforeAll(async () => {

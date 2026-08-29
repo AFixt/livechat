@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { AuditLog, ConsentRecord, Tenant, VisitorSession } from '../../src/models/index.js';
 
-import { probeHarness } from './setup.js';
+import { integrationDbUp, probeHarness } from './setup.js';
 
 type Harness = Awaited<ReturnType<typeof probeHarness>>;
 
@@ -48,7 +48,7 @@ async function expectHonoredGpc(tenantId: string): Promise<void> {
   expect(applied).not.toBeNull();
 }
 
-describe('GPC universal opt-out (integration)', () => {
+describe.skipIf(!integrationDbUp)('GPC universal opt-out (integration)', () => {
   beforeAll(async () => {
     harness = await probeHarness();
     if (harness === null) console.warn('[integration] MySQL or Redis not reachable — skipping');
