@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
+## [0.4.1] - 2026-08-29
+
+### Fixed
+
+- **An unreachable integration stack now fails the API test suite instead of
+  passing it.** With MySQL/Redis down, every integration test hit its
+  `if (harness === null) return;` guard and reported ✓ passed in 0–1 ms —
+  400/400 green with zero integration coverage. `tests/integration/setup.ts`
+  now probes the stack once at module load and fails the file with operator
+  guidance when it is down; running without the stack takes an explicit
+  `INTEGRATION_DB_OPTIONAL=1`, under which every suite reports as *skipped*,
+  never passed. `REQUIRE_DB` is gone — failing loudly is no longer opt-in.
+  `api/tests/availability-gate.test.ts` pins both arms against a child vitest
+  run pointed at dead ports. ([#170], [#171])
+
+- **The socket integration tests no longer race wall-clock sleeps.** Sixteen
+  fixed 150–300 ms sleeps across `visitor-socket`, `chat-flow` and
+  `staff-availability` are replaced with waits keyed to the state each
+  assertion actually consults: room membership via the adapter
+  (`waitForRoomSize` / `waitForRoomSizeAtMost`), presence records
+  (`waitUntil`), and causal anchors for the "no leak" negatives. The
+  `chat:typing` fan-out flake observed on CI — the accept handler awaits a
+  MySQL assignment before its `socket.join`, so 150 ms was not always
+  enough — is fixed, and the conversion surfaced a real hazard the sleeps had
+  papered over: a staff socket's connect-time availability restore broadcasts
+  concurrently with any toggle fired right after connect, which can emit a
+  duplicate `support:availability_changed`. Affected tests now anchor on the
+  connect-time `availability:self` that follows the restore. ([#172], [#173])
+
 ## [0.4.0] - 2026-08-29
 
 ### Changed
@@ -1062,7 +1091,8 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
   ships with Node 22, and effective on toolchain upgrade.
 - `body-parser` bumped to 2.3.0, clearing OSV `GHSA-v422-hmwv-36x6`.
 
-[Unreleased]: https://github.com/AFixt/livechat/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/AFixt/livechat/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/AFixt/livechat/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/AFixt/livechat/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/AFixt/livechat/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/AFixt/livechat/compare/v0.2.0...v0.3.0
@@ -1101,3 +1131,7 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
 [#164]: https://github.com/AFixt/livechat/pull/164
 [#165]: https://github.com/AFixt/livechat/issues/165
 [#166]: https://github.com/AFixt/livechat/pull/166
+[#170]: https://github.com/AFixt/livechat/issues/170
+[#171]: https://github.com/AFixt/livechat/pull/171
+[#172]: https://github.com/AFixt/livechat/pull/172
+[#173]: https://github.com/AFixt/livechat/pull/173
