@@ -3,9 +3,16 @@ import { io as ioClient, type Socket } from 'socket.io-client';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
+import { GLOBAL_STAFF_ROOM } from '../../src/io/rooms.js';
 import { Chat, Tenant, User } from '../../src/models/index.js';
 
-import { integrationDbUp, probeLiveHarness, type LiveTestHarness } from './setup.js';
+import {
+  integrationDbUp,
+  probeLiveHarness,
+  waitForRoomSize,
+  waitUntil,
+  type LiveTestHarness,
+} from './setup.js';
 
 async function seedTenantAndStaff(
   tenantSlug: string,
@@ -171,8 +178,8 @@ describe.skipIf(!integrationDbUp)('chat flow (integration)', () => {
 
   test('tenant isolation: tenant A staff never receives tenant B messages', async () => {
     if (harness === null) return;
-    const { baseUrl } = harness;
-    await seedTenantAndStaff('alpha', 'a-staff@alpha.example');
+    const { baseUrl, io } = harness;
+    const { tenantId: alphaTenantId } = await seedTenantAndStaff('alpha', 'a-staff@alpha.example');
     await seedTenantAndStaff('beta', 'b-staff@beta.example');
 
     const staffAToken = await loginAs(baseUrl, 'a-staff@alpha.example', 'Staff!Password1');
@@ -199,15 +206,23 @@ describe.skipIf(!integrationDbUp)('chat flow (integration)', () => {
       forceNew: true,
     });
     await Promise.all([waitFor(staffA, 'connect'), waitFor(visitorB, 'connect')]);
+    // A fair negative needs staff A fully in its rooms first — otherwise the
+    // "no leak" assertion would pass trivially against a half-connected socket.
+    await waitForRoomSize(io.of('/staff'), `tenant:${alphaTenantId}`, 1);
     visitorB.emit('chat:join', { chatId: betaChatId });
+    await waitForRoomSize(io.of('/visitor'), `chat:${betaChatId}`, 1);
 
     let leakedToA = false;
     staffA.on('chat:message', () => {
       leakedToA = true;
     });
 
+    // Anchor the negative to the same broadcast: the room echo back to the
+    // sender is written by the very server emit that would have leaked, so
+    // once it arrives the fan-out for this message has been fully decided.
+    const echo = waitFor(visitorB, 'chat:message');
     visitorB.emit('chat:message', { chatId: betaChatId, body: 'beta message' });
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await echo;
     expect(leakedToA).toBe(false);
 
     staffA.disconnect();
@@ -216,8 +231,8 @@ describe.skipIf(!integrationDbUp)('chat flow (integration)', () => {
 
   test('availability drives no_support; current chat + support-initiated wiring', async () => {
     if (harness === null) return;
-    const { baseUrl, redis } = harness;
-    await seedTenantAndStaff('gamma', 'g-staff@gamma.example');
+    const { baseUrl, redis, io, services } = harness;
+    const { tenantId: gammaTenantId } = await seedTenantAndStaff('gamma', 'g-staff@gamma.example');
     const accessToken = await loginAs(baseUrl, 'g-staff@gamma.example', 'Staff!Password1');
     const { cookie: visitorCookie, sessionId, csrfToken } = await initVisitor(baseUrl, 'gamma');
 
@@ -249,8 +264,14 @@ describe.skipIf(!integrationDbUp)('chat flow (integration)', () => {
       forceNew: true,
     });
     await waitFor(staffSocket, 'connect');
+    await waitForRoomSize(io.of('/staff'), `tenant:${gammaTenantId}`, 1);
     staffSocket.emit('availability:set', { status: 'available' });
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // The POST below consults the presence record, so wait for that exact
+    // state rather than guessing how long the handler needs to write it.
+    await waitUntil(
+      async () => services.presence.anyStaffAvailable(gammaTenantId),
+      'gamma staff never became available',
+    );
     const onlineRes = await request(baseUrl)
       .post('/api/v1/visitor/chats')
       .set('cookie', `livechat_visitor=${visitorCookie}`)
@@ -277,11 +298,11 @@ describe.skipIf(!integrationDbUp)('chat flow (integration)', () => {
 
   test('untenanted staff watch all tenants; scoped staff stay isolated', async () => {
     if (harness === null) return;
-    const { baseUrl } = harness;
+    const { baseUrl, io } = harness;
     // A visitor in tenant "delta", an untenanted AFixt staff (tenant_id null),
     // and a staff scoped to an unrelated tenant "omega".
     await seedTenantAndStaff('delta', 'd-staff@delta.example');
-    await seedTenantAndStaff('omega', 'o-staff@omega.example');
+    const { tenantId: omegaTenantId } = await seedTenantAndStaff('omega', 'o-staff@omega.example');
     await User.create({
       email: 'global@afixt.example',
       passwordHash: 'Staff!Password1',
@@ -320,8 +341,11 @@ describe.skipIf(!integrationDbUp)('chat flow (integration)', () => {
       forceNew: true,
     });
     await Promise.all([waitFor(globalSocket, 'connect'), waitFor(omegaSocket, 'connect')]);
-    // Let the connection handlers finish joining their rooms.
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    // Wait on the rooms themselves rather than guessing how long the
+    // connection handlers need: the untenanted agent lands in the global
+    // room, the omega agent in its tenant room.
+    await waitForRoomSize(io.of('/staff'), GLOBAL_STAFF_ROOM, 1);
+    await waitForRoomSize(io.of('/staff'), `tenant:${omegaTenantId}`, 1);
 
     let leakedToOmega = false;
     omegaSocket.on('visitor:joined', () => {
@@ -341,7 +365,9 @@ describe.skipIf(!integrationDbUp)('chat flow (integration)', () => {
 
     const joined = await globalSeesVisitor;
     expect(joined.visitorSessionId).toBeTruthy();
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    // The would-be leak is written by the same server emit that just reached
+    // the global socket, so the fan-out for it has already been decided —
+    // there is nothing further to wait for.
     expect(leakedToOmega).toBe(false);
 
     globalSocket.disconnect();
@@ -389,7 +415,9 @@ describe.skipIf(!integrationDbUp)('chat flow (integration)', () => {
     staffA.emit('chat:message', { chatId: betaChatId, body: 'hijack attempt' });
     expect((await messageErr).event).toBe('chat:message');
 
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Both chat:error round-trips arrived on staffA's own connection, which
+    // is FIFO: any wrongful chat:assigned from those handlers would already
+    // have been delivered before the errors. No wait needed.
     expect(assigned).toBe(false);
     const chatAfter = await Chat.findByPk(betaChatId);
     expect(chatAfter?.assignedTo).toBeNull();

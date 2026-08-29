@@ -225,13 +225,56 @@ export async function waitForRoomSize(
   size: number,
   timeoutMs = 5000,
 ): Promise<void> {
+  await waitUntil(
+    () => (nsp.adapter.rooms.get(room)?.size ?? 0) >= size,
+    `room ${room} did not reach ${String(size)} member(s)`,
+    timeoutMs,
+  );
+}
+
+/**
+ * Poll a namespace's adapter until `room` holds at most `size` members. The
+ * shrink counterpart of {@link waitForRoomSize}: a client `disconnect()`
+ * resolves before the server has processed the departure, so a test that
+ * asserts on post-disconnect state waits for the membership to actually drop.
+ * @param nsp - The namespace whose adapter to watch.
+ * @param room - The room name.
+ * @param size - Maximum member count to wait for.
+ * @param timeoutMs - Give-up threshold.
+ */
+export async function waitForRoomSizeAtMost(
+  nsp: { adapter: { rooms: Map<string, Set<string>> } },
+  room: string,
+  size: number,
+  timeoutMs = 5000,
+): Promise<void> {
+  await waitUntil(
+    () => (nsp.adapter.rooms.get(room)?.size ?? 0) <= size,
+    `room ${room} did not drop to ${String(size)} member(s)`,
+    timeoutMs,
+  );
+}
+
+/**
+ * Poll an arbitrary condition until it holds. The general form behind the
+ * room waits, for states the adapter cannot see — e.g. a presence record the
+ * next HTTP request will consult. Prefer the specific helpers where they fit;
+ * a condition passed here should still be *structural* (the state an
+ * assertion depends on), never a disguised sleep.
+ * @param condition - Returns true (or a promise of true) once the state holds.
+ * @param label - Failure description, phrased as what never happened.
+ * @param timeoutMs - Give-up threshold.
+ */
+export async function waitUntil(
+  condition: () => Promise<boolean> | boolean,
+  label: string,
+  timeoutMs = 5000,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    if ((nsp.adapter.rooms.get(room)?.size ?? 0) >= size) return;
+    if (await condition()) return;
     if (Date.now() > deadline) {
-      throw new Error(
-        `room ${room} did not reach ${String(size)} member(s) within ${String(timeoutMs)}ms`,
-      );
+      throw new Error(`${label} within ${String(timeoutMs)}ms`);
     }
     await new Promise((resolve) => setTimeout(resolve, 25));
   }

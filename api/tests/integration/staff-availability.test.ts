@@ -4,7 +4,14 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { Tenant, User } from '../../src/models/index.js';
 
-import { integrationDbUp, probeLiveHarness, type LiveTestHarness } from './setup.js';
+import {
+  integrationDbUp,
+  probeLiveHarness,
+  waitForRoomSize,
+  waitForRoomSizeAtMost,
+  waitUntil,
+  type LiveTestHarness,
+} from './setup.js';
 
 const STAFF_PASSWORD = 'Staff!Password1';
 
@@ -155,8 +162,6 @@ function waitFor<T>(socket: Socket, event: string, timeoutMs = 3000): Promise<T>
   });
 }
 
-const settle = (ms = 150): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
 describe.skipIf(!integrationDbUp)('staff availability (integration)', () => {
   let harness: LiveTestHarness | null = null;
 
@@ -190,13 +195,18 @@ describe.skipIf(!integrationDbUp)('staff availability (integration)', () => {
 
   test('availability is per-user, not per-socket: a second tab closing does not drop it', async () => {
     if (harness === null) return;
-    const { baseUrl, services } = harness;
+    const { baseUrl, io, services } = harness;
     const { tenantId } = await seedTenantAndStaff('avail-multitab', 'multitab@avail.example');
     const token = await loginAs(baseUrl, 'multitab@avail.example');
 
+    // Consume each tab's connect-time availability:self restore ('away') —
+    // it is the last thing the connection handler emits, so receiving it
+    // proves setup finished AND keeps the toggle listener below from
+    // catching a restore instead of the toggle.
     const tabA = await connectStaff(baseUrl, token);
+    await waitFor(tabA, 'availability:self');
     const tabB = await connectStaff(baseUrl, token);
-    await settle();
+    await waitFor(tabB, 'availability:self');
 
     // Setting available in one tab is echoed to the other (same user room).
     const bSeesSelf = waitFor<{ status: string }>(tabB, 'availability:self');
@@ -206,7 +216,7 @@ describe.skipIf(!integrationDbUp)('staff availability (integration)', () => {
 
     // Closing one tab must not flip the agent away while the other is open.
     tabB.disconnect();
-    await settle();
+    await waitForRoomSizeAtMost(io.of('/staff'), `tenant:${tenantId}`, 1);
     expect(await services.presence.anyStaffAvailable(tenantId)).toBe(true);
 
     tabA.disconnect();
@@ -214,7 +224,7 @@ describe.skipIf(!integrationDbUp)('staff availability (integration)', () => {
 
   test('explicit away status persists across a reconnect (survives reload)', async () => {
     if (harness === null) return;
-    const { baseUrl, services } = harness;
+    const { baseUrl, io, services } = harness;
     const { tenantId } = await seedTenantAndStaff('avail-persist', 'persist@avail.example');
     const token = await loginAs(baseUrl, 'persist@avail.example');
 
@@ -223,7 +233,7 @@ describe.skipIf(!integrationDbUp)('staff availability (integration)', () => {
     await waitFor(first, 'availability:self');
     expect(await services.presence.anyStaffAvailable(tenantId)).toBe(true);
     first.disconnect();
-    await settle();
+    await waitForRoomSizeAtMost(io.of('/staff'), `tenant:${tenantId}`, 0);
 
     // Reconnect restores the persisted 'available' status, not a default.
     const second = await connectStaff(baseUrl, token);
@@ -259,8 +269,8 @@ describe.skipIf(!integrationDbUp)('staff availability (integration)', () => {
 
   test('availability change bridges to the visitor room via support:availability_changed', async () => {
     if (harness === null) return;
-    const { baseUrl } = harness;
-    await seedTenantAndStaff('avail-bridge', 'bridge@avail.example');
+    const { baseUrl, io } = harness;
+    const { tenantId } = await seedTenantAndStaff('avail-bridge', 'bridge@avail.example');
     const token = await loginAs(baseUrl, 'bridge@avail.example');
 
     // A visitor session joins the tenant's visitor room on connect.
@@ -280,9 +290,15 @@ describe.skipIf(!integrationDbUp)('staff availability (integration)', () => {
       forceNew: true,
     });
     await waitFor(visitorSocket, 'connect');
-    await settle();
+    // support:availability_changed targets the visitor-namespace tenant room,
+    // so membership there is the state to wait for.
+    await waitForRoomSize(io.of('/visitor'), `tenant:${tenantId}`, 1);
 
     const staffSocket = await connectStaff(baseUrl, token);
+    // Wait out the connect-time restore: it broadcasts
+    // support:availability_changed unconditionally and would race the toggle
+    // broadcast below. availability:self is emitted after that completes.
+    await waitFor(staffSocket, 'availability:self');
     const visitorSeesAvailable = waitFor<{ available: boolean }>(
       visitorSocket,
       'support:availability_changed',
@@ -318,19 +334,29 @@ describe.skipIf(!integrationDbUp)('staff availability (integration)', () => {
 
   test('an untenanted global agent toggling availability live-pushes to a served tenant visitor', async () => {
     if (harness === null) return;
-    const { baseUrl } = harness;
+    const { baseUrl, io, services } = harness;
     // A tenant with a connected visitor but NO tenant-scoped agent of its own —
     // only the untenanted global agent (issue #19) can serve it.
-    await seedTenantAndStaff('avail-global', 'ignored@avail.example');
+    const { tenantId } = await seedTenantAndStaff('avail-global', 'ignored@avail.example');
     await seedGlobalStaff('global@avail.example');
     const token = await loginAs(baseUrl, 'global@avail.example');
 
     const visitorSocket = await connectVisitor(baseUrl, 'avail-global');
-    await settle();
+    await waitForRoomSize(io.of('/visitor'), `tenant:${tenantId}`, 1);
+    // The visitor's presence record is written by a detached task on connect,
+    // and the global broadcast's tenant fan-out reads exactly that record —
+    // room membership alone does not prove it landed.
+    await waitUntil(
+      async () => (await services.presence.tenantsWithVisitors()).includes(tenantId),
+      'visitor presence never registered',
+    );
 
     // The global agent connects; nothing should flip yet (they default away).
+    // Its connect-time restore runs broadcastGlobalStaffAvailability, whose
+    // after-snapshot would see the toggle below and emit a duplicate — the
+    // availability:self that follows it is the completion signal to wait for.
     const staffSocket = await connectStaff(baseUrl, token);
-    await settle();
+    await waitFor(staffSocket, 'availability:self');
 
     // Going available must live-push the §5.1.2 transition to the already-
     // connected visitor even though the agent belongs to no tenant.
