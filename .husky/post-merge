@@ -1,6 +1,28 @@
+# Bring node_modules in line after a merge or checkout that moved the lockfile.
+#
+# `npm ci` rather than `npm install`, because install RE-RESOLVES and rewrites
+# package-lock.json — and this repo's zod overrides give npm two defensible
+# resolutions for chromium-bidi's zod, so it alternates between them (#161).
+# The result was a tree that went dirty on every branch switch, for a file
+# nobody edited, with `git commit -am` standing ready to sweep it into an
+# unrelated commit. `npm ci` installs exactly what is committed and never
+# writes to the lockfile.
+#
+# The fallback is not decoration. `npm ci` DELETES node_modules before it
+# installs, so a failure part-way — an expired registry token, a network blip —
+# leaves no working install at all. That is how this hook's own environment got
+# destroyed while #161 was being investigated. `npm install` can repair from a
+# partial state, so it is what we reach for when ci fails: the lockfile may get
+# rewritten, but a rewritten lockfile beats an unusable checkout.
 changed=$(git diff HEAD@{1} HEAD --name-only)
 if echo "$changed" | grep -q "package-lock.json"; then
   echo "Lockfile changed; installing and auditing..."
-  npm install
-  npm audit --production --audit-level=high || true
+  if ! npm ci; then
+    echo "post-merge: 'npm ci' failed — falling back to 'npm install' to leave you a working tree." >&2
+    echo "post-merge: if package-lock.json comes back modified, that is the fallback, not your change (#161)." >&2
+    npm install
+  fi
+  # --omit=dev, not the legacy --production alias, which npm warns about on
+  # every run: identical output here (both: found 0 vulnerabilities).
+  npm audit --omit=dev --audit-level=high || true
 fi
