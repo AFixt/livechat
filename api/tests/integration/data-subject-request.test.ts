@@ -11,7 +11,7 @@ import {
 } from '../../src/models/index.js';
 import { createServices } from '../../src/services/index.js';
 
-import { probeHarness } from './setup.js';
+import { integrationDbUp, probeHarness } from './setup.js';
 
 import type { Env } from '../../src/config/env.js';
 import type { Express } from 'express';
@@ -24,7 +24,7 @@ interface Subject {
   chatId: string;
 }
 
-describe('data-subject access and erasure (#121)', () => {
+describe.skipIf(!integrationDbUp)('data-subject access and erasure (#121)', () => {
   let harness: Harness;
   let app: Express;
   /** An app configured to hard-delete rather than anonymize. */

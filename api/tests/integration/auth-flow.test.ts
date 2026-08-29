@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { Invitation, Tenant, User } from '../../src/models/index.js';
 
-import { probeHarness } from './setup.js';
+import { integrationDbUp, probeHarness } from './setup.js';
 
 type Harness = Awaited<ReturnType<typeof probeHarness>>;
 
@@ -47,7 +47,7 @@ async function seedTenantAndAdmin(): Promise<{
   return { tenantId: tenant.id, adminEmail, adminPassword };
 }
 
-describe('auth flow (integration)', () => {
+describe.skipIf(!integrationDbUp)('auth flow (integration)', () => {
   let harness: Harness;
 
   beforeAll(async () => {

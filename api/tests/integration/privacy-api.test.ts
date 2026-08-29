@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { AuditLog, ConsentRecord, Tenant } from '../../src/models/index.js';
 
-import { probeHarness } from './setup.js';
+import { integrationDbUp, probeHarness } from './setup.js';
 
 type Harness = Awaited<ReturnType<typeof probeHarness>>;
 
@@ -36,7 +36,7 @@ function cookiesOf(res: request.Response): string[] {
   return raw ?? [];
 }
 
-describe('privacy API (integration)', () => {
+describe.skipIf(!integrationDbUp)('privacy API (integration)', () => {
   beforeAll(async () => {
     harness = await probeHarness();
     if (harness === null) console.warn('[integration] MySQL or Redis not reachable — skipping');

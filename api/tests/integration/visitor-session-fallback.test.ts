@@ -3,13 +3,13 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { Tenant } from '../../src/models/index.js';
 
-import { probeHarness } from './setup.js';
+import { integrationDbUp, probeHarness } from './setup.js';
 
 type Harness = Awaited<ReturnType<typeof probeHarness>>;
 
 const TENANT_SLUG = 'fallback-t';
 
-describe('visitor session header fallback (#75)', () => {
+describe.skipIf(!integrationDbUp)('visitor session header fallback (#75)', () => {
   let harness: Harness;
 
   beforeAll(async () => {

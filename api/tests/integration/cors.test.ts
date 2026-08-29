@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { clearOriginCache } from '../../src/middlewares/cors.js';
 import { Tenant } from '../../src/models/index.js';
 
-import { probeHarness } from './setup.js';
+import { integrationDbUp, probeHarness } from './setup.js';
 
 type Harness = Awaited<ReturnType<typeof probeHarness>>;
 
@@ -30,7 +30,7 @@ async function seedTenant(slug: string, allowedOrigins: string[] | null): Promis
   return tenant.id;
 }
 
-describe('per-tenant CORS (#74)', () => {
+describe.skipIf(!integrationDbUp)('per-tenant CORS (#74)', () => {
   let harness: Harness;
 
   beforeAll(async () => {

@@ -4,9 +4,9 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { Tenant } from '../../src/models/index.js';
 
-import { probeHarness, type TestHarness } from './setup.js';
+import { integrationDbUp, probeHarness, type TestHarness } from './setup.js';
 
-describe('embed hardening (integration)', () => {
+describe.skipIf(!integrationDbUp)('embed hardening (integration)', () => {
   let harness: TestHarness | null = null;
   let tenantId = '';
 

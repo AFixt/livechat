@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { Chat, ChatMessage, Tenant, User, VisitorSession } from '../../src/models/index.js';
 
-import { probeHarness } from './setup.js';
+import { integrationDbUp, probeHarness } from './setup.js';
 
 import type { ChatStatus } from '@livechat/shared';
 import type { Express } from 'express';
@@ -200,7 +200,7 @@ async function seedMessage(chatId: string, body: string, deliveredAt: Date): Pro
   });
 }
 
-describe('chat routes (integration)', () => {
+describe.skipIf(!integrationDbUp)('chat routes (integration)', () => {
   let harness: Harness;
 
   beforeAll(async () => {

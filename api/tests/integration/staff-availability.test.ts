@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { Tenant, User } from '../../src/models/index.js';
 
-import { probeLiveHarness, type LiveTestHarness } from './setup.js';
+import { integrationDbUp, probeLiveHarness, type LiveTestHarness } from './setup.js';
 
 const STAFF_PASSWORD = 'Staff!Password1';
 
@@ -157,7 +157,7 @@ function waitFor<T>(socket: Socket, event: string, timeoutMs = 3000): Promise<T>
 
 const settle = (ms = 150): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-describe('staff availability (integration)', () => {
+describe.skipIf(!integrationDbUp)('staff availability (integration)', () => {
   let harness: LiveTestHarness | null = null;
 
   beforeAll(async () => {
