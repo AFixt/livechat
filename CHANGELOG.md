@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
+## [0.4.0] - 2026-08-29
+
+### Changed
+
+- **`@afixt/usecase-runner` upgraded to 2.0.1**, dropping the scoped
+  `zod: 3.25.76` override that 1.3.2 forced on its subtree. That override was
+  the cause of npm holding two defensible resolutions for `chromium-bidi`'s
+  zod and alternating between them on every install — the lockfile is now
+  byte-identical across repeated installs. All 39 use cases validate under
+  2.x's stricter parser, and the generated Playwright specs were regenerated.
+  ([#163], [#164]; also closes the cause of [#161])
+
+### Fixed
+
+- **`usecase-runner` no longer runs below its declared zod minimum.** The root
+  override pinned `zod@4.3.6` while `@afixt/usecase-runner@2.0.1` declares
+  `^4.4.3` — and `npm ls | grep invalid` structurally cannot see this, because
+  npm reports an overridden edge as satisfied-by-fiat, never `invalid`. zod is
+  now 4.4.3 in the root override and the `shared`/`api`/`ui` pins, and
+  `shared/tests/dependency-ranges.test.ts` guards the whole class: it walks the
+  installed tree with real semver comparisons, fails anything resolved below
+  its declared minimum, and requires a written entry for any major-boundary
+  override. The two `chromium-bidi` copies forced from zod 3 to 4 are accepted
+  there in writing — scoping the override for them was measured and made
+  things worse. ([#165], [#166])
+
+- **The post-merge hook installs with `npm ci`**, which installs exactly what
+  the lockfile says and never rewrites it. `npm install` re-resolved on every
+  lockfile-moving merge or checkout, dirtying the working tree with a change
+  nobody made — it fired twice during the v0.3.1 release, including on the
+  checkout of `main` immediately before tagging. ([#161], [#162])
+
 ## [0.3.1] - 2026-08-26
 
 ### Fixed
@@ -1030,7 +1062,8 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
   ships with Node 22, and effective on toolchain upgrade.
 - `body-parser` bumped to 2.3.0, clearing OSV `GHSA-v422-hmwv-36x6`.
 
-[Unreleased]: https://github.com/AFixt/livechat/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/AFixt/livechat/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/AFixt/livechat/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/AFixt/livechat/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/AFixt/livechat/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AFixt/livechat/compare/v0.1.2...v0.2.0
@@ -1062,3 +1095,9 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
 [#150]: https://github.com/AFixt/livechat/issues/150
 [#148]: https://github.com/AFixt/livechat/pull/148
 [#155]: https://github.com/AFixt/livechat/issues/155
+[#161]: https://github.com/AFixt/livechat/issues/161
+[#162]: https://github.com/AFixt/livechat/pull/162
+[#163]: https://github.com/AFixt/livechat/issues/163
+[#164]: https://github.com/AFixt/livechat/pull/164
+[#165]: https://github.com/AFixt/livechat/issues/165
+[#166]: https://github.com/AFixt/livechat/pull/166
