@@ -20,12 +20,3 @@ export interface WidgetMessage {
   senderKind: 'visitor' | 'user' | 'system';
   deliveredAt: string;
 }
-
-/**
- * Public tenant configuration surfaced to the widget (colors, icon, hours).
- */
-export interface WidgetTenantConfig {
-  primaryColor?: string;
-  supportHoursText?: string;
-  supportPhone?: string;
-}

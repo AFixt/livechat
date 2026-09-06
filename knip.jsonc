@@ -1,0 +1,63 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+
+  // Everything below is a real entry point that no static analysis can reach,
+  // verified individually. Without these, Knip reported 26 "unused files" —
+  // including the entire migration history.
+  "workspaces": {
+    ".": {
+      // Fixtures for `semgrep --test --config .semgrep/rules.yml .semgrep/tests/`.
+      // They are test *data* for the security rules, not code that ever runs —
+      // the file deliberately contains vulnerable-looking snippets importing
+      // cors, jsonwebtoken and socket.io. Treating it as an entry would put
+      // those illustrative imports into the dependency graph and demand they
+      // be declared, so it is ignored outright instead.
+      "ignore": [".semgrep/tests/**"],
+    },
+
+    "api": {
+      "entry": [
+        // sequelize-cli loads these by path from .sequelizerc, never by import:
+        // `migrations-path` -> src/db/migrations, `config` -> src/db/config.cjs.
+        // Deleting them on Knip's word would destroy the schema history.
+        "src/db/config.cjs",
+        "src/db/migrations/*.cjs",
+        // Operational scripts, each documented and none imported:
+        //   generate-openapi          - docs/security/api-testing.md
+        //   purge-expired-visitor-data - ADR-0020, docs/privacy/data-retention.md
+        //   seed-first-tenant          - a real job in .do/app.yaml:122
+        "src/scripts/*.ts",
+      ],
+      // Two dependencies nothing imports, both loaded by name at runtime:
+      //
+      //   pino-pretty  named as a string, `target: 'pino-pretty'`, in the pino
+      //                transport config (src/config/logger.ts:31).
+      //   mysql2       Sequelize require()s the driver for the configured
+      //                dialect from inside its own connection manager, so
+      //                there is no import anywhere in this repo to find.
+      //                Removing it is not a static-analysis error you notice
+      //                later: every integration test dies at construction with
+      //                "Please install mysql2 package manually".
+      "ignoreDependencies": ["pino-pretty", "mysql2"],
+    },
+
+    "e2e": {
+      // auth.setup.ts is matched by Playwright's `testMatch: /auth\.setup\.ts/`
+      // project, and support/seed.ts is run as `tsx e2e/support/seed.ts` from
+      // e2e/setup-and-serve-api.sh, which Playwright starts as a webServer.
+      "entry": ["auth.setup.ts", "support/seed.ts", "**/*.spec.ts"],
+    },
+
+    "ui": {
+      // Same Playwright setup-project pattern as e2e.
+      "entry": ["e2e/auth.setup.ts", "e2e/**/*.spec.ts"],
+    },
+  },
+
+  // Four tools installed on the system or supplied by the CI runner rather
+  // than through npm: the Lighthouse CI and Artillery load-test drivers, and
+  // the osv-scanner / trufflehog security scanners. Knip sees the scripts and
+  // shared/tests/secret-scan.suspected.test.ts invoke them and reads that as a
+  // missing dependency.
+  "ignoreBinaries": ["lhci", "artillery", "osv-scanner", "trufflehog"],
+}

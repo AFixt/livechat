@@ -13,5 +13,3 @@ export function ResetPasswordPage(): React.JSX.Element {
     </Typography>
   );
 }
-
-export default ResetPasswordPage;

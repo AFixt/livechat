@@ -26,7 +26,7 @@ export const CONSENT_EVENT = 'afixt-livechat:consent';
  *   referrer, language, user-agent; live presence in the console). Denied by
  *   default and gated when consent is required.
  */
-export interface ConsentState {
+interface ConsentState {
   /** Whether functional (chat-operation) processing is permitted. */
   functional: boolean;
   /** Whether analytics/presence capture is permitted. */
@@ -34,10 +34,10 @@ export interface ConsentState {
 }
 
 /** A partial consent decision passed by the host CMP. */
-export type ConsentDecision = Partial<ConsentState>;
+type ConsentDecision = Partial<ConsentState>;
 
 /** Subscriber invoked with a fresh snapshot on every consent change. */
-export type ConsentListener = (state: ConsentState) => void;
+type ConsentListener = (state: ConsentState) => void;
 
 /** The consent store contract. */
 export interface ConsentStore {

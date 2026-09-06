@@ -23,7 +23,7 @@ export const API_URL = `http://localhost:${String(PORTS.api)}`;
 export const MAILHOG_API = 'http://localhost:28026';
 
 /** Shared infra the dev docker-compose exposes on non-default ports. */
-export const DB = {
+const DB = {
   host: 'localhost',
   port: 23307,
   name: 'livechat_e2e',
@@ -32,7 +32,7 @@ export const DB = {
   rootPass: 'livechat_root_pass',
 } as const;
 
-export const REDIS = { host: 'localhost', port: 26380 } as const;
+const REDIS = { host: 'localhost', port: 26380 } as const;
 
 /**
  * Environment for the api server the e2e stack runs. NODE_ENV=test makes

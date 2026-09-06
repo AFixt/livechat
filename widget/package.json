@@ -23,7 +23,6 @@
     "socket.io-client": "4.8.3"
   },
   "devDependencies": {
-    "@livechat/shared": "*",
     "@playwright/test": "1.59.1",
     "@preact/preset-vite": "2.10.5",
     "@size-limit/preset-small-lib": "12.1.0",

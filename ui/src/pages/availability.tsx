@@ -55,5 +55,3 @@ export function AvailabilityPage(): React.JSX.Element {
     </Stack>
   );
 }
-
-export default AvailabilityPage;

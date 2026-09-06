@@ -7,5 +7,3 @@ import Typography from '@mui/material/Typography';
 export function ForgotPasswordPage(): React.JSX.Element {
   return <Typography component="p">Forgot-password form not yet implemented.</Typography>;
 }
-
-export default ForgotPasswordPage;
