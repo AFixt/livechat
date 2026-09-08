@@ -55,11 +55,11 @@ Husky runs on pre-push.
 
 ### `@afixt/*` packages and `NPM_TOKEN`
 
-This repo installs private `@afixt/*` scoped packages (`usecase-runner`,
-`a11y-assert`). In CI, npm authenticates via an **organization-level** GitHub
-Actions secret named `NPM_TOKEN` — `actions/setup-node` writes a runner-local
-`.npmrc` from it, which is why no auth token is committed to this repo's
-`.npmrc` (local installs keep using your own credentials).
+This repo installs private `@afixt/*` scoped packages (`usecase-runner`). In CI,
+npm authenticates via an **organization-level** GitHub Actions secret named
+`NPM_TOKEN` — `actions/setup-node` writes a runner-local `.npmrc` from it, which
+is why no auth token is committed to this repo's `.npmrc` (local installs keep
+using your own credentials).
 
 If installing an `@afixt/*` package returns **404, that is an authentication
 problem, not a missing package**. The usual cause is a stale **repo-level**

@@ -110,6 +110,8 @@ Per issue #1 — the full stack is the mandate, not a suggestion:
 - Stylelint + `stylelint-config-standard` + `@double-great/stylelint-a11y`
 - `markdownlint-cli2`
 - `jscpd` (dup detection, `--threshold 1 --min-tokens 50`)
+- [Knip](https://knip.dev) (unused files, exports and dependencies; kept at
+  zero, exceptions with reasons in `knip.jsonc`)
 - `lychee` (Markdown link check)
 - `license-checker-rseidelsohn` (allowlist-only licenses)
 - `size-limit` (build gate)
@@ -240,7 +242,8 @@ See `AFixt/usecase-runner/spec.md` for DSL reference and
 Once scaffolded, root-level scripts mirror the house pattern:
 
 - `npm run dev` — run api, ui, widget in parallel (concurrently)
-- `npm run check` — `lint` + `typecheck` + `stylelint` + `markdownlint`
+- `npm run check` — `lint` + `typecheck` + `knip` + `stylelint` +
+  `markdownlint` + `usecases:validate`
 - `npm run check:all` — `check` + `test` + `build` + `size` + `dupes` +
   `links` + `security` + `license:check` (pre-push gate)
 - `npm test` — Vitest across workspaces
