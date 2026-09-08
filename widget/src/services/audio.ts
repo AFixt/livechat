@@ -18,7 +18,7 @@ function readCookie(name: string): string | undefined {
  * the mute preference survives page navigation within the session).
  * @returns Whether the sound is muted.
  */
-export function isMuted(): boolean {
+function isMuted(): boolean {
   return readCookie(COOKIE_NAME) === '1';
 }
 

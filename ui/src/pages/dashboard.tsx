@@ -331,5 +331,3 @@ function ChatPane(props: ChatPaneProps): React.JSX.Element {
     </Paper>
   );
 }
-
-export default DashboardPage;

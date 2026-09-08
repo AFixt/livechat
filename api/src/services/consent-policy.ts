@@ -21,7 +21,7 @@ export const RULE_VERSION = '2026-08-15.1';
  * - `opt_in` — suppressed until the visitor explicitly grants it (GDPR/EU style).
  * - `opt_out` — permitted by default until the visitor (or GPC) opts out (US style).
  */
-export type PurposeMode = 'always' | 'opt_in' | 'opt_out';
+type PurposeMode = 'always' | 'opt_in' | 'opt_out';
 
 /**
  * The jurisdiction rules table — the single, data-driven source of policy.
@@ -36,7 +36,7 @@ export type PurposeMode = 'always' | 'opt_in' | 'opt_out';
  *
  * GPC is honored as a universal opt-out in every jurisdiction (see {@link decide}).
  */
-export const RULES: Record<Jurisdiction, Record<ConsentPurpose, PurposeMode>> = {
+const RULES: Record<Jurisdiction, Record<ConsentPurpose, PurposeMode>> = {
   EU: { functional: 'always', presence: 'opt_in', analytics: 'opt_in' },
   UK: { functional: 'always', presence: 'opt_in', analytics: 'opt_in' },
   US_CA: { functional: 'always', presence: 'opt_out', analytics: 'opt_out' },

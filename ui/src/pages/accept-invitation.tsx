@@ -15,5 +15,3 @@ export function AcceptInvitationPage(): React.JSX.Element {
     </Typography>
   );
 }
-
-export default AcceptInvitationPage;

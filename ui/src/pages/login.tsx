@@ -117,5 +117,3 @@ export function LoginPage(): React.JSX.Element {
     </Container>
   );
 }
-
-export default LoginPage;

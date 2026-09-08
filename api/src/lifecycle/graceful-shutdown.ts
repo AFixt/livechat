@@ -5,7 +5,7 @@ import type { Sequelize } from 'sequelize';
 import type { Server as IoServer } from 'socket.io';
 
 /** How long to wait for a clean shutdown before forcing the process down. */
-export const SHUTDOWN_TIMEOUT_MS = 10_000;
+const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 /**
  * Collaborators the shutdown sequence has to wind down.

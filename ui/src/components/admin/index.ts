@@ -6,5 +6,4 @@ export { PageHeader } from './page-header.js';
 export { SelectField, toTenantOptions, toValueOptions } from './select-field.js';
 export { useDialogForm } from './use-dialog-form.js';
 
-export type { AdminTableColumn, AdminTableQuery } from './admin-table.js';
-export type { SelectOption } from './select-field.js';
+export type { AdminTableColumn } from './admin-table.js';
