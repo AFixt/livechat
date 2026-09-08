@@ -45,12 +45,14 @@
       // auth.setup.ts is matched by Playwright's `testMatch: /auth\.setup\.ts/`
       // project, and support/seed.ts is run as `tsx e2e/support/seed.ts` from
       // e2e/setup-and-serve-api.sh, which Playwright starts as a webServer.
-      "entry": ["auth.setup.ts", "support/seed.ts", "**/*.spec.ts"],
+      // The *.spec.ts files need no entry: Knip's Playwright plugin reads them
+      // from playwright.config.ts.
+      "entry": ["auth.setup.ts", "support/seed.ts"],
     },
 
     "ui": {
       // Same Playwright setup-project pattern as e2e.
-      "entry": ["e2e/auth.setup.ts", "e2e/**/*.spec.ts"],
+      "entry": ["e2e/auth.setup.ts"],
     },
   },
 
