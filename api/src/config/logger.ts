@@ -27,9 +27,12 @@ export function createLogger(
         'refreshToken',
         'accessToken',
         // PII backstop (#184): email addresses are never logged. Call sites
-        // log an id instead; these catch one that forgets. `err.rejected`,
-        // `err.rejectedErrors` and `err.response` are where nodemailer puts
-        // the refused recipients and the SMTP reply that quotes them.
+        // log an id instead; these catch the common ways one forgets.
+        // `err.rejected`, `err.rejectedErrors` and `err.response` are where
+        // nodemailer puts the refused recipients and the SMTP reply that
+        // quotes them. The backstop is shallow — `*.email` is one level deep
+        // and `err.message` is never redacted — so the call site must still
+        // narrow what it logs.
         'to',
         'email',
         '*.email',
