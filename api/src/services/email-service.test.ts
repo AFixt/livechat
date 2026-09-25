@@ -1,7 +1,7 @@
 import { createServer, type AddressInfo, type Server } from 'node:net';
 
-import nodemailer from 'nodemailer';
-import { afterEach, describe, expect, it } from 'vitest';
+import nodemailer, { type Transporter } from 'nodemailer';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createLogger } from '../config/logger.js';
 
@@ -24,8 +24,13 @@ const ADDRESS = /[\w.+-]+@[\w-]+\.[\w.-]+/;
 async function startRejectingSmtpServer(): Promise<Server> {
   const server = createServer((socket) => {
     socket.write('220 test ESMTP\r\n');
+    // Carry a partial line over to the next chunk: TCP does not promise that
+    // one SMTP command arrives in one `data` event.
+    let pending = '';
     socket.on('data', (chunk: Buffer) => {
-      for (const line of chunk.toString('utf8').split('\r\n').filter(Boolean)) {
+      const lines = (pending + chunk.toString('utf8')).split('\r\n');
+      pending = lines.pop() ?? '';
+      for (const line of lines.filter(Boolean)) {
         const rcpt = /^RCPT TO:<([^>]*)>/i.exec(line);
         if (rcpt !== null) {
           socket.write(`550 5.1.1 <${rcpt[1] ?? ''}>: Recipient address rejected\r\n`);
@@ -85,6 +90,7 @@ const user = { id: 'user-1', email: RECIPIENT } as User;
 let server: Server | undefined;
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   if (server === undefined) return;
   const closing = server;
   server = undefined;
@@ -152,6 +158,32 @@ describe('email-service send failures (#184)', () => {
       'chat:chat-1',
       'user:user-1',
     ]);
+  });
+});
+
+describe('email-service unexpected send failures (#184)', () => {
+  it.each([
+    ['a non-object rejection', `could not send to ${RECIPIENT}`],
+    [
+      'an error with mistyped code fields',
+      Object.assign(new Error(`rejected ${RECIPIENT}`), { code: 550, responseCode: '550' }),
+    ],
+  ])('%s is logged as null codes, with no address anywhere', async (_label, rejection) => {
+    vi.spyOn(nodemailer, 'createTransport').mockReturnValue({
+      sendMail: vi.fn().mockRejectedValue(rejection),
+    } as unknown as Transporter);
+    const lines: string[] = [];
+    const email = serviceOn(25, lines);
+
+    await email.sendVerificationEmail(user, 'verify-token');
+
+    expect(lines).toHaveLength(1);
+    const output = lines.join('');
+    expect(output).not.toMatch(ADDRESS);
+    expect(JSON.parse(output)).toMatchObject({
+      ref: 'user:user-1',
+      err: { code: null, responseCode: null },
+    });
   });
 });
 
