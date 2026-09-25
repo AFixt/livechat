@@ -46,11 +46,7 @@ describe('invitation-service', () => {
           invitedBy: 'inviter-1',
         }),
       );
-      expect(email.sendInvitationEmail).toHaveBeenCalledExactlyOnceWith(
-        'new@example.com',
-        'New Person',
-        expect.any(String),
-      );
+      expect(email.sendInvitationEmail).toHaveBeenCalledExactlyOnceWith(created);
     });
 
     it('creates an untenanted invitation without checking the tenant', async () => {
@@ -70,11 +66,7 @@ describe('invitation-service', () => {
 
       expect(result).toBe(created);
       expect(findByPk).not.toHaveBeenCalled();
-      expect(email.sendInvitationEmail).toHaveBeenCalledExactlyOnceWith(
-        'global@example.com',
-        null,
-        expect.any(String),
-      );
+      expect(email.sendInvitationEmail).toHaveBeenCalledExactlyOnceWith(created);
     });
 
     it('throws 400 when the given tenantId does not exist', async () => {

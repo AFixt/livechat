@@ -40,7 +40,7 @@ export function createInvitationService(deps: InvitationDeps) {
         invitedBy,
         expiresAt: new Date(Date.now() + input.expiresInDays * DAY_MS),
       });
-      await deps.email.sendInvitationEmail(input.email, input.name ?? null, token);
+      await deps.email.sendInvitationEmail(invitation);
       return invitation;
     },
 

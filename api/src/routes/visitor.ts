@@ -365,6 +365,7 @@ export function buildVisitorRouter(deps: VisitorRouterDeps): Router {
       const messages = await deps.chat.listMessages(chat.id);
       await deps.email.sendTranscriptEmail(
         email,
+        chat.id,
         messages.map((m) => ({
           senderKind: m.senderKind,
           body: m.body,

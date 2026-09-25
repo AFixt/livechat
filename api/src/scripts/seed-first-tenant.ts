@@ -80,7 +80,7 @@ async function main(): Promise<void> {
         preferences: null,
       },
     });
-    logger.info({ userId: admin.id, email: admin.email }, 'super_admin ensured');
+    logger.info({ userId: admin.id }, 'super_admin ensured');
     logger.info('seed complete — disable this job by setting instance_count: 0');
   } catch (err) {
     logger.fatal({ err }, 'seed failed');
