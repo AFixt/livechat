@@ -25,7 +25,8 @@ set -euo pipefail
 #     lack of a fix as the entry above. The only archive extracted on that path
 #     is the Chrome build @puppeteer/browsers downloads for estimo, not
 #     attacker-supplied input. @puppeteer/browsers 3.x drops extract-zip, but
-#     find-chrome-bin pins 2.10.10 exactly. Tracked in #51; same review date.
+#     find-chrome-bin and estimo's puppeteer-core both pin 2.10.10 exactly.
+#     Tracked in #51; same review date.
 #   GHSA-vfj7-8cjw-p6xm  braces <=3.0.3 stack exhaustion from deeply nested brace
 #     patterns. No fixed version exists (3.0.3 is the latest release). Dev-only:
 #     reached through micromatch/fast-glob in lint-staged, stylelint and

@@ -152,7 +152,8 @@ exceptions:
       (2.0.1 is latest). Dev-only: transitive via @puppeteer/browsers in the
       Lighthouse/estimo perf tooling, never in the production runtime; the only
       archive it extracts is Google's Chrome download. @puppeteer/browsers 3.x
-      drops extract-zip, but find-chrome-bin pins 2.10.10 exactly.
+      drops extract-zip, but find-chrome-bin and estimo's puppeteer-core both
+      pin 2.10.10 exactly.
     added: 2026-08-15
     # Aligned with osv-scanner.toml `ignoreUntil = 2026-11-13`.
     expires: 2026-11-13

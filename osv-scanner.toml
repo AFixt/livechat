@@ -21,7 +21,8 @@ ignoreUntil = 2026-11-13
 # package, flaw class (CWE-22), path and lack of a fix as GHSA-jmr9 above. The
 # only archive extracted on that path is the Chrome build @puppeteer/browsers
 # downloads for estimo — not attacker-supplied input. @puppeteer/browsers 3.x
-# drops extract-zip, but find-chrome-bin pins 2.10.10 exactly. Tracked in #51.
+# drops extract-zip, but find-chrome-bin and estimo's puppeteer-core both pin
+# 2.10.10 exactly. Tracked in #51.
 reason = "No fixed version published (2.0.1 is latest); dev-only via @puppeteer/browsers perf tooling extracting Google's Chrome download, not in production runtime. Tracked in #51."
 
 [[IgnoredVulns]]
