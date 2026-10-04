@@ -36,6 +36,17 @@ cd "$ROOT"
 
 TIER="${1:-verified}"
 
+# Scan the repository's COMMON git dir rather than the working tree at "$ROOT".
+# In a linked worktree, "$ROOT/.git" is a pointer file. trufflehog's
+# "file://$ROOT" form then fails with "failed to read index file: ... not a
+# directory", so the gate could not run from a worktree at all. The common
+# dir is a plain git directory holding every object and ref, so it is scanned
+# with --bare. In a normal checkout the common dir IS "$ROOT/.git": the same
+# repository, objects and refs as before, and both forms scan the same
+# chunks (measured when this was introduced). We stay in "$ROOT" so
+# --exclude-paths still resolves.
+REPO="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir)"
+
 if ! command -v trufflehog >/dev/null 2>&1; then
   echo "skip: trufflehog not installed — secret scan ($TIER) not run locally." >&2
   echo "      install: run scripts/bootstrap.sh (brew, else the official installer)." >&2
@@ -55,7 +66,7 @@ fi
 case "$TIER" in
   verified)
     echo "secret-scan[verified]: blocking gate — fails on confirmed-live secrets"
-    exec trufflehog git "file://$ROOT" \
+    exec trufflehog git "file://$REPO" --bare \
       --results=verified --fail --no-update ${EXCLUDE[@]+"${EXCLUDE[@]}"}
     ;;
   suspected)
@@ -63,7 +74,7 @@ case "$TIER" in
     # No --fail: this tier never blocks. Human-reviewed; new true positives are
     # promoted to a fix, new false positives are recorded (see the exception
     # lifecycle in docs/adr/0012-*.md).
-    exec trufflehog git "file://$ROOT" \
+    exec trufflehog git "file://$REPO" --bare \
       --results=unverified,unknown --no-update ${EXCLUDE[@]+"${EXCLUDE[@]}"}
     ;;
   *)

@@ -81,6 +81,7 @@ const scratchDirs: string[] = [];
 function runTierAgainst(
   files: Record<string, string>,
   tier: string,
+  { fromWorktree = false }: { fromWorktree?: boolean } = {},
 ): { output: string; status: number | null } {
   const dir = mkdtempSync(join(tmpdir(), 'secret-scan-'));
   scratchDirs.push(dir);
@@ -118,10 +119,21 @@ function runTierAgainst(
   git(['add', '-A']);
   git(['commit', '-q', '-m', 'fixture']);
 
+  // A linked worktree's `.git` is a pointer file, not a directory. Running the
+  // script from one is how the pre-push gate runs in a worktree, which is the
+  // shape the script once could not scan at all.
+  let root = dir;
+  if (fromWorktree) {
+    root = mkdtempSync(join(tmpdir(), 'secret-scan-wt-'));
+    scratchDirs.push(root);
+    rmSync(root, { recursive: true, force: true });
+    git(['worktree', 'add', '-q', '-b', 'wt', root]);
+  }
+
   // Same reasoning as `gitEnv` above: the script shells out to git/trufflehog,
   // so it must not inherit the outer repository's git environment either.
-  const run = spawnSync('bash', [join(dir, 'scripts', 'secret-scan.sh'), tier], {
-    cwd: dir,
+  const run = spawnSync('bash', [join(root, 'scripts', 'secret-scan.sh'), tier], {
+    cwd: root,
     encoding: 'utf8',
     env: gitEnv,
   });
@@ -165,5 +177,33 @@ describe.skipIf(skip)('secret-scan.sh suspected tier', () => {
     expect(output).not.toMatch(/Found (unverified|unknown) result/i);
     expect(output).not.toContain('Detector Type:');
     expect(output).toMatch(/"unverified_secrets": *0/);
+  }, 60_000);
+});
+
+describe.skipIf(skip)('secret-scan.sh run from a linked git worktree', () => {
+  it('scans the repository and surfaces a planted fake secret (suspected tier)', () => {
+    const accessKey = fakeAwsAccessKeyId();
+    const { output, status } = runTierAgainst(
+      {
+        'config.txt': `aws_access_key_id = ${accessKey}\naws_secret_access_key = ${fakeAwsSecret()}\n`,
+      },
+      'suspected',
+      { fromWorktree: true },
+    );
+    expect(output).not.toContain('error running scan');
+    expect(status).toBe(0);
+    expect(output).toContain(accessKey);
+    expect(output).toMatch(/"unverified_secrets": *1/);
+  }, 60_000);
+
+  it('runs the blocking verified tier to completion on clean input (exit 0)', () => {
+    const { output, status } = runTierAgainst(
+      { 'readme.txt': 'just some ordinary prose with no credentials in it\n' },
+      'verified',
+      { fromWorktree: true },
+    );
+    expect(output).not.toContain('error running scan');
+    expect(output).toMatch(/finished scanning/);
+    expect(status).toBe(0);
   }, 60_000);
 });
