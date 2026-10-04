@@ -71,6 +71,13 @@ const ACCEPTED_MAJOR_JUMPS: Record<string, string> = {
   // advisories against the 8.x line. Sequelize uses uuid only to generate v4
   // ids, an API stable across all three majors.
   'sequelize:uuid': 'forced 8.x -> 11.x for advisories; only uuid.v4() is used (#165)',
+  // get-uri (dev: puppeteer -> proxy-agent -> pac-proxy-agent) declares
+  // basic-ftp ^5, and every 5.x is affected by GHSA-c475-qrg2-pj4r; the only
+  // fix is 6.2.1, and even get-uri 8.x still declares ^5. basic-ftp 6.0.0's one
+  // breaking change refuses separate transfer hosts by default (FTP bounce
+  // protection). get-uri calls only access, lastMod, list and downloadTo,
+  // which are unchanged.
+  'get-uri:basic-ftp': 'forced 5.x -> 6.x for GHSA-c475-qrg2-pj4r; API used is unchanged (#186)',
 };
 
 interface PackageManifest {
