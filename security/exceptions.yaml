@@ -143,16 +143,40 @@ exceptions:
     source: scripts/npm-audit.sh (ALLOW) + osv-scanner.toml (IgnoredVulns)
     rules:
       - GHSA-jmr9-qjv8-65gv
+      - GHSA-7pqw-9j4j-h8q3
     owner: "@AFixt/security"
     reason: >-
-      extract-zip 2.0.1 unvalidated symlink path traversal. No fixed version
-      exists (2.0.1 is latest). Dev-only: transitive via @puppeteer/browsers in
-      the Lighthouse/estimo perf tooling, never in the production runtime.
+      extract-zip 2.0.1 unvalidated symlink path traversal (GHSA-jmr9) and
+      arbitrary file write through symlink archive entries (GHSA-7pqw, added
+      2026-10-04 — same package, flaw class and path). No fixed version exists
+      (2.0.1 is latest). Dev-only: transitive via @puppeteer/browsers in the
+      Lighthouse/estimo perf tooling, never in the production runtime; the only
+      archive it extracts is Google's Chrome download. @puppeteer/browsers 3.x
+      drops extract-zip, but find-chrome-bin pins 2.10.10 exactly.
     added: 2026-08-15
     # Aligned with osv-scanner.toml `ignoreUntil = 2026-11-13`.
     expires: 2026-11-13
     status: active
     issue: 51
+
+  - id: dep-braces-nested-pattern-dos
+    tool: npm-audit, osv-scanner
+    source: scripts/npm-audit.sh (ALLOW) + osv-scanner.toml (IgnoredVulns)
+    rules:
+      - GHSA-vfj7-8cjw-p6xm
+    owner: "@AFixt/security"
+    reason: >-
+      braces <=3.0.3 stack exhaustion from deeply nested brace patterns. No
+      fixed version exists (3.0.3 is latest). Dev-only: reached through
+      micromatch/fast-glob in lint-staged, stylelint and markdownlint-cli2,
+      which expand only the glob patterns written in this repository's own
+      config and CLI calls. No request data reaches them, and nothing in the
+      runtime depends on braces.
+    added: 2026-10-04
+    # Aligned with osv-scanner.toml `ignoreUntil = 2026-11-13`.
+    expires: 2026-11-13
+    status: active
+    issue: 186
 
   # --- container / Dockerfile / IaC scanning (ADR-0016, issue #60) --------
   # The nginx-image non-root deferral is one decision expressed in three tool

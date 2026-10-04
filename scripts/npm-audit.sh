@@ -20,7 +20,20 @@ set -euo pipefail
 #     performance tooling — never in the production api/ui/widget runtime.
 #     Tracked in #51. Revisit 2026-11-13: adopt a fixed extract-zip once one
 #     ships, or drop the perf tooling that drags it in.
-export ALLOW="GHSA-jmr9-qjv8-65gv"
+#   GHSA-7pqw-9j4j-h8q3  extract-zip 2.0.1 arbitrary file write through symlink
+#     archive entries. Same package, same flaw class (CWE-22), same path in, same
+#     lack of a fix as the entry above. The only archive extracted on that path
+#     is the Chrome build @puppeteer/browsers downloads for estimo, not
+#     attacker-supplied input. @puppeteer/browsers 3.x drops extract-zip, but
+#     find-chrome-bin pins 2.10.10 exactly. Tracked in #51; same review date.
+#   GHSA-vfj7-8cjw-p6xm  braces <=3.0.3 stack exhaustion from deeply nested brace
+#     patterns. No fixed version exists (3.0.3 is the latest release). Dev-only:
+#     reached through micromatch/fast-glob in lint-staged, stylelint and
+#     markdownlint-cli2, which expand only the glob patterns written in this
+#     repository's own config and CLI calls. No request data reaches them, and
+#     nothing in the api/ui/widget runtime depends on braces. Revisit
+#     2026-11-13: adopt a fixed braces once one ships.
+export ALLOW="GHSA-jmr9-qjv8-65gv,GHSA-7pqw-9j4j-h8q3,GHSA-vfj7-8cjw-p6xm"
 
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
