@@ -145,7 +145,11 @@ function runGate(
   return { status: run.status, output: [run.stdout, run.stderr].join(''), rows };
 }
 
-describe('link-check gate (#155)', () => {
+// Every case builds a fixture git repo and runs the gate script in a bash
+// subprocess, so a 5s default flakes under check:all load (several cases ran
+// 5-7s there while passing alone in well under that). Same remedy as the
+// real-git case in post-merge-hook.test.ts.
+describe('link-check gate (#155)', { timeout: 20_000 }, () => {
   it('drops a cached timeout before the run, so it cannot decide this run', () => {
     // The poisoning that prompted #155: the row is already there when the gate
     // starts, put there by a direct lychee invocation or an older cache.
