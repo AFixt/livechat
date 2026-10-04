@@ -36,16 +36,20 @@ cd "$ROOT"
 
 TIER="${1:-verified}"
 
-# Scan the repository's COMMON git dir rather than the working tree at "$ROOT".
-# In a linked worktree, "$ROOT/.git" is a pointer file. trufflehog's
+# Scan this checkout's git dir with --bare rather than the working tree at
+# "$ROOT". In a linked worktree, "$ROOT/.git" is a pointer file. trufflehog's
 # "file://$ROOT" form then fails with "failed to read index file: ... not a
-# directory", so the gate could not run from a worktree at all. The common
-# dir is a plain git directory holding every object and ref, so it is scanned
-# with --bare. In a normal checkout the common dir IS "$ROOT/.git": the same
-# repository, objects and refs as before, and both forms scan the same
-# chunks (measured when this was introduced). We stay in "$ROOT" so
-# --exclude-paths still resolves.
-REPO="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir)"
+# directory", so the gate could not run from a worktree at all.
+#
+# It must be the worktree's OWN git dir (.git/worktrees/<name>), not the
+# common dir. Git resolves every object and ref through it, and it also holds
+# that worktree's HEAD. A detached HEAD is reachable from no ref in the common
+# dir, so scanning the common dir would skip exactly the commits a
+# `git push origin HEAD:<branch>` from a detached worktree sends. In a normal
+# checkout the git dir IS "$ROOT/.git": the same repository, objects, refs and
+# HEAD as before, and both forms scan the same chunks (measured when this was
+# introduced). We stay in "$ROOT" so --exclude-paths still resolves.
+REPO="$(git -C "$ROOT" rev-parse --absolute-git-dir)"
 
 if ! command -v trufflehog >/dev/null 2>&1; then
   echo "skip: trufflehog not installed — secret scan ($TIER) not run locally." >&2

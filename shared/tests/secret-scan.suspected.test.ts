@@ -81,7 +81,10 @@ const scratchDirs: string[] = [];
 function runTierAgainst(
   files: Record<string, string>,
   tier: string,
-  { fromWorktree = false }: { fromWorktree?: boolean } = {},
+  {
+    fromWorktree = false,
+    detachedFiles,
+  }: { fromWorktree?: boolean; detachedFiles?: Record<string, string> } = {},
 ): { output: string; status: number | null } {
   const dir = mkdtempSync(join(tmpdir(), 'secret-scan-'));
   scratchDirs.push(dir);
@@ -110,8 +113,8 @@ function runTierAgainst(
     GIT_TERMINAL_PROMPT: '0',
   };
 
-  const git = (args: string[]): void => {
-    execFileSync('git', args, { cwd: dir, env: gitEnv, stdio: 'ignore' });
+  const git = (args: string[], cwd: string = dir): void => {
+    execFileSync('git', args, { cwd, env: gitEnv, stdio: 'ignore' });
   };
   git(['init', '-q', '-b', 'main']);
   git(['config', 'user.email', 'fixture@example.test']);
@@ -127,7 +130,20 @@ function runTierAgainst(
     root = mkdtempSync(join(tmpdir(), 'secret-scan-wt-'));
     scratchDirs.push(root);
     rmSync(root, { recursive: true, force: true });
-    git(['worktree', 'add', '-q', '-b', 'wt', root]);
+    if (detachedFiles) {
+      // A detached worktree's HEAD lives in its own per-worktree git dir, not
+      // under refs/ in the common dir, so commits made there are reachable
+      // from no ref the common dir holds. They are exactly what a push from
+      // that worktree (`git push origin HEAD:<branch>`) sends.
+      git(['worktree', 'add', '-q', '--detach', root]);
+      for (const [name, contents] of Object.entries(detachedFiles)) {
+        writeFileSync(join(root, name), contents);
+      }
+      git(['add', '-A'], root);
+      git(['commit', '-q', '-m', 'detached fixture'], root);
+    } else {
+      git(['worktree', 'add', '-q', '-b', 'wt', root]);
+    }
   }
 
   // Same reasoning as `gitEnv` above: the script shells out to git/trufflehog,
@@ -189,6 +205,24 @@ describe.skipIf(skip)('secret-scan.sh run from a linked git worktree', () => {
       },
       'suspected',
       { fromWorktree: true },
+    );
+    expect(output).not.toContain('error running scan');
+    expect(status).toBe(0);
+    expect(output).toContain(accessKey);
+    expect(output).toMatch(/"unverified_secrets": *1/);
+  }, 60_000);
+
+  it('scans a commit that exists only on the detached HEAD of the worktree', () => {
+    const accessKey = fakeAwsAccessKeyId();
+    const { output, status } = runTierAgainst(
+      { 'readme.txt': 'just some ordinary prose with no credentials in it\n' },
+      'suspected',
+      {
+        fromWorktree: true,
+        detachedFiles: {
+          'config.txt': `aws_access_key_id = ${accessKey}\naws_secret_access_key = ${fakeAwsSecret()}\n`,
+        },
+      },
     );
     expect(output).not.toContain('error running scan');
     expect(status).toBe(0);
