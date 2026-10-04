@@ -13,3 +13,26 @@ ignoreUntil = 2026-11-13
 # Revisit at ignoreUntil: adopt a fixed extract-zip the moment one ships, or drop
 # the perf tooling that drags it in.
 reason = "No fixed version published (2.0.1 is latest); dev-only via @puppeteer/browsers perf tooling, not in production runtime. Tracked in #51."
+
+[[IgnoredVulns]]
+id = "GHSA-7pqw-9j4j-h8q3"
+ignoreUntil = 2026-11-13
+# extract-zip 2.0.1: arbitrary file write through symlink archive entries. Same
+# package, flaw class (CWE-22), path and lack of a fix as GHSA-jmr9 above. The
+# only archive extracted on that path is the Chrome build @puppeteer/browsers
+# downloads for estimo — not attacker-supplied input. @puppeteer/browsers 3.x
+# drops extract-zip, but find-chrome-bin and estimo's puppeteer-core both pin
+# 2.10.10 exactly. Tracked in #51.
+reason = "No fixed version published (2.0.1 is latest); dev-only via @puppeteer/browsers perf tooling extracting Google's Chrome download, not in production runtime. Tracked in #51."
+
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm"
+ignoreUntil = 2026-11-13
+# braces <=3.0.3 (CVSS 8.7): stack exhaustion from deeply nested brace patterns.
+# No fixed version exists (3.0.3 is the latest release; osv lists no `fixed`
+# event). Dev-only: reached through micromatch/fast-glob in lint-staged,
+# stylelint and markdownlint-cli2, which expand only the glob patterns written
+# in this repository's own config and CLI calls. No request data reaches them,
+# and nothing in the api/ui/widget runtime depends on braces. Revisit at
+# ignoreUntil: adopt a fixed braces the moment one ships.
+reason = "No fixed version published (3.0.3 is latest); dev-only via lint-staged/stylelint/markdownlint-cli2 globbing over repo-authored patterns, not in production runtime."
