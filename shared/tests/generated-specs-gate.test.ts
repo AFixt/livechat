@@ -106,11 +106,7 @@ function runGate(cwd: string): { status: number | null; output: string } {
   return { status: run.status, output: [run.stdout, run.stderr].join('') };
 }
 
-// Every case builds a fixture git repo and runs the gate script in a bash
-// subprocess, so a 5s default flakes under check:all load (several cases ran
-// 5-7s there while passing alone in well under that). Same remedy as the
-// real-git case in post-merge-hook.test.ts.
-describe('usecases-specs-in-sync gate', { timeout: 20_000 }, () => {
+describe('usecases-specs-in-sync gate', () => {
   it('passes on a clean tree', () => {
     const { status, output } = runGate(fixtureRepo());
     expect(output).toContain('in sync');
