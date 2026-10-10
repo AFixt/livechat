@@ -29,9 +29,9 @@ set -euo pipefail
 #     Tracked in #51; same review date.
 #   GHSA-vfj7-8cjw-p6xm  braces <=3.0.3 stack exhaustion from deeply nested brace
 #     patterns. No fixed version exists (3.0.3 is the latest release). Dev-only:
-#     reached through micromatch/fast-glob in lint-staged, stylelint and
-#     markdownlint-cli2, which expand only the glob patterns written in this
-#     repository's own config and CLI calls. No request data reaches them, and
+#     reached through micromatch/fast-glob in lint-staged, stylelint and jscpd
+#     (markdownlint-cli2 left with #189), which expand only the glob patterns
+#     written in this repository's own config and CLI calls. No request data reaches them, and
 #     nothing in the api/ui/widget runtime depends on braces. Revisit
 #     2026-11-13: adopt a fixed braces once one ships.
 export ALLOW="GHSA-jmr9-qjv8-65gv,GHSA-7pqw-9j4j-h8q3,GHSA-vfj7-8cjw-p6xm"

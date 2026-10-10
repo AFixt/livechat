@@ -108,7 +108,8 @@ Per issue #1 — the full stack is the mandate, not a suggestion:
   `promise`, `n`, `jsdoc`, `no-secrets`
 - Prettier + `prettier-plugin-organize-imports`
 - Stylelint + `stylelint-config-standard` + `@double-great/stylelint-a11y`
-- `markdownlint-cli2`
+- `markdownlint-cli` (config `.markdownlint.jsonc`, ignores
+  `.markdownlintignore`)
 - `jscpd` (dup detection, `--threshold 1 --min-tokens 50`)
 - [Knip](https://knip.dev) (unused files, exports and dependencies; kept at
   zero, exceptions with reasons in `knip.jsonc`)
