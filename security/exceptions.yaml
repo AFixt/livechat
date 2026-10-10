@@ -169,8 +169,9 @@ exceptions:
     reason: >-
       braces <=3.0.3 stack exhaustion from deeply nested brace patterns. No
       fixed version exists (3.0.3 is latest). Dev-only: reached through
-      micromatch/fast-glob in lint-staged, stylelint and markdownlint-cli2,
-      which expand only the glob patterns written in this repository's own
+      micromatch/fast-glob in lint-staged, stylelint and jscpd
+      (markdownlint-cli2 left with #189), which expand only the glob patterns
+      written in this repository's own
       config and CLI calls. No request data reaches them, and nothing in the
       runtime depends on braces.
     added: 2026-10-04

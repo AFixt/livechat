@@ -49,7 +49,11 @@
     "engine.io": "^6.6.10",
     "browserslist": "^4.28.7",
     "postcss-selector-parser": "^7.1.3",
-    "katex": "^0.18.2"
+    "katex": "^0.18.2",
+    "markdownlint-cli": {
+      "js-yaml": "^5.4.1",
+      "smol-toml": "^1.9.0"
+    }
   },
   "scripts": {
     "prepare": "husky || true",
@@ -74,8 +78,8 @@
     "format:check": "prettier --check .",
     "stylelint": "stylelint \"**/*.{css,scss}\" --allow-empty-input --max-warnings=0",
     "stylelint:fix": "stylelint \"**/*.{css,scss}\" --allow-empty-input --fix",
-    "markdownlint": "markdownlint-cli2 \"**/*.md\" \"#**/node_modules/**\"",
-    "markdownlint:fix": "markdownlint-cli2 --fix \"**/*.md\" \"#**/node_modules/**\"",
+    "markdownlint": "markdownlint \"**/*.md\"",
+    "markdownlint:fix": "markdownlint --fix \"**/*.md\"",
     "dupes": "jscpd",
     "links": "bash scripts/link-check.sh",
     "test": "npm-run-all -s test:shared test:api test:ui test:widget",
@@ -150,7 +154,7 @@
     "knip": "6.33.0",
     "license-checker-rseidelsohn": "4.4.2",
     "lint-staged": "15.3.0",
-    "markdownlint-cli2": "0.17.1",
+    "markdownlint-cli": "0.49.1",
     "npm-run-all": "4.1.5",
     "prettier": "3.4.2",
     "stylelint": "17.9.0",

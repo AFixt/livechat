@@ -31,8 +31,10 @@ ignoreUntil = 2026-11-13
 # braces <=3.0.3 (CVSS 8.7): stack exhaustion from deeply nested brace patterns.
 # No fixed version exists (3.0.3 is the latest release; osv lists no `fixed`
 # event). Dev-only: reached through micromatch/fast-glob in lint-staged,
-# stylelint and markdownlint-cli2, which expand only the glob patterns written
-# in this repository's own config and CLI calls. No request data reaches them,
+# stylelint and jscpd (@jscpd/finder), which expand only the glob patterns
+# written in this repository's own config and CLI calls. (markdownlint-cli2 was
+# a fourth path until #189 swapped it for markdownlint-cli, which globs with
+# tinyglobby and does not reach braces.) No request data reaches them,
 # and nothing in the api/ui/widget runtime depends on braces. Revisit at
 # ignoreUntil: adopt a fixed braces the moment one ships.
-reason = "No fixed version published (3.0.3 is latest); dev-only via lint-staged/stylelint/markdownlint-cli2 globbing over repo-authored patterns, not in production runtime."
+reason = "No fixed version published (3.0.3 is latest); dev-only via lint-staged/stylelint/jscpd globbing over repo-authored patterns, not in production runtime."
