@@ -1,0 +1,29 @@
+id: support-login--suspended-tenant
+title: "Login is refused, with an accessible reason, while the tenant is suspended"
+extends: support-login
+type: negative
+description: |
+  Issue #197 — a user whose tenant is suspended or archived cannot sign in,
+  whatever the tenant's expiry date. The correct password still gets a 403,
+  and the form renders the server's reason in an alert (role="alert") rather
+  than the locked-account text, keeping the user on /login. Refresh, every
+  authenticated request and the staff socket refuse the same user; those
+  paths are covered by the api integration test `tenant-status.test.ts`.
+
+  A variant of support-login: it reuses the parent's entry steps and
+  overrides from the submit step onward (steps_override).
+
+preconditions:
+  - A tenant-scoped staff user exists with the credentials of support-login.
+  - That user's tenant has status "suspended".
+
+data: {}
+
+steps_override:
+  from_step: 10
+  steps:
+    - 'activate: button "Sign in"'
+    - >-
+      verify: alert "Your organization's access is not active. Please contact
+      your administrator."
+    - 'verify: url "http://localhost:5174/login"'
