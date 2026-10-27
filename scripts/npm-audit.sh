@@ -34,7 +34,13 @@ set -euo pipefail
 #     written in this repository's own config and CLI calls. No request data reaches them, and
 #     nothing in the api/ui/widget runtime depends on braces. Revisit
 #     2026-11-13: adopt a fixed braces once one ships.
-export ALLOW="GHSA-jmr9-qjv8-65gv,GHSA-7pqw-9j4j-h8q3,GHSA-vfj7-8cjw-p6xm"
+#   GHSA-27r3-jxmh-p828  body-parser 2.0.0-2.3.0 denial of service via trailing
+#     bytes after a compressed request body. RUNTIME: express 5 parses every api
+#     request body with it. The fix, body-parser 2.4.0, was published
+#     2026-10-22 and is still inside the 7-day min-release-age cooldown in
+#     .npmrc, so no install can adopt it yet. Deliberately short: expires
+#     2026-10-30, when the gate goes red again and forces the bump.
+export ALLOW="GHSA-jmr9-qjv8-65gv,GHSA-7pqw-9j4j-h8q3,GHSA-vfj7-8cjw-p6xm,GHSA-27r3-jxmh-p828"
 
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT

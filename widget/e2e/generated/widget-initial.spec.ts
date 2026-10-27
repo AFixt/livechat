@@ -14,10 +14,10 @@ test.describe('Widget shows the closed trigger by default', () => {
     await page.goto('http://localhost:5175/');
 
     // Step 2: Locate button "Chat with support" (initial.uc.yaml:1)
-    await expect(page.getByRole('button', { name: 'Chat with support' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Chat with support', exact: true })).toBeVisible();
 
     // Step 3: Focus button "Chat with support" (initial.uc.yaml:2)
-    const step3_el = page.getByRole('button', { name: 'Chat with support' });
+    const step3_el = page.getByRole('button', { name: 'Chat with support', exact: true });
     await step3_el.focus();
     await expect(step3_el).toBeFocused();
 

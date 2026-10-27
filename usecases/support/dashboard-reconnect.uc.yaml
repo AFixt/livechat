@@ -1,6 +1,6 @@
 id: support-dashboard-reconnect
 title: "Operator sees a reconnecting banner when live updates drop"
-type: extension
+type: positive
 description: |
   §3 / issue #69 (AC6) — when the console's realtime socket drops, the dashboard
   shows a visible "reconnecting" banner inside a polite status region, so the
@@ -14,6 +14,11 @@ description: |
   behavioural source of truth for the operator-facing reconnect surface.
 
 start_location: "http://localhost:5174/"
+
+expected_result: >-
+  The dashboard shows a visible "reconnecting" banner inside a polite status
+  region while the realtime socket is down, and it confirms the reconnection
+  once live updates are restored.
 
 preconditions:
   - A staff user is already authenticated (see support-login.uc.yaml).

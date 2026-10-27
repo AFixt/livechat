@@ -38,3 +38,12 @@ ignoreUntil = 2026-11-13
 # and nothing in the api/ui/widget runtime depends on braces. Revisit at
 # ignoreUntil: adopt a fixed braces the moment one ships.
 reason = "No fixed version published (3.0.3 is latest); dev-only via lint-staged/stylelint/jscpd globbing over repo-authored patterns, not in production runtime."
+
+[[IgnoredVulns]]
+id = "GHSA-27r3-jxmh-p828"
+ignoreUntil = 2026-10-30
+# body-parser 2.0.0-2.3.0: denial of service via trailing bytes after a
+# compressed request body. Runtime (express 5 body parsing). The fix, 2.4.0,
+# shipped 2026-10-22 and is inside the 7-day min-release-age cooldown in .npmrc;
+# adopt it the day the cooldown ends. Deliberately short-lived.
+reason = "Fix (body-parser 2.4.0) is inside the 7-day min-release-age cooldown; adopt on expiry."

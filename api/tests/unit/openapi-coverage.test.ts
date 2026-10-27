@@ -162,8 +162,8 @@ describe('OpenAPI spec covers the mounted API surface (#119)', () => {
   const mounted = new Set(MOUNTS.flatMap((m) => collectRoutes(m.router, m.prefix)));
   const spec = buildOpenApiSpec({ API_URL: env.API_URL });
   const documented = new Set<string>();
-  for (const [path, item] of Object.entries(spec.paths ?? {})) {
-    for (const method of Object.keys(item as Record<string, unknown>)) {
+  for (const [path, item] of Object.entries(spec.paths)) {
+    for (const method of Object.keys(item)) {
       documented.add(`${method} ${path}`);
     }
   }

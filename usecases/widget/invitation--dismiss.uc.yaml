@@ -1,6 +1,6 @@
 id: widget-invitation--dismiss
 title: "Visitor dismisses the proactive invitation"
-type: extension
+type: positive
 description: |
   §5.1.2 — the invitation flourish must be dismissible without opening a
   chat. Activating the dismiss control returns the widget to its plain
@@ -14,6 +14,10 @@ description: |
   behavioural source of truth for the dismiss path.
 
 start_location: "http://localhost:5175/"
+
+expected_result: >-
+  Dismissing the invitation returns the widget to its plain closed trigger
+  without opening a chat.
 
 preconditions:
   - At least one support agent is online and available for the tenant.

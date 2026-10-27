@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Visitor declines the email transcript after support ends the chat', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('widget-chat-ended--decline: Visitor declines the email transcript after support ends the chat (extension)', async ({ page }) => {
+  test('widget-chat-ended--decline: Visitor declines the email transcript after support ends the chat (positive)', async ({ page }) => {
     // Preconditions:
     //   - The visitor was in an active chat that a support agent has just ended.
 
@@ -14,21 +14,21 @@ test.describe('Visitor declines the email transcript after support ends the chat
     await page.goto('http://localhost:5175/');
 
     // Step 2: Locate text "Chat ended. Would you like an email copy of this conversation?" (chat-ended--decline.uc.yaml:1)
-    await expect(page.getByText('Chat ended. Would you like an email copy of this conversation?')).toBeVisible();
+    await expect(page.getByText('Chat ended. Would you like an email copy of this conversation?', { exact: true })).toBeVisible();
 
     // Step 3: Locate button "No thanks" (chat-ended--decline.uc.yaml:1)
-    await expect(page.getByRole('button', { name: 'No thanks' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'No thanks', exact: true })).toBeVisible();
 
     // Step 4: Focus button "No thanks" (chat-ended--decline.uc.yaml:2)
-    const step4_el = page.getByRole('button', { name: 'No thanks' });
+    const step4_el = page.getByRole('button', { name: 'No thanks', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Activate button "No thanks" (chat-ended--decline.uc.yaml:3)
-    await page.getByRole('button', { name: 'No thanks' }).click();
+    await page.getByRole('button', { name: 'No thanks', exact: true }).click();
 
     // Step 6: Locate button "Chat with support" (chat-ended--decline.uc.yaml:4)
-    await expect(page.getByRole('button', { name: 'Chat with support' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Chat with support', exact: true })).toBeVisible();
 
   });
 });

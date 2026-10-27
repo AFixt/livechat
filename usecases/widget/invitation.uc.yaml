@@ -1,6 +1,6 @@
 id: widget-invitation
 title: "Visitor sees the proactive invitation while support is online"
-type: extension
+type: positive
 description: |
   §5.1.2 — when a support agent is available, the closed widget swaps its
   plain trigger for the invitation flourish "after a short period" (it shows
@@ -16,6 +16,11 @@ description: |
   behavioural source of truth for the invitation surface itself.
 
 start_location: "http://localhost:5175/"
+
+expected_result: >-
+  While support is available the closed widget shows the invitation with a
+  "Start a chat" action and a dismiss action, and "Start a chat" opens the
+  panel on the name and first-message form.
 
 preconditions:
   - At least one support agent is online and available for the tenant.

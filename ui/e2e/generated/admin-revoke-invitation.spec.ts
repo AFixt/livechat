@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Admin revokes a pending invitation', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('admin-revoke-invitation: Admin revokes a pending invitation (extension)', async ({ page }) => {
+  test('admin-revoke-invitation: Admin revokes a pending invitation (positive)', async ({ page }) => {
     // Preconditions:
     //   - An admin or super_admin user is authenticated.
     //   - At least one invitation with status "pending" is listed (see admin-invite-user.uc.yaml).
@@ -15,21 +15,21 @@ test.describe('Admin revokes a pending invitation', () => {
     await page.goto('http://localhost:5174/admin/invitations');
 
     // Step 2: Locate table "Invitations" (revoke-invitation.uc.yaml:1)
-    await expect(page.getByRole('table', { name: 'Invitations' })).toBeVisible();
+    await expect(page.getByRole('table', { name: 'Invitations', exact: true })).toBeVisible();
 
     // Step 3: Locate button "Revoke" (revoke-invitation.uc.yaml:2)
-    await expect(page.getByRole('button', { name: 'Revoke' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Revoke', exact: true })).toBeVisible();
 
     // Step 4: Focus button "Revoke" (revoke-invitation.uc.yaml:3)
-    const step4_el = page.getByRole('button', { name: 'Revoke' });
+    const step4_el = page.getByRole('button', { name: 'Revoke', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Activate button "Revoke" (revoke-invitation.uc.yaml:4)
-    await page.getByRole('button', { name: 'Revoke' }).click();
+    await page.getByRole('button', { name: 'Revoke', exact: true }).click();
 
     // Step 6: Verify text "revoked" (revoke-invitation.uc.yaml:5)
-    await expect(page.getByText('revoked')).toBeVisible();
+    await expect(page.getByText('revoked', { exact: true })).toBeVisible();
 
   });
 });

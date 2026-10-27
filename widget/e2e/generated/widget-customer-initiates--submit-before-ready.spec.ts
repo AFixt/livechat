@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Visitor submits the start-chat form before the session is ready', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('widget-customer-initiates--submit-before-ready: Visitor submits the start-chat form before the session is ready (extension)', async ({ page }) => {
+  test('widget-customer-initiates--submit-before-ready: Visitor submits the start-chat form before the session is ready (positive)', async ({ page }) => {
     // Preconditions:
     //   - The API stack is running with an "acme" tenant.
     //   - At least one support agent is available, so the chat lands active.
@@ -16,41 +16,41 @@ test.describe('Visitor submits the start-chat form before the session is ready',
     await page.goto('http://localhost:5175/');
 
     // Step 2: Locate button "Chat with support" (customer-initiates--submit-before-ready.uc.yaml:1)
-    await expect(page.getByRole('button', { name: 'Chat with support' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Chat with support', exact: true })).toBeVisible();
 
     // Step 3: Focus button "Chat with support" (customer-initiates--submit-before-ready.uc.yaml:2)
-    const step3_el = page.getByRole('button', { name: 'Chat with support' });
+    const step3_el = page.getByRole('button', { name: 'Chat with support', exact: true });
     await step3_el.focus();
     await expect(step3_el).toBeFocused();
 
     // Step 4: Activate button "Chat with support" (customer-initiates--submit-before-ready.uc.yaml:3)
-    await page.getByRole('button', { name: 'Chat with support' }).click();
+    await page.getByRole('button', { name: 'Chat with support', exact: true }).click();
 
     // Step 5: Locate heading "Chat with support" (customer-initiates--submit-before-ready.uc.yaml:4)
-    await expect(page.getByRole('heading', { name: 'Chat with support' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Chat with support', exact: true })).toBeVisible();
 
     // Step 6: Locate field "Your name" (customer-initiates--submit-before-ready.uc.yaml:5)
-    await expect(page.getByLabel('Your name')).toBeVisible();
+    await expect(page.getByLabel('Your name', { exact: true })).toBeVisible();
 
     // Step 7: Focus field "Your name" (customer-initiates--submit-before-ready.uc.yaml:6)
-    const step7_el = page.getByLabel('Your name');
+    const step7_el = page.getByLabel('Your name', { exact: true });
     await step7_el.focus();
     await expect(step7_el).toBeFocused();
 
     // Step 8: Enter field "Your name" value "Quick Visitor" (customer-initiates--submit-before-ready.uc.yaml:7)
-    await page.getByLabel('Your name').fill('Quick Visitor');
+    await page.getByLabel('Your name', { exact: true }).fill('Quick Visitor');
 
     // Step 9: Locate field "How can we help?" (customer-initiates--submit-before-ready.uc.yaml:8)
-    await expect(page.getByLabel('How can we help?')).toBeVisible();
+    await expect(page.getByLabel('How can we help?', { exact: true })).toBeVisible();
 
     // Step 10: Note submitted with no intervening step, so the write races the bootstrap (customer-initiates--submit-before-ready.uc.yaml:1)
     // Note: submitted with no intervening step, so the write races the bootstrap
 
     // Step 11: Activate button "Start chat" (customer-initiates--submit-before-ready.uc.yaml:2)
-    await page.getByRole('button', { name: 'Start chat' }).click();
+    await page.getByRole('button', { name: 'Start chat', exact: true }).click();
 
     // Step 12: Verify text "I need help right away." (customer-initiates--submit-before-ready.uc.yaml:3)
-    await expect(page.getByText('I need help right away.')).toBeVisible();
+    await expect(page.getByText('I need help right away.', { exact: true })).toBeVisible();
 
   });
 });

@@ -15,50 +15,52 @@ test.describe('Allowed-origins rejects a non-URL entry with an accessible error'
     await page.goto('http://localhost:5174/admin/tenants');
 
     // Step 2: Locate heading "Tenants" (edit-tenant-settings--invalid-origin.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Tenants' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Tenants', exact: true })).toBeVisible();
 
     // Step 3: Locate button "Edit" (edit-tenant-settings--invalid-origin.uc.yaml:2)
-    await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
 
     // Step 4: Focus button "Edit" (edit-tenant-settings--invalid-origin.uc.yaml:3)
-    const step4_el = page.getByRole('button', { name: 'Edit' });
+    const step4_el = page.getByRole('button', { name: 'Edit', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Activate button "Edit" (edit-tenant-settings--invalid-origin.uc.yaml:4)
-    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
 
     // Step 6: Locate heading "Embed snippet" (edit-tenant-settings--invalid-origin.uc.yaml:5)
-    await expect(page.getByRole('heading', { name: 'Embed snippet' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Embed snippet', exact: true })).toBeVisible();
 
     // Step 7: Locate heading "Allowed origins" (edit-tenant-settings--invalid-origin.uc.yaml:6)
-    await expect(page.getByRole('heading', { name: 'Allowed origins' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Allowed origins', exact: true })).toBeVisible();
 
     // Step 8: Locate field "Allowed origins" (edit-tenant-settings--invalid-origin.uc.yaml:7)
-    await expect(page.getByLabel('Allowed origins')).toBeVisible();
+    await expect(page.getByLabel('Allowed origins', { exact: true })).toBeVisible();
 
     // Step 9: Focus field "Allowed origins" (edit-tenant-settings--invalid-origin.uc.yaml:8)
-    const step9_el = page.getByLabel('Allowed origins');
+    const step9_el = page.getByLabel('Allowed origins', { exact: true });
     await step9_el.focus();
     await expect(step9_el).toBeFocused();
 
     // Step 10: Enter field "Allowed origins" value "not-a-valid-origin" (edit-tenant-settings--invalid-origin.uc.yaml:1)
-    await page.getByLabel('Allowed origins').fill('not-a-valid-origin');
+    await page.getByLabel('Allowed origins', { exact: true }).fill('not-a-valid-origin');
 
     // Step 11: Activate button "Save" (edit-tenant-settings--invalid-origin.uc.yaml:2)
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     // Step 12: Verify field_error "Allowed origins" (edit-tenant-settings--invalid-origin.uc.yaml:3)
-    const fieldErrorEl = page.getByLabel('Allowed origins');
-    await expect(fieldErrorEl).toHaveAttribute('aria-invalid', 'true');
-    const fieldErrorId = await fieldErrorEl.evaluate((el) => {
-      const describedBy = el.getAttribute('aria-describedby') || el.getAttribute('aria-errormessage');
-      return describedBy;
-    });
-    expect(fieldErrorId).toBeTruthy();
-    if (fieldErrorId) {
-      const errorMsg = page.locator('#' + fieldErrorId.split(' ')[0]);
-      await expect(errorMsg).toBeVisible();
+    {
+      const fieldErrorEl = page.getByLabel('Allowed origins', { exact: true });
+      await expect(fieldErrorEl).toHaveAttribute('aria-invalid', 'true');
+      const fieldErrorRef = await fieldErrorEl.evaluate((el) => {
+        const refs = el.getAttribute('aria-describedby') || el.getAttribute('aria-errormessage') || '';
+        const id = refs.trim().split(/\s+/)[0];
+        return id ? '#' + CSS.escape(id) : null;
+      });
+      expect(fieldErrorRef, 'aria-describedby or aria-errormessage').toBeTruthy();
+      if (fieldErrorRef) {
+        await expect(page.locator(fieldErrorRef)).toBeVisible();
+      }
     }
 
   });

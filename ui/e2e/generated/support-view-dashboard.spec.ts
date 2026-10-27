@@ -14,19 +14,19 @@ test.describe('Support staff sees empty visitor and chat lists after login', () 
     await page.goto('http://localhost:5174/');
 
     // Step 2: Locate heading "Dashboard" (view-dashboard.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
 
     // Step 3: Locate heading "Visitors on site" (view-dashboard.uc.yaml:2)
-    await expect(page.getByRole('heading', { name: 'Visitors on site' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Visitors on site', exact: true })).toBeVisible();
 
     // Step 4: Locate heading "Your chats" (view-dashboard.uc.yaml:3)
-    await expect(page.getByRole('heading', { name: 'Your chats' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your chats', exact: true })).toBeVisible();
 
     // Step 5: Locate text "No visitors are currently on the site." (view-dashboard.uc.yaml:4)
-    await expect(page.getByText('No visitors are currently on the site.')).toBeVisible();
+    await expect(page.getByText('No visitors are currently on the site.', { exact: true })).toBeVisible();
 
     // Step 6: Locate text "No active chats." (view-dashboard.uc.yaml:5)
-    await expect(page.getByText('No active chats.')).toBeVisible();
+    await expect(page.getByText('No active chats.', { exact: true })).toBeVisible();
 
   });
 });
