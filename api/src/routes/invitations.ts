@@ -1,5 +1,6 @@
 import { createInvitationInputSchema, type CreateInvitationInput } from '@livechat/shared';
 
+import { callerTenantScope, resolveTenantFilter } from '../middlewares/authorize.js';
 import { parsedBody, validate } from '../middlewares/validate.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
@@ -17,7 +18,8 @@ interface InvitationsRouterDeps extends AdminRouterDeps {
 }
 
 /**
- * Build the `/invitations` sub-router (super_admin + admin only).
+ * Build the `/invitations` sub-router (super_admin + admin only), confined to
+ * the caller's tenant for tenant-scoped admins (#196).
  * @param deps - Env, redis, invitation service.
  * @returns Express router.
  */
@@ -27,8 +29,8 @@ export function buildInvitationsRouter(deps: InvitationsRouterDeps): Router {
   router.get(
     '/',
     asyncHandler(async (req, res) => {
-      const tenantId = req.query.tenantId;
-      const list = await deps.invitation.list(typeof tenantId === 'string' ? tenantId : undefined);
+      // A tenant-scoped caller sees only their own tenant's invitations (#196).
+      const list = await deps.invitation.list(resolveTenantFilter(req, req.query.tenantId));
       res.json({ success: true, data: list });
     }),
   );
@@ -39,7 +41,7 @@ export function buildInvitationsRouter(deps: InvitationsRouterDeps): Router {
     asyncHandler(async (req, res) => {
       if (req.user === undefined) return;
       const body = parsedBody(req, createInvitationInputSchema) satisfies CreateInvitationInput;
-      const invitation = await deps.invitation.create(body, req.user.id);
+      const invitation = await deps.invitation.create(body, req.user);
       res.status(201).json({ success: true, data: invitation });
     }),
   );
@@ -49,7 +51,7 @@ export function buildInvitationsRouter(deps: InvitationsRouterDeps): Router {
     asyncHandler(async (req, res) => {
       const id = req.params.id;
       if (typeof id !== 'string') return;
-      await deps.invitation.revoke(id);
+      await deps.invitation.revoke(id, callerTenantScope(req));
       res.json({ success: true });
     }),
   );
