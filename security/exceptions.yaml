@@ -180,6 +180,23 @@ exceptions:
     status: active
     issue: 186
 
+  - id: dep-body-parser-compressed-trailing-bytes
+    tool: npm-audit, osv-scanner
+    source: scripts/npm-audit.sh (ALLOW) + osv-scanner.toml (IgnoredVulns)
+    rules:
+      - GHSA-27r3-jxmh-p828
+    owner: "@AFixt/security"
+    reason: >-
+      body-parser 2.0.0-2.3.0 denial of service via trailing bytes after a
+      compressed request body. Runtime: express 5 parses every api request body
+      with it. The fix, body-parser 2.4.0, was published 2026-10-22 and is
+      inside the 7-day min-release-age cooldown in .npmrc, so it cannot be
+      installed yet. Short-lived on purpose: adopt 2.4.0 when this expires.
+    added: 2026-10-27
+    # Aligned with osv-scanner.toml `ignoreUntil = 2026-10-30`.
+    expires: 2026-10-30
+    status: active
+
   # --- container / Dockerfile / IaC scanning (ADR-0016, issue #60) --------
   # The nginx-image non-root deferral is one decision expressed in three tool
   # configs (Hadolint DL3002, Trivy AVD-DS-0002, Checkov CKV_DOCKER_3); each is
