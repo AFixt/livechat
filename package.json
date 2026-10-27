@@ -126,7 +126,7 @@
     "test:e2e:journeys": "npm --workspace @livechat/e2e run test"
   },
   "devDependencies": {
-    "@afixt/usecase-runner": "2.0.1",
+    "@afixt/usecase-runner": "1.0.1",
     "@commitlint/cli": "19.6.1",
     "@commitlint/config-conventional": "19.6.0",
     "@double-great/stylelint-a11y": "3.4.10",

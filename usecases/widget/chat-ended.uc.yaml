@@ -1,6 +1,6 @@
 id: widget-chat-ended
 title: "Visitor is offered an email transcript when support ends the chat"
-type: extension
+type: positive
 description: |
   §5.1.7 — when the support agent ends the session, the chat surface is
   replaced with an offer to email the visitor a copy of the conversation.

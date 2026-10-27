@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Visitor sees that support is typing', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('widget-typing-indicator: Visitor sees that support is typing (extension)', async ({ page }) => {
+  test('widget-typing-indicator: Visitor sees that support is typing (positive)', async ({ page }) => {
     // Preconditions:
     //   - The visitor is in an active chat with a support agent (see widget-actively-chatting).
     //   - The support agent has begun composing a reply, emitting chat:typing.
@@ -15,18 +15,18 @@ test.describe('Visitor sees that support is typing', () => {
     await page.goto('http://localhost:5175/');
 
     // Step 2: Locate region "Chat transcript" (typing-indicator.uc.yaml:1)
-    await expect(page.getByRole('region', { name: 'Chat transcript' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Chat transcript', exact: true })).toBeVisible();
 
     // Step 3: Locate field "Message" (typing-indicator.uc.yaml:2)
-    await expect(page.getByLabel('Message')).toBeVisible();
+    await expect(page.getByLabel('Message', { exact: true })).toBeVisible();
 
     // Step 4: Focus field "Message" (typing-indicator.uc.yaml:3)
-    const step4_el = page.getByLabel('Message');
+    const step4_el = page.getByLabel('Message', { exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Verify text "Support is typing" (typing-indicator.uc.yaml:1)
-    await expect(page.getByText('Support is typing')).toBeVisible();
+    await expect(page.getByText('Support is typing', { exact: true })).toBeVisible();
 
   });
 });

@@ -14,10 +14,10 @@ test.describe('Super admin views the tenants list', () => {
     await page.goto('http://localhost:5174/admin/tenants');
 
     // Step 2: Locate heading "Tenants" (view-tenants.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Tenants' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Tenants', exact: true })).toBeVisible();
 
     // Step 3: Locate button "Create tenant" (view-tenants.uc.yaml:2)
-    await expect(page.getByRole('button', { name: 'Create tenant' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Create tenant', exact: true })).toBeVisible();
 
   });
 });

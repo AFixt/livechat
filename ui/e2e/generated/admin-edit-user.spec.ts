@@ -15,30 +15,30 @@ test.describe('Admin edits a user\'s role and status', () => {
     await page.goto('http://localhost:5174/admin/users');
 
     // Step 2: Locate heading "Users" (edit-user.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
 
     // Step 3: Locate button "Edit" (edit-user.uc.yaml:2)
-    await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
 
     // Step 4: Focus button "Edit" (edit-user.uc.yaml:3)
-    const step4_el = page.getByRole('button', { name: 'Edit' });
+    const step4_el = page.getByRole('button', { name: 'Edit', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Activate button "Edit" (edit-user.uc.yaml:4)
-    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
 
     // Step 6: Locate field "Role" (edit-user.uc.yaml:5)
-    await expect(page.getByLabel('Role')).toBeVisible();
+    await expect(page.getByLabel('Role', { exact: true })).toBeVisible();
 
     // Step 7: Locate field "Status" (edit-user.uc.yaml:6)
-    await expect(page.getByLabel('Status')).toBeVisible();
+    await expect(page.getByLabel('Status', { exact: true })).toBeVisible();
 
     // Step 8: Locate button "Save" (edit-user.uc.yaml:7)
-    await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 
     // Step 9: Locate button "Cancel" (edit-user.uc.yaml:8)
-    await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
 
   });
 });

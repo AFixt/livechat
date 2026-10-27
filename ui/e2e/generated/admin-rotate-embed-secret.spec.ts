@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Super admin rotates a tenant\'s embed secret', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('admin-rotate-embed-secret: Super admin rotates a tenant\'s embed secret (extension)', async ({ page }) => {
+  test('admin-rotate-embed-secret: Super admin rotates a tenant\'s embed secret (positive)', async ({ page }) => {
     // Preconditions:
     //   - A super_admin user is authenticated.
     //   - At least one tenant exists and its settings surface is expanded (see admin-edit-tenant-settings.uc.yaml).
@@ -15,21 +15,21 @@ test.describe('Super admin rotates a tenant\'s embed secret', () => {
     await page.goto('http://localhost:5174/admin/tenants');
 
     // Step 2: Locate heading "Rotate embed secret" (rotate-embed-secret.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Rotate embed secret' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Rotate embed secret', exact: true })).toBeVisible();
 
     // Step 3: Locate button "Rotate embed secret" (rotate-embed-secret.uc.yaml:2)
-    await expect(page.getByRole('button', { name: 'Rotate embed secret' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Rotate embed secret', exact: true })).toBeVisible();
 
     // Step 4: Focus button "Rotate embed secret" (rotate-embed-secret.uc.yaml:3)
-    const step4_el = page.getByRole('button', { name: 'Rotate embed secret' });
+    const step4_el = page.getByRole('button', { name: 'Rotate embed secret', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Activate button "Rotate embed secret" (rotate-embed-secret.uc.yaml:4)
-    await page.getByRole('button', { name: 'Rotate embed secret' }).click();
+    await page.getByRole('button', { name: 'Rotate embed secret', exact: true }).click();
 
     // Step 6: Verify text "New embed secret (save this — it won't be shown again)" (rotate-embed-secret.uc.yaml:5)
-    await expect(page.getByText('New embed secret (save this — it won\'t be shown again)')).toBeVisible();
+    await expect(page.getByText('New embed secret (save this — it won\'t be shown again)', { exact: true })).toBeVisible();
 
   });
 });

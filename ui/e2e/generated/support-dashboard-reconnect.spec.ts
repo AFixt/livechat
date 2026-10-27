@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Operator sees a reconnecting banner when live updates drop', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('support-dashboard-reconnect: Operator sees a reconnecting banner when live updates drop (extension)', async ({ page }) => {
+  test('support-dashboard-reconnect: Operator sees a reconnecting banner when live updates drop (positive)', async ({ page }) => {
     // Preconditions:
     //   - A staff user is already authenticated (see support-login.uc.yaml).
     //   - The console's realtime socket has dropped (established over sockets — see the e2e journey suite).
@@ -15,10 +15,10 @@ test.describe('Operator sees a reconnecting banner when live updates drop', () =
     await page.goto('http://localhost:5174/');
 
     // Step 2: Locate heading "Dashboard" (dashboard-reconnect.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
 
     // Step 3: Locate text "Connection lost. Reconnecting to live updates…" (dashboard-reconnect.uc.yaml:2)
-    await expect(page.getByText('Connection lost. Reconnecting to live updates…')).toBeVisible();
+    await expect(page.getByText('Connection lost. Reconnecting to live updates…', { exact: true })).toBeVisible();
 
   });
 });

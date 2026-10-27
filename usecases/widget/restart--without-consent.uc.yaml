@@ -1,6 +1,6 @@
 id: widget-restart-without-consent
 title: "Returning visitor resumes a prior conversation while untracked"
-type: extension
+type: positive
 description: |
   §5.1.8 / issues #53 and #55 — the consent gate must not strand a chat it
   expressly allowed the visitor to open.

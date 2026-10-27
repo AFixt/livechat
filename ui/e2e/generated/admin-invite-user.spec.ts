@@ -15,49 +15,49 @@ test.describe('Admin invites a new staff user', () => {
     await page.goto('http://localhost:5174/admin/invitations');
 
     // Step 2: Locate heading "Invitations" (invite-user.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Invitations' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Invitations', exact: true })).toBeVisible();
 
     // Step 3: Locate button "Invite user" (invite-user.uc.yaml:2)
-    await expect(page.getByRole('button', { name: 'Invite user' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Invite user', exact: true })).toBeVisible();
 
     // Step 4: Focus button "Invite user" (invite-user.uc.yaml:3)
-    const step4_el = page.getByRole('button', { name: 'Invite user' });
+    const step4_el = page.getByRole('button', { name: 'Invite user', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Activate button "Invite user" (invite-user.uc.yaml:4)
-    await page.getByRole('button', { name: 'Invite user' }).click();
+    await page.getByRole('button', { name: 'Invite user', exact: true }).click();
 
     // Step 6: Locate heading "Invite user" (invite-user.uc.yaml:5)
-    await expect(page.getByRole('heading', { name: 'Invite user' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Invite user', exact: true })).toBeVisible();
 
     // Step 7: Locate field "Email" (invite-user.uc.yaml:6)
-    await expect(page.getByLabel('Email')).toBeVisible();
+    await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
 
     // Step 8: Focus field "Email" (invite-user.uc.yaml:7)
-    const step8_el = page.getByLabel('Email');
+    const step8_el = page.getByLabel('Email', { exact: true });
     await step8_el.focus();
     await expect(step8_el).toBeFocused();
 
     // Step 9: Enter field "Email" value "newbie@acme.example" (invite-user.uc.yaml:8)
-    await page.getByLabel('Email').fill('newbie@acme.example');
+    await page.getByLabel('Email', { exact: true }).fill('newbie@acme.example');
 
     // Step 10: Locate select "Role" (invite-user.uc.yaml:9)
-    await expect(page.getByRole('combobox', { name: 'Role' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Role', exact: true })).toBeVisible();
 
     // Step 11: Select select "Role" option "staff" (invite-user.uc.yaml:10)
-    const step11_select_combobox = page.getByRole('combobox', { name: 'Role' });
-    const step11_select = await step11_select_combobox.count() > 0 ? step11_select_combobox : page.getByLabel('Role');
+    const step11_select_combobox = page.getByRole('combobox', { name: 'Role', exact: true });
+    const step11_select = await step11_select_combobox.count() > 0 ? step11_select_combobox : page.getByLabel('Role', { exact: true });
     await step11_select.selectOption('staff');
 
     // Step 12: Locate button "Create" (invite-user.uc.yaml:11)
-    await expect(page.getByRole('button', { name: 'Create' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Create', exact: true })).toBeVisible();
 
     // Step 13: Activate button "Create" (invite-user.uc.yaml:12)
-    await page.getByRole('button', { name: 'Create' }).click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
 
     // Step 14: Verify text "newbie@acme.example" (invite-user.uc.yaml:13)
-    await expect(page.getByText('newbie@acme.example')).toBeVisible();
+    await expect(page.getByText('newbie@acme.example', { exact: true })).toBeVisible();
 
   });
 });

@@ -14,44 +14,44 @@ test.describe('Super admin creates a new tenant', () => {
     await page.goto('http://localhost:5174/admin/tenants');
 
     // Step 2: Locate button "Create tenant" (create-tenant.uc.yaml:1)
-    await expect(page.getByRole('button', { name: 'Create tenant' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Create tenant', exact: true })).toBeVisible();
 
     // Step 3: Focus button "Create tenant" (create-tenant.uc.yaml:2)
-    const step3_el = page.getByRole('button', { name: 'Create tenant' });
+    const step3_el = page.getByRole('button', { name: 'Create tenant', exact: true });
     await step3_el.focus();
     await expect(step3_el).toBeFocused();
 
     // Step 4: Activate button "Create tenant" (create-tenant.uc.yaml:3)
-    await page.getByRole('button', { name: 'Create tenant' }).click();
+    await page.getByRole('button', { name: 'Create tenant', exact: true }).click();
 
     // Step 5: Locate heading "Create tenant" (create-tenant.uc.yaml:4)
-    await expect(page.getByRole('heading', { name: 'Create tenant' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Create tenant', exact: true })).toBeVisible();
 
     // Step 6: Locate field "Name" (create-tenant.uc.yaml:5)
-    await expect(page.getByLabel('Name')).toBeVisible();
+    await expect(page.getByLabel('Name', { exact: true })).toBeVisible();
 
     // Step 7: Focus field "Name" (create-tenant.uc.yaml:6)
-    const step7_el = page.getByLabel('Name');
+    const step7_el = page.getByLabel('Name', { exact: true });
     await step7_el.focus();
     await expect(step7_el).toBeFocused();
 
     // Step 8: Enter field "Name" value "Beta Corp" (create-tenant.uc.yaml:7)
-    await page.getByLabel('Name').fill('Beta Corp');
+    await page.getByLabel('Name', { exact: true }).fill('Beta Corp');
 
     // Step 9: Locate field "Slug" (create-tenant.uc.yaml:8)
-    await expect(page.getByLabel('Slug')).toBeVisible();
+    await expect(page.getByLabel('Slug', { exact: true })).toBeVisible();
 
     // Step 10: Enter field "Slug" value "beta-corp" (create-tenant.uc.yaml:9)
-    await page.getByLabel('Slug').fill('beta-corp');
+    await page.getByLabel('Slug', { exact: true }).fill('beta-corp');
 
     // Step 11: Locate button "Create" (create-tenant.uc.yaml:10)
-    await expect(page.getByRole('button', { name: 'Create' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Create', exact: true })).toBeVisible();
 
     // Step 12: Activate button "Create" (create-tenant.uc.yaml:11)
-    await page.getByRole('button', { name: 'Create' }).click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
 
     // Step 13: Verify text "Beta Corp" (create-tenant.uc.yaml:12)
-    await expect(page.getByText('Beta Corp')).toBeVisible();
+    await expect(page.getByText('Beta Corp', { exact: true })).toBeVisible();
 
   });
 });

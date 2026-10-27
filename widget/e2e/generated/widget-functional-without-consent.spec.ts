@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Visitor can chat without ambient presence tracking (consent gate)', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('widget-functional-without-consent: Visitor can chat without ambient presence tracking (consent gate) (extension)', async ({ page }) => {
+  test('widget-functional-without-consent: Visitor can chat without ambient presence tracking (consent gate) (positive)', async ({ page }) => {
     // Preconditions:
     //   - The API stack is running with an "acme" tenant.
     //   - At least one support agent is available (the widget harness seeds this).
@@ -16,44 +16,44 @@ test.describe('Visitor can chat without ambient presence tracking (consent gate)
     await page.goto('http://localhost:5175/');
 
     // Step 2: Locate button "Chat with support" (functional-without-consent.uc.yaml:1)
-    await expect(page.getByRole('button', { name: 'Chat with support' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Chat with support', exact: true })).toBeVisible();
 
     // Step 3: Focus button "Chat with support" (functional-without-consent.uc.yaml:2)
-    const step3_el = page.getByRole('button', { name: 'Chat with support' });
+    const step3_el = page.getByRole('button', { name: 'Chat with support', exact: true });
     await step3_el.focus();
     await expect(step3_el).toBeFocused();
 
     // Step 4: Activate button "Chat with support" (functional-without-consent.uc.yaml:3)
-    await page.getByRole('button', { name: 'Chat with support' }).click();
+    await page.getByRole('button', { name: 'Chat with support', exact: true }).click();
 
     // Step 5: Locate heading "Chat with support" (functional-without-consent.uc.yaml:4)
-    await expect(page.getByRole('heading', { name: 'Chat with support' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Chat with support', exact: true })).toBeVisible();
 
     // Step 6: Locate field "Your name" (functional-without-consent.uc.yaml:5)
-    await expect(page.getByLabel('Your name')).toBeVisible();
+    await expect(page.getByLabel('Your name', { exact: true })).toBeVisible();
 
     // Step 7: Enter field "Your name" value "Jordan Visitor" (functional-without-consent.uc.yaml:6)
-    await page.getByLabel('Your name').fill('Jordan Visitor');
+    await page.getByLabel('Your name', { exact: true }).fill('Jordan Visitor');
 
     // Step 8: Locate field "How can we help?" (functional-without-consent.uc.yaml:7)
-    await expect(page.getByLabel('How can we help?')).toBeVisible();
+    await expect(page.getByLabel('How can we help?', { exact: true })).toBeVisible();
 
     // Step 9: Enter field "How can we help?" value "Can you help me place an order?" (functional-without-consent.uc.yaml:8)
-    await page.getByLabel('How can we help?').fill('Can you help me place an order?');
+    await page.getByLabel('How can we help?', { exact: true }).fill('Can you help me place an order?');
 
     // Step 10: Locate button "Start chat" (functional-without-consent.uc.yaml:9)
-    await expect(page.getByRole('button', { name: 'Start chat' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start chat', exact: true })).toBeVisible();
 
     // Step 11: Focus button "Start chat" (functional-without-consent.uc.yaml:10)
-    const step11_el = page.getByRole('button', { name: 'Start chat' });
+    const step11_el = page.getByRole('button', { name: 'Start chat', exact: true });
     await step11_el.focus();
     await expect(step11_el).toBeFocused();
 
     // Step 12: Activate button "Start chat" (functional-without-consent.uc.yaml:11)
-    await page.getByRole('button', { name: 'Start chat' }).click();
+    await page.getByRole('button', { name: 'Start chat', exact: true }).click();
 
     // Step 13: Verify text "Can you help me place an order?" (functional-without-consent.uc.yaml:12)
-    await expect(page.getByText('Can you help me place an order?')).toBeVisible();
+    await expect(page.getByText('Can you help me place an order?', { exact: true })).toBeVisible();
 
   });
 });

@@ -1,6 +1,6 @@
 id: widget-functional-without-consent
 title: "Visitor can chat without ambient presence tracking (consent gate)"
-type: extension
+type: positive
 description: |
   §16.2 / issue #53 — the consent gate must never block the widget's
   functional path. When a visitor's jurisdiction resolves to an opt-in (or
@@ -15,6 +15,10 @@ description: |
   api integration test `visitor-consent-gate.test.ts`.
 
 start_location: "http://localhost:5175/"
+
+expected_result: >-
+  Without presence or analytics consent the widget still renders its trigger,
+  opens, and lets the visitor start a chat.
 
 preconditions:
   - The API stack is running with an "acme" tenant.

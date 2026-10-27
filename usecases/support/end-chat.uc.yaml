@@ -1,6 +1,6 @@
 id: support-end-chat
 title: "Operator ends an active chat"
-type: extension
+type: positive
 description: |
   §5.1.7 (operator side) — with an active chat selected, the operator ends
   the session via the "End chat" control (emitting chat:end). The composer

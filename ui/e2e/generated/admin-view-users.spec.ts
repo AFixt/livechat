@@ -14,10 +14,10 @@ test.describe('Admin views the users list with tenant filter', () => {
     await page.goto('http://localhost:5174/admin/users');
 
     // Step 2: Locate heading "Users" (view-users.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
 
     // Step 3: Locate select "Filter by tenant" (view-users.uc.yaml:2)
-    await expect(page.getByRole('combobox', { name: 'Filter by tenant' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Filter by tenant', exact: true })).toBeVisible();
 
   });
 });

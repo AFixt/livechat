@@ -14,46 +14,46 @@ test.describe('Support staff signs in', () => {
     await page.goto('http://localhost:5174/login');
 
     // Step 2: Locate heading "Sign in" (login.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
 
     // Step 3: Locate field "Email address" (login.uc.yaml:2)
-    await expect(page.getByLabel('Email address')).toBeVisible();
+    await expect(page.getByLabel('Email address', { exact: true })).toBeVisible();
 
     // Step 4: Focus field "Email address" (login.uc.yaml:3)
-    const step4_el = page.getByLabel('Email address');
+    const step4_el = page.getByLabel('Email address', { exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Enter field "Email address" value "staff@acme.example" (login.uc.yaml:4)
-    await page.getByLabel('Email address').fill('staff@acme.example');
+    await page.getByLabel('Email address', { exact: true }).fill('staff@acme.example');
 
     // Step 6: Locate field "Password" (login.uc.yaml:5)
-    await expect(page.getByLabel('Password')).toBeVisible();
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
 
     // Step 7: Focus field "Password" (login.uc.yaml:6)
-    const step7_el = page.getByLabel('Password');
+    const step7_el = page.getByLabel('Password', { exact: true });
     await step7_el.focus();
     await expect(step7_el).toBeFocused();
 
     // Step 8: Enter field "Password" value "Staff!Password1" (login.uc.yaml:7)
-    await page.getByLabel('Password').fill('Staff!Password1');
+    await page.getByLabel('Password', { exact: true }).fill('Staff!Password1');
 
     // Step 9: Locate button "Sign in" (login.uc.yaml:8)
-    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
 
     // Step 10: Focus button "Sign in" (login.uc.yaml:9)
-    const step10_el = page.getByRole('button', { name: 'Sign in' });
+    const step10_el = page.getByRole('button', { name: 'Sign in', exact: true });
     await step10_el.focus();
     await expect(step10_el).toBeFocused();
 
     // Step 11: Activate button "Sign in" (login.uc.yaml:10)
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 
     // Step 12: Verify url "http://localhost:5174/" (login.uc.yaml:11)
     await expect(page).toHaveURL('http://localhost:5174/');
 
     // Step 13: Locate heading "Dashboard" (login.uc.yaml:12)
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
 
   });
 });

@@ -14,21 +14,21 @@ test.describe('Operator mutes the audible new-message alert', () => {
     await page.goto('http://localhost:5174/settings/preferences');
 
     // Step 2: Locate heading "Preferences" (toggle-alert-sound.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Preferences' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Preferences', exact: true })).toBeVisible();
 
     // Step 3: Locate checkbox "Alert sound muted" (toggle-alert-sound.uc.yaml:2)
-    await expect(page.getByRole('checkbox', { name: 'Alert sound muted' })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Alert sound muted', exact: true })).toBeVisible();
 
     // Step 4: Focus checkbox "Alert sound muted" (toggle-alert-sound.uc.yaml:3)
-    const step4_el = page.getByRole('checkbox', { name: 'Alert sound muted' });
+    const step4_el = page.getByRole('checkbox', { name: 'Alert sound muted', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Select checkbox "Alert sound muted" (toggle-alert-sound.uc.yaml:4)
-    await page.getByRole('checkbox', { name: 'Alert sound muted' }).check();
+    await page.getByRole('checkbox', { name: 'Alert sound muted', exact: true }).check();
 
     // Step 6: Verify text "Alert sound muted" (toggle-alert-sound.uc.yaml:5)
-    await expect(page.getByText('Alert sound muted')).toBeVisible();
+    await expect(page.getByText('Alert sound muted', { exact: true })).toBeVisible();
 
   });
 });
