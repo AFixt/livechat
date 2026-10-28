@@ -147,6 +147,30 @@ describe('markdownlint ignore list', () => {
   });
 });
 
+describe('prettier ignore list', () => {
+  it('ignores lychee/ but still checks real Markdown', () => {
+    const root = scratch('prettier-ignores-');
+    // Only the ignore list is under test; prettier's defaults format the probe.
+    copyFileSync(join(REPO_ROOT, '.prettierignore'), join(root, '.prettierignore'));
+    // Badly formatted: prettier rewrites `*` bullets to `-` and drops the
+    // blank-line run, so `--check` reports any file holding it.
+    const badlyFormatted = '# Probe\n\n\n\n* one\n* two\n';
+    for (const d of ['lychee', LINTED_DIR]) {
+      mkdirSync(join(root, d), { recursive: true });
+      writeFileSync(join(root, d, 'out.md'), badlyFormatted);
+    }
+    // Same argv as the `format:check` npm script.
+    const run = spawnSync(join(REPO_ROOT, 'node_modules', '.bin', 'prettier'), ['--check', '.'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+    const output = [run.stdout, run.stderr].join('');
+    // Control: the un-ignored copy is reported, so the run really checked files.
+    expect(output).toContain(`${LINTED_DIR}/out.md`);
+    expect(output, 'lychee/ should be ignored').not.toContain('lychee/out.md');
+  });
+});
+
 describe('eslint ignore list', () => {
   // Loading the root flat config pulls in the typed-linting setup, which takes
   // well over vitest's 5s default on a cold run.
