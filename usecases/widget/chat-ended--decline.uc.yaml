@@ -1,7 +1,7 @@
 id: widget-chat-ended--decline
 title: "Visitor declines the email transcript after support ends the chat"
 extends: widget-chat-ended
-type: extension
+type: positive
 description: |
   §5.1.7 — declining the transcript offer ("No thanks") must return the
   widget to its initial closed state without collecting an email address.

@@ -38,3 +38,23 @@ ignoreUntil = 2026-11-13
 # and nothing in the api/ui/widget runtime depends on braces. Revisit at
 # ignoreUntil: adopt a fixed braces the moment one ships.
 reason = "No fixed version published (3.0.3 is latest); dev-only via lint-staged/stylelint/jscpd globbing over repo-authored patterns, not in production runtime."
+
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+ignoreUntil = 2026-11-13
+# glob 9.0.0-14.0.1 (medium): an aborted walk keeps traversing in the background.
+# Published 2026-10-30, already in develop's lockfile. Needs a caller passing an
+# AbortSignal; no code here does. Reached through @afixt/usecase-runner,
+# read-package-json (dev) and sequelize-cli > js-beautify, which glob
+# repo-authored paths from the CLI. The fix is a major (14.x) those ranges reject.
+reason = "Needs an AbortSignal caller, none here; the fix is a major the dependents' ranges reject. Adopt once they move."
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2026-11-13
+# minimatch <11.0.1 (medium): pattern amplification. Published 2026-10-30, already
+# in develop's lockfile. Needs an attacker-controlled pattern. The patterns here
+# come from repo config and CLI calls: the eslint plugins, npm-run-all, glob, and
+# sequelize-cli > js-beautify > editorconfig (dev-time CLI). No request data
+# reaches them. The fix is a major (11.x) those ranges reject.
+reason = "Needs an attacker-controlled glob pattern, none reach minimatch here; the fix is a major the dependents' ranges reject. Adopt once they move."

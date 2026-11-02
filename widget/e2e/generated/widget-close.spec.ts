@@ -14,18 +14,18 @@ test.describe('Visitor can close the widget and focus returns to the trigger', (
     await page.goto('http://localhost:5175/');
 
     // Step 2: Locate button "Close chat widget" (close-widget.uc.yaml:1)
-    await expect(page.getByRole('button', { name: 'Close chat widget' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Close chat widget', exact: true })).toBeVisible();
 
     // Step 3: Focus button "Close chat widget" (close-widget.uc.yaml:2)
-    const step3_el = page.getByRole('button', { name: 'Close chat widget' });
+    const step3_el = page.getByRole('button', { name: 'Close chat widget', exact: true });
     await step3_el.focus();
     await expect(step3_el).toBeFocused();
 
     // Step 4: Activate button "Close chat widget" (close-widget.uc.yaml:3)
-    await page.getByRole('button', { name: 'Close chat widget' }).click();
+    await page.getByRole('button', { name: 'Close chat widget', exact: true }).click();
 
     // Step 5: Focus button "Chat with support" (close-widget.uc.yaml:4)
-    const step5_el = page.getByRole('button', { name: 'Chat with support' });
+    const step5_el = page.getByRole('button', { name: 'Chat with support', exact: true });
     await step5_el.focus();
     await expect(step5_el).toBeFocused();
 

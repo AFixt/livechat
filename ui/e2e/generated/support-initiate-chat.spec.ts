@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Operator starts a chat with a visitor from the presence list', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('support-initiate-chat: Operator starts a chat with a visitor from the presence list (extension)', async ({ page }) => {
+  test('support-initiate-chat: Operator starts a chat with a visitor from the presence list (positive)', async ({ page }) => {
     // Preconditions:
     //   - A staff user is authenticated (see support-login.uc.yaml).
     //   - At least one visitor is present on the site (established over sockets — see the e2e journey suite).
@@ -15,7 +15,7 @@ test.describe('Operator starts a chat with a visitor from the presence list', ()
     await page.goto('http://localhost:5174/');
 
     // Step 2: Locate heading "Visitors on site" (initiate-chat.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Visitors on site' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Visitors on site', exact: true })).toBeVisible();
 
     // Step 3: Note Each visitor row is a button whose accessible name is "Start a chat with visitor <id>"; activating it emits chat:initiate for that visitor. The per-visitor name and the socket round trip are covered by the cross-ends journey suite. (initiate-chat.uc.yaml:2)
     // Note: Each visitor row is a button whose accessible name is

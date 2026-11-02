@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Visitor sees a reconnecting banner when the socket drops', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('widget-reconnect: Visitor sees a reconnecting banner when the socket drops (extension)', async ({ page }) => {
+  test('widget-reconnect: Visitor sees a reconnecting banner when the socket drops (positive)', async ({ page }) => {
     // Preconditions:
     //   - A chat is already active (see widget-customer-initiates.uc.yaml).
     //   - The visitor's realtime socket has dropped (established over sockets — see the e2e journey suite).
@@ -15,10 +15,10 @@ test.describe('Visitor sees a reconnecting banner when the socket drops', () => 
     await page.goto('http://localhost:5175/');
 
     // Step 2: Locate region "Chat transcript" (actively-chatting-reconnect.uc.yaml:1)
-    await expect(page.getByRole('region', { name: 'Chat transcript' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Chat transcript', exact: true })).toBeVisible();
 
     // Step 3: Locate text "Connection lost. Reconnecting…" (actively-chatting-reconnect.uc.yaml:2)
-    await expect(page.getByText('Connection lost. Reconnecting…')).toBeVisible();
+    await expect(page.getByText('Connection lost. Reconnecting…', { exact: true })).toBeVisible();
 
   });
 });

@@ -1,6 +1,6 @@
 id: widget-reconnect
 title: "Visitor sees a reconnecting banner when the socket drops"
-type: extension
+type: positive
 description: |
   §3 / issue #69 — while the widget's realtime socket is down, the panel shows a
   visible "reconnecting" banner, and the change is announced through the global
@@ -15,6 +15,11 @@ description: |
   visitor-facing reconnect surface.
 
 start_location: "http://localhost:5175/"
+
+expected_result: >-
+  The panel shows a visible "reconnecting" banner while the socket is down,
+  the change is announced once through the global live region, and the
+  banner clears when the socket returns.
 
 preconditions:
   - A chat is already active (see widget-customer-initiates.uc.yaml).

@@ -1,6 +1,6 @@
 id: widget-restart
 title: "Returning visitor is offered to resume a prior conversation"
-type: extension
+type: positive
 description: |
   §5.1.8 — when a returning visitor still has an unfinished chat, the widget
   offers to resume it ("welcome back, continue?") rather than starting fresh.

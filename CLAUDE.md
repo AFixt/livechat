@@ -208,9 +208,10 @@ following the `@afixt/usecase-runner` DSL.
 - `@afixt/usecase-runner validate usecases/` runs in pre-push and CI.
 - Organize as: `usecases/widget/<flow>.uc.yaml`,
   `usecases/support/<flow>.uc.yaml`, `usecases/admin/<flow>.uc.yaml`. Negative
-  and extension cases (`type: negative` / `type: extension`) are required for
-  error paths and state variants (no-support-available, support-initiated,
-  restart-chat, etc.).
+  cases (`type: negative`) are required for error paths, and alternate-flow
+  cases (`type: positive`, named `<flow>--<variant>`) for state variants
+  (no-support-available, support-initiated, restart-chat, etc.). There is no
+  `type: extension` — usecase-runner 1.0.1 rejects it.
 - **Coverage rule for PRs:** if a PR adds or modifies a user interaction without
   a matching `.uc.yaml` change, CI fails.
 

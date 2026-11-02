@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Visitor sees the invitation when support starts a chat', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('widget-support-initiated: Visitor sees the invitation when support starts a chat (extension)', async ({ page }) => {
+  test('widget-support-initiated: Visitor sees the invitation when support starts a chat (positive)', async ({ page }) => {
     // Preconditions:
     //   - A support agent has initiated a chat with this visitor (chat:initiate, established over sockets — see the e2e journey suite).
 
@@ -14,21 +14,21 @@ test.describe('Visitor sees the invitation when support starts a chat', () => {
     await page.goto('http://localhost:5175/');
 
     // Step 2: Locate heading "A support agent wants to chat" (support-initiated.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'A support agent wants to chat' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'A support agent wants to chat', exact: true })).toBeVisible();
 
     // Step 3: Locate text "Would you like to start a conversation right now?" (support-initiated.uc.yaml:2)
-    await expect(page.getByText('Would you like to start a conversation right now?')).toBeVisible();
+    await expect(page.getByText('Would you like to start a conversation right now?', { exact: true })).toBeVisible();
 
     // Step 4: Locate button "Accept" (support-initiated.uc.yaml:3)
-    await expect(page.getByRole('button', { name: 'Accept' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Accept', exact: true })).toBeVisible();
 
     // Step 5: Focus button "Accept" (support-initiated.uc.yaml:4)
-    const step5_el = page.getByRole('button', { name: 'Accept' });
+    const step5_el = page.getByRole('button', { name: 'Accept', exact: true });
     await step5_el.focus();
     await expect(step5_el).toBeFocused();
 
     // Step 6: Activate button "Accept" (support-initiated.uc.yaml:5)
-    await page.getByRole('button', { name: 'Accept' }).click();
+    await page.getByRole('button', { name: 'Accept', exact: true }).click();
 
   });
 });

@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Operator ends an active chat', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('support-end-chat: Operator ends an active chat (extension)', async ({ page }) => {
+  test('support-end-chat: Operator ends an active chat (positive)', async ({ page }) => {
     // Preconditions:
     //   - A staff user is authenticated (see support-login.uc.yaml).
     //   - The operator has an active chat selected (established over sockets — see the e2e journey suite).
@@ -15,18 +15,18 @@ test.describe('Operator ends an active chat', () => {
     await page.goto('http://localhost:5174/');
 
     // Step 2: Locate region "Chat transcript" (end-chat.uc.yaml:1)
-    await expect(page.getByRole('region', { name: 'Chat transcript' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Chat transcript', exact: true })).toBeVisible();
 
     // Step 3: Locate button "End chat" (end-chat.uc.yaml:2)
-    await expect(page.getByRole('button', { name: 'End chat' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'End chat', exact: true })).toBeVisible();
 
     // Step 4: Focus button "End chat" (end-chat.uc.yaml:3)
-    const step4_el = page.getByRole('button', { name: 'End chat' });
+    const step4_el = page.getByRole('button', { name: 'End chat', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Activate button "End chat" (end-chat.uc.yaml:4)
-    await page.getByRole('button', { name: 'End chat' }).click();
+    await page.getByRole('button', { name: 'End chat', exact: true }).click();
 
     // Step 6: Note After chat:end is acknowledged the chat status becomes ended_by_agent and the Message field, Send and End chat controls disable; the visitor-side consequence (§5.1.7) is covered by widget-chat-ended.uc.yaml and the journey suite. (end-chat.uc.yaml:5)
     // Note: After chat:end is acknowledged the chat status becomes ended_by_agent and the Message field, Send and End chat controls disable; the visitor-side consequence (§5.1.7) is covered by widget-chat-ended.uc.yaml and the journey suite.

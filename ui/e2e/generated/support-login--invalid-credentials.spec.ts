@@ -14,32 +14,32 @@ test.describe('Login rejects wrong password with an accessible alert', () => {
     await page.goto('http://localhost:5174/login');
 
     // Step 2: Locate heading "Sign in" (login--invalid-credentials.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
 
-    // Step 3: Locate field "Email address" (login--invalid-credentials.uc.yaml:2)
-    await expect(page.getByLabel('Email address')).toBeVisible();
+    // Step 3: Locate textbox "Email address" (login--invalid-credentials.uc.yaml:2)
+    await expect(page.getByRole('textbox', { name: 'Email address', exact: true })).toBeVisible();
 
-    // Step 4: Focus field "Email address" (login--invalid-credentials.uc.yaml:3)
-    const step4_el = page.getByLabel('Email address');
+    // Step 4: Focus textbox "Email address" (login--invalid-credentials.uc.yaml:3)
+    const step4_el = page.getByRole('textbox', { name: 'Email address', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
-    // Step 5: Enter field "Email address" value "staff@acme.example" (login--invalid-credentials.uc.yaml:4)
-    await page.getByLabel('Email address').fill('staff@acme.example');
+    // Step 5: Enter textbox "Email address" value "staff@acme.example" (login--invalid-credentials.uc.yaml:4)
+    await page.getByRole('textbox', { name: 'Email address', exact: true }).fill('staff@acme.example');
 
-    // Step 6: Locate field "Password" (login--invalid-credentials.uc.yaml:5)
-    await expect(page.getByLabel('Password')).toBeVisible();
+    // Step 6: Locate field contains "Password" (login--invalid-credentials.uc.yaml:5)
+    await expect(page.getByLabel('Password', { exact: false })).toBeVisible();
 
-    // Step 7: Focus field "Password" (login--invalid-credentials.uc.yaml:6)
-    const step7_el = page.getByLabel('Password');
+    // Step 7: Focus field contains "Password" (login--invalid-credentials.uc.yaml:6)
+    const step7_el = page.getByLabel('Password', { exact: false });
     await step7_el.focus();
     await expect(step7_el).toBeFocused();
 
-    // Step 8: Enter field "Password" value "definitely-wrong-pass" (login--invalid-credentials.uc.yaml:1)
-    await page.getByLabel('Password').fill('definitely-wrong-pass');
+    // Step 8: Enter field contains "Password" value "definitely-wrong-pass" (login--invalid-credentials.uc.yaml:1)
+    await page.getByLabel('Password', { exact: false }).fill('definitely-wrong-pass');
 
     // Step 9: Activate button "Sign in" (login--invalid-credentials.uc.yaml:2)
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 
     // Step 10: Verify alert "Invalid email or password" (login--invalid-credentials.uc.yaml:3)
     await expect(page.getByRole('alert').filter({ hasText: 'Invalid email or password' })).toBeVisible();

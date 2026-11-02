@@ -15,27 +15,27 @@ test.describe('Support staff opens a chat and sees the transcript and composer',
     await page.goto('http://localhost:5174/');
 
     // Step 2: Locate heading "Your chats" (open-chat.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Your chats' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your chats', exact: true })).toBeVisible();
 
     // Step 3: Locate region "Chat transcript" (open-chat.uc.yaml:2)
-    await expect(page.getByRole('region', { name: 'Chat transcript' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Chat transcript', exact: true })).toBeVisible();
 
     // Step 4: Locate field "Message" (open-chat.uc.yaml:3)
-    await expect(page.getByLabel('Message')).toBeVisible();
+    await expect(page.getByLabel('Message', { exact: true })).toBeVisible();
 
     // Step 5: Focus field "Message" (open-chat.uc.yaml:4)
-    const step5_el = page.getByLabel('Message');
+    const step5_el = page.getByLabel('Message', { exact: true });
     await step5_el.focus();
     await expect(step5_el).toBeFocused();
 
     // Step 6: Enter field "Message" value "Happy to help — let me take a look at that for you." (open-chat.uc.yaml:5)
-    await page.getByLabel('Message').fill('Happy to help — let me take a look at that for you.');
+    await page.getByLabel('Message', { exact: true }).fill('Happy to help — let me take a look at that for you.');
 
     // Step 7: Locate button "Send" (open-chat.uc.yaml:6)
-    await expect(page.getByRole('button', { name: 'Send' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeVisible();
 
     // Step 8: Locate button "End chat" (open-chat.uc.yaml:7)
-    await expect(page.getByRole('button', { name: 'End chat' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'End chat', exact: true })).toBeVisible();
 
   });
 });

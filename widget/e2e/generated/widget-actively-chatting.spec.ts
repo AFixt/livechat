@@ -14,27 +14,27 @@ test.describe('Visitor sends messages in an active chat', () => {
     await page.goto('http://localhost:5175/');
 
     // Step 2: Locate region "Chat transcript" (actively-chatting.uc.yaml:1)
-    await expect(page.getByRole('region', { name: 'Chat transcript' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Chat transcript', exact: true })).toBeVisible();
 
     // Step 3: Locate field "Message" (actively-chatting.uc.yaml:2)
-    await expect(page.getByLabel('Message')).toBeVisible();
+    await expect(page.getByLabel('Message', { exact: true })).toBeVisible();
 
     // Step 4: Focus field "Message" (actively-chatting.uc.yaml:3)
-    const step4_el = page.getByLabel('Message');
+    const step4_el = page.getByLabel('Message', { exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Enter field "Message" value "I still need help — can someone look?" (actively-chatting.uc.yaml:4)
-    await page.getByLabel('Message').fill('I still need help — can someone look?');
+    await page.getByLabel('Message', { exact: true }).fill('I still need help — can someone look?');
 
     // Step 6: Locate button "Send" (actively-chatting.uc.yaml:5)
-    await expect(page.getByRole('button', { name: 'Send' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeVisible();
 
     // Step 7: Activate button "Send" (actively-chatting.uc.yaml:6)
-    await page.getByRole('button', { name: 'Send' }).click();
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
 
     // Step 8: Verify text "I still need help — can someone look?" (actively-chatting.uc.yaml:7)
-    await expect(page.getByText('I still need help — can someone look?')).toBeVisible();
+    await expect(page.getByText('I still need help — can someone look?', { exact: true })).toBeVisible();
 
   });
 });

@@ -40,7 +40,7 @@ interface OperationRef {
  */
 function listOperations(spec: ReturnType<typeof buildOpenApiSpec>): OperationRef[] {
   const ops: OperationRef[] = [];
-  const paths = (spec.paths ?? {}) as Record<string, Record<string, { security?: unknown }>>;
+  const paths = spec.paths as Record<string, Record<string, { security?: unknown }>>;
   for (const [path, item] of Object.entries(paths)) {
     for (const method of HTTP_METHODS) {
       const op = item[method];

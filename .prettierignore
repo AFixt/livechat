@@ -29,6 +29,13 @@ package-lock.json
 .stylelintcache
 reports/
 
+# lychee-action writes its run summary to lychee/out.md inside the workspace
+# before `check:all` runs, so CI format-checks a file whose layout lychee
+# controls, not us. `.markdownlintignore` carries the same entry; this one was
+# missing, so `format:check` failed every CI run. Pinned in
+# shared/tests/gate-ignores.test.ts.
+lychee/
+
 # Editor
 .vscode/
 .idea/
