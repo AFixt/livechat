@@ -180,6 +180,40 @@ exceptions:
     status: active
     issue: 186
 
+  - id: dep-glob-abort-signal-traversal
+    tool: osv-scanner
+    source: osv-scanner.toml (IgnoredVulns)
+    rules:
+      - GHSA-3g3m-2fjr-6pw4
+    owner: "@AFixt/security"
+    reason: >-
+      glob 9.0.0-14.0.1 keeps traversing after an aborted walk. Medium, and
+      needs a caller passing an AbortSignal; no code here does. Reached through
+      usecase-runner, read-package-json and sequelize-cli > js-beautify, which
+      glob repo-authored paths from the CLI. The fix is a 14.x major those
+      ranges reject.
+    added: 2026-11-02
+    # Aligned with osv-scanner.toml `ignoreUntil = 2026-11-13`.
+    expires: 2026-11-13
+    status: active
+
+  - id: dep-minimatch-pattern-amplification
+    tool: osv-scanner
+    source: osv-scanner.toml (IgnoredVulns)
+    rules:
+      - GHSA-g3hv-75wg-m249
+    owner: "@AFixt/security"
+    reason: >-
+      minimatch <11.0.1 denial of service via pattern amplification. Medium, and
+      needs an attacker-controlled pattern. Patterns here come from repo config
+      and CLI calls (eslint plugins, npm-run-all, glob, sequelize-cli >
+      js-beautify > editorconfig); no request data reaches them. The fix is an
+      11.x major those ranges reject.
+    added: 2026-11-02
+    # Aligned with osv-scanner.toml `ignoreUntil = 2026-11-13`.
+    expires: 2026-11-13
+    status: active
+
   # --- container / Dockerfile / IaC scanning (ADR-0016, issue #60) --------
   # The nginx-image non-root deferral is one decision expressed in three tool
   # configs (Hadolint DL3002, Trivy AVD-DS-0002, Checkov CKV_DOCKER_3); each is
