@@ -31,16 +31,16 @@ test.describe('Admin invites a new staff user', () => {
     // Step 6: Locate heading "Invite user" (invite-user.uc.yaml:5)
     await expect(page.getByRole('heading', { name: 'Invite user', exact: true })).toBeVisible();
 
-    // Step 7: Locate field "Email" (invite-user.uc.yaml:6)
-    await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
+    // Step 7: Locate textbox "Email" (invite-user.uc.yaml:6)
+    await expect(page.getByRole('textbox', { name: 'Email', exact: true })).toBeVisible();
 
-    // Step 8: Focus field "Email" (invite-user.uc.yaml:7)
-    const step8_el = page.getByLabel('Email', { exact: true });
+    // Step 8: Focus textbox "Email" (invite-user.uc.yaml:7)
+    const step8_el = page.getByRole('textbox', { name: 'Email', exact: true });
     await step8_el.focus();
     await expect(step8_el).toBeFocused();
 
-    // Step 9: Enter field "Email" value "newbie@acme.example" (invite-user.uc.yaml:8)
-    await page.getByLabel('Email', { exact: true }).fill('newbie@acme.example');
+    // Step 9: Enter textbox "Email" value "newbie@acme.example" (invite-user.uc.yaml:8)
+    await page.getByRole('textbox', { name: 'Email', exact: true }).fill('newbie@acme.example');
 
     // Step 10: Locate select "Role" (invite-user.uc.yaml:9)
     await expect(page.getByRole('combobox', { name: 'Role', exact: true })).toBeVisible();

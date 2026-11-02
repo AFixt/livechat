@@ -27,22 +27,22 @@ test.describe('Super admin creates a new tenant', () => {
     // Step 5: Locate heading "Create tenant" (create-tenant.uc.yaml:4)
     await expect(page.getByRole('heading', { name: 'Create tenant', exact: true })).toBeVisible();
 
-    // Step 6: Locate field "Name" (create-tenant.uc.yaml:5)
-    await expect(page.getByLabel('Name', { exact: true })).toBeVisible();
+    // Step 6: Locate textbox "Name" (create-tenant.uc.yaml:5)
+    await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible();
 
-    // Step 7: Focus field "Name" (create-tenant.uc.yaml:6)
-    const step7_el = page.getByLabel('Name', { exact: true });
+    // Step 7: Focus textbox "Name" (create-tenant.uc.yaml:6)
+    const step7_el = page.getByRole('textbox', { name: 'Name', exact: true });
     await step7_el.focus();
     await expect(step7_el).toBeFocused();
 
-    // Step 8: Enter field "Name" value "Beta Corp" (create-tenant.uc.yaml:7)
-    await page.getByLabel('Name', { exact: true }).fill('Beta Corp');
+    // Step 8: Enter textbox "Name" value "Beta Corp" (create-tenant.uc.yaml:7)
+    await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Beta Corp');
 
-    // Step 9: Locate field "Slug" (create-tenant.uc.yaml:8)
-    await expect(page.getByLabel('Slug', { exact: true })).toBeVisible();
+    // Step 9: Locate textbox "Slug" (create-tenant.uc.yaml:8)
+    await expect(page.getByRole('textbox', { name: 'Slug', exact: true })).toBeVisible();
 
-    // Step 10: Enter field "Slug" value "beta-corp" (create-tenant.uc.yaml:9)
-    await page.getByLabel('Slug', { exact: true }).fill('beta-corp');
+    // Step 10: Enter textbox "Slug" value "beta-corp" (create-tenant.uc.yaml:9)
+    await page.getByRole('textbox', { name: 'Slug', exact: true }).fill('beta-corp');
 
     // Step 11: Locate button "Create" (create-tenant.uc.yaml:10)
     await expect(page.getByRole('button', { name: 'Create', exact: true })).toBeVisible();
