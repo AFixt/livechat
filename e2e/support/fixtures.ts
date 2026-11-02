@@ -8,6 +8,7 @@
 export interface SeedTenant {
   name: string;
   slug: string;
+  status: 'active' | 'suspended' | 'archived';
 }
 
 /** A user to seed. Passwords are plain here; the model hashes on create. */
@@ -23,8 +24,10 @@ export interface SeedUser {
 }
 
 export const TENANTS = {
-  acme: { name: 'Acme Corp', slug: 'acme' },
-  globex: { name: 'Globex Industries', slug: 'globex' },
+  acme: { name: 'Acme Corp', slug: 'acme', status: 'active' },
+  globex: { name: 'Globex Industries', slug: 'globex', status: 'active' },
+  /** Suspended with no expiry — the tenant rule alone must refuse its users (#197). */
+  initech: { name: 'Initech', slug: 'initech', status: 'suspended' },
 } as const satisfies Record<string, SeedTenant>;
 
 export const USERS = {
@@ -70,6 +73,16 @@ export const USERS = {
     role: 'staff',
     status: 'suspended',
     tenantSlug: 'globex',
+  },
+  /** Active on purpose, so only the tenant's suspension can refuse the sign-in. */
+  suspendedTenantStaff: {
+    email: 'peter@initech.example',
+    password: 'Staff!Password1',
+    firstName: 'Peter',
+    lastName: 'Gibbons',
+    role: 'staff',
+    status: 'active',
+    tenantSlug: 'initech',
   },
 } as const satisfies Record<string, SeedUser>;
 

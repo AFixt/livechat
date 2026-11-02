@@ -2,7 +2,7 @@ import { io as ioClient, type Socket } from 'socket.io-client';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-import { Tenant, User } from '../../src/models/index.js';
+import { Invitation, Tenant, User } from '../../src/models/index.js';
 
 import { integrationDbUp, probeLiveHarness, type LiveTestHarness } from './setup.js';
 
@@ -140,6 +140,17 @@ describe.skipIf(!integrationDbUp)('tenant status gates every access path (#197)'
       expect(res.status).toBe(403);
     });
 
+    test('answers a wrong password with the ordinary 401, hiding the tenant state', async () => {
+      if (harness === null) return;
+      const tenant = await createTenant('login-wrong-password', 'suspended', null);
+      await createUser('login-wrong-password@example.com', 'admin', tenant.id);
+      const res = await request(harness.app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'login-wrong-password@example.com', password: 'not-the-password' });
+      expect(res.status).toBe(401);
+      expect(res.body.message).toBe('Invalid email or password');
+    });
+
     test('still admits a user of an active, unexpired tenant', async () => {
       if (harness === null) return;
       const tenant = await createTenant('login-active', 'active', new Date(Date.now() + DAY_MS));
@@ -151,6 +162,36 @@ describe.skipIf(!integrationDbUp)('tenant status gates every access path (#197)'
       if (harness === null) return;
       await createUser('login-super@example.com', 'super_admin', null);
       await login('login-super@example.com');
+    });
+  });
+
+  describe('register', () => {
+    test('refuses an invitation into a suspended tenant and leaves it pending', async () => {
+      if (harness === null) return;
+      const tenant = await createTenant('register-suspended', 'suspended', null);
+      const inviter = await createUser('register-inviter@example.com', 'super_admin', null);
+      const email = 'register-invitee@example.com';
+      const invitation = await Invitation.create({
+        email,
+        role: 'staff',
+        token: 'register-suspended-tenant-token',
+        invitedBy: inviter.id,
+        expiresAt: new Date(Date.now() + DAY_MS),
+        tenantId: tenant.id,
+        name: null,
+        acceptedAt: null,
+      });
+      const res = await request(harness.app).post('/api/v1/auth/register').send({
+        token: invitation.token,
+        email,
+        password: PASSWORD,
+        firstName: 'Test',
+        lastName: 'User',
+      });
+      expect(res.status).toBe(403);
+      await expect(User.findOne({ where: { email } })).resolves.toBeNull();
+      await invitation.reload();
+      expect(invitation.status).toBe('pending');
     });
   });
 

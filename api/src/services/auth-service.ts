@@ -75,6 +75,8 @@ export function createAuthService(deps: AuthDeps) {
         where: { email: input.email.toLowerCase() },
       });
       if (existing !== null) throw ApiError.conflict('Email already registered');
+      // An account in a suspended tenant could never sign in (#197).
+      await assertTenantUsable({ role: invitation.role, tenantId: invitation.tenantId });
 
       const verificationToken = randomBytes(32).toString('hex');
       const user = await User.create({

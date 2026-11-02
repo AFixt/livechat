@@ -8,7 +8,7 @@ test.describe('Login is refused, with an accessible reason, while the tenant is 
 
   test('support-login--suspended-tenant: Login is refused, with an accessible reason, while the tenant is suspended (negative)', async ({ page }) => {
     // Preconditions:
-    //   - A tenant-scoped staff user exists with the credentials of support-login.
+    //   - An active staff user exists with the credentials below.
     //   - That user's tenant has status "suspended".
 
     // Step 1: Access start location
@@ -17,27 +17,27 @@ test.describe('Login is refused, with an accessible reason, while the tenant is 
     // Step 2: Locate heading "Sign in" (login--suspended-tenant.uc.yaml:1)
     await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
 
-    // Step 3: Locate field "Email address" (login--suspended-tenant.uc.yaml:2)
-    await expect(page.getByLabel('Email address', { exact: true })).toBeVisible();
+    // Step 3: Locate textbox "Email address" (login--suspended-tenant.uc.yaml:2)
+    await expect(page.getByRole('textbox', { name: 'Email address', exact: true })).toBeVisible();
 
-    // Step 4: Focus field "Email address" (login--suspended-tenant.uc.yaml:3)
-    const step4_el = page.getByLabel('Email address', { exact: true });
+    // Step 4: Focus textbox "Email address" (login--suspended-tenant.uc.yaml:3)
+    const step4_el = page.getByRole('textbox', { name: 'Email address', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
-    // Step 5: Enter field "Email address" value "staff@acme.example" (login--suspended-tenant.uc.yaml:4)
-    await page.getByLabel('Email address', { exact: true }).fill('staff@acme.example');
+    // Step 5: Enter textbox "Email address" value "peter@initech.example" (login--suspended-tenant.uc.yaml:4)
+    await page.getByRole('textbox', { name: 'Email address', exact: true }).fill('peter@initech.example');
 
-    // Step 6: Locate field "Password" (login--suspended-tenant.uc.yaml:5)
-    await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
+    // Step 6: Locate field contains "Password" (login--suspended-tenant.uc.yaml:5)
+    await expect(page.getByLabel('Password', { exact: false })).toBeVisible();
 
-    // Step 7: Focus field "Password" (login--suspended-tenant.uc.yaml:6)
-    const step7_el = page.getByLabel('Password', { exact: true });
+    // Step 7: Focus field contains "Password" (login--suspended-tenant.uc.yaml:6)
+    const step7_el = page.getByLabel('Password', { exact: false });
     await step7_el.focus();
     await expect(step7_el).toBeFocused();
 
-    // Step 8: Enter field "Password" value "Staff!Password1" (login--suspended-tenant.uc.yaml:7)
-    await page.getByLabel('Password', { exact: true }).fill('Staff!Password1');
+    // Step 8: Enter field contains "Password" value "Staff!Password1" (login--suspended-tenant.uc.yaml:7)
+    await page.getByLabel('Password', { exact: false }).fill('Staff!Password1');
 
     // Step 9: Locate button "Sign in" (login--suspended-tenant.uc.yaml:8)
     await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();

@@ -7,17 +7,20 @@ description: |
   whatever the tenant's expiry date. The correct password still gets a 403,
   and the form renders the server's reason in an alert (role="alert") rather
   than the locked-account text, keeping the user on /login. Refresh, every
-  authenticated request and the staff socket refuse the same user; those
-  paths are covered by the api integration test `tenant-status.test.ts`.
+  authenticated request and a new staff-socket connection refuse the same
+  user; those paths are covered by the api integration test
+  `tenant-status.test.ts`.
 
   A variant of support-login: it reuses the parent's entry steps and
   overrides from the submit step onward (steps_override).
 
 preconditions:
-  - A tenant-scoped staff user exists with the credentials of support-login.
+  - An active staff user exists with the credentials below.
   - That user's tenant has status "suspended".
 
-data: {}
+data:
+  email: "peter@initech.example"
+  password: "Staff!Password1"
 
 steps_override:
   from_step: 10
