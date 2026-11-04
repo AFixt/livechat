@@ -63,6 +63,16 @@ describe('assertCanChangeRole (#195)', () => {
     }).toThrow(/outranks you/);
   });
 
+  it('refuses changing a user to a role above the caller’s own', () => {
+    expect(() => {
+      assertCanChangeRole(
+        tenantAdmin,
+        { id: 'u-1', role: 'client', tenantId: TENANT },
+        'super_admin',
+      );
+    }).toThrow(/above your own/);
+  });
+
   it('allows a permitted change', () => {
     expect(() => {
       assertCanChangeRole(tenantAdmin, { id: 'u-1', role: 'client', tenantId: TENANT }, 'staff');

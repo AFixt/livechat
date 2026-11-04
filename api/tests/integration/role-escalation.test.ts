@@ -135,10 +135,12 @@ describe.skipIf(!integrationDbUp)('role changes respect the caller’s ceiling (
 
   test('nobody can change their own role, even to a lower one', async () => {
     if (harness === null) return;
+    const denied = (await deniedAudits(tenantAdmin.id)).length;
     const res = await patchRole(tenantAdminToken, tenantAdmin.id, 'client');
     expect(res.status).toBe(403);
     await tenantAdmin.reload();
     expect(tenantAdmin.role).toBe('admin');
+    expect(await deniedAudits(tenantAdmin.id)).toHaveLength(denied + 1);
   });
 
   test('a global admin cannot grant super_admin, a role above their own', async () => {
@@ -160,22 +162,28 @@ describe.skipIf(!integrationDbUp)('role changes respect the caller’s ceiling (
     expect(res.status).toBe(403);
     await superAdmin.reload();
     expect(superAdmin.role).toBe('super_admin');
+    expect(await deniedAudits(superAdmin.id)).toHaveLength(1);
   });
 
   test('even a super_admin cannot put the super_admin role inside a tenant', async () => {
     if (harness === null) return;
     await createUser('role-super@example.com', 'super_admin', null);
     const token = await login('role-super@example.com');
+    const denied = (await deniedAudits(tenantStaff.id)).length;
     const res = await patchRole(token, tenantStaff.id, 'super_admin');
     expect(res.status).toBe(403);
     await tenantStaff.reload();
     expect(tenantStaff.role).toBe('staff');
+    expect(await deniedAudits(tenantStaff.id)).toHaveLength(denied + 1);
   });
 
   test('a permitted change still succeeds and is audited as user.update', async () => {
     if (harness === null) return;
+    // A fresh admin, so a regression in an earlier test cannot fail this one.
+    await createUser('role-admin-2@example.com', 'admin', tenantAdmin.tenantId);
+    const token = await login('role-admin-2@example.com');
     const target = await createUser('role-client@example.com', 'client', tenantAdmin.tenantId);
-    const res = await patchRole(tenantAdminToken, target.id, 'staff');
+    const res = await patchRole(token, target.id, 'staff');
     expect(res.status).toBe(200);
     expect(res.body.data.role).toBe('staff');
     const rows = await AuditLog.findAll({
