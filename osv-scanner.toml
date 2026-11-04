@@ -40,10 +40,21 @@ ignoreUntil = 2026-11-13
 reason = "No fixed version published (3.0.3 is latest); dev-only via lint-staged/stylelint/jscpd globbing over repo-authored patterns, not in production runtime."
 
 [[IgnoredVulns]]
-id = "GHSA-27r3-jxmh-p828"
-ignoreUntil = 2026-10-30
-# body-parser 2.0.0-2.3.0: denial of service via trailing bytes after a
-# compressed request body. Runtime (express 5 body parsing). The fix, 2.4.0,
-# shipped 2026-10-22 and is inside the 7-day min-release-age cooldown in .npmrc;
-# adopt it the day the cooldown ends. Deliberately short-lived.
-reason = "Fix (body-parser 2.4.0) is inside the 7-day min-release-age cooldown; adopt on expiry."
+id = "GHSA-3g3m-2fjr-6pw4"
+ignoreUntil = 2026-11-13
+# glob 9.0.0-14.0.1 (medium): an aborted walk keeps traversing in the background.
+# Published 2026-10-30, already in develop's lockfile. Needs a caller passing an
+# AbortSignal; no code here does. Reached through @afixt/usecase-runner,
+# read-package-json (dev) and sequelize-cli > js-beautify, which glob
+# repo-authored paths from the CLI. The fix is a major (14.x) those ranges reject.
+reason = "Needs an AbortSignal caller, none here; the fix is a major the dependents' ranges reject. Adopt once they move."
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2026-11-13
+# minimatch <11.0.1 (medium): pattern amplification. Published 2026-10-30, already
+# in develop's lockfile. Needs an attacker-controlled pattern. The patterns here
+# come from repo config and CLI calls: the eslint plugins, npm-run-all, glob, and
+# sequelize-cli > js-beautify > editorconfig (dev-time CLI). No request data
+# reaches them. The fix is a major (11.x) those ranges reject.
+reason = "Needs an attacker-controlled glob pattern, none reach minimatch here; the fix is a major the dependents' ranges reject. Adopt once they move."
