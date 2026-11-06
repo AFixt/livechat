@@ -20,14 +20,18 @@ data:
   email: "staff@acme.example"
   password: "Staff!Password1"
 
+# Both fields are MUI `required`, so their label text carries an aria-hidden
+# asterisk that an exact `field "..."` match cannot see past. Email uses the
+# role form; a password input has no role, so it matches by substring.
+# See usecases/README.md, "Targeting required fields".
 steps:
   - locate: heading "Sign in"
-  - locate: field "Email address"
-  - focus: field "Email address"
-  - enter: field "Email address" value "{{ email }}"
-  - locate: field "Password"
-  - focus: field "Password"
-  - enter: field "Password" value "{{ password }}"
+  - locate: textbox "Email address"
+  - focus: textbox "Email address"
+  - enter: textbox "Email address" value "{{ email }}"
+  - locate: field contains "Password"
+  - focus: field contains "Password"
+  - enter: field contains "Password" value "{{ password }}"
   - locate: button "Sign in"
   - focus: button "Sign in"
   - activate: button "Sign in"

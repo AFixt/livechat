@@ -180,21 +180,38 @@ exceptions:
     status: active
     issue: 186
 
-  - id: dep-body-parser-compressed-trailing-bytes
-    tool: npm-audit, osv-scanner
-    source: scripts/npm-audit.sh (ALLOW) + osv-scanner.toml (IgnoredVulns)
+  - id: dep-glob-abort-signal-traversal
+    tool: osv-scanner
+    source: osv-scanner.toml (IgnoredVulns)
     rules:
-      - GHSA-27r3-jxmh-p828
+      - GHSA-3g3m-2fjr-6pw4
     owner: "@AFixt/security"
     reason: >-
-      body-parser 2.0.0-2.3.0 denial of service via trailing bytes after a
-      compressed request body. Runtime: express 5 parses every api request body
-      with it. The fix, body-parser 2.4.0, was published 2026-10-22 and is
-      inside the 7-day min-release-age cooldown in .npmrc, so it cannot be
-      installed yet. Short-lived on purpose: adopt 2.4.0 when this expires.
-    added: 2026-10-27
-    # Aligned with osv-scanner.toml `ignoreUntil = 2026-10-30`.
-    expires: 2026-10-30
+      glob 9.0.0-14.0.1 keeps traversing after an aborted walk. Medium, and
+      needs a caller passing an AbortSignal; no code here does. Reached through
+      usecase-runner, read-package-json and sequelize-cli > js-beautify, which
+      glob repo-authored paths from the CLI. The fix is a 14.x major those
+      ranges reject.
+    added: 2026-11-02
+    # Aligned with osv-scanner.toml `ignoreUntil = 2026-11-13`.
+    expires: 2026-11-13
+    status: active
+
+  - id: dep-minimatch-pattern-amplification
+    tool: osv-scanner
+    source: osv-scanner.toml (IgnoredVulns)
+    rules:
+      - GHSA-g3hv-75wg-m249
+    owner: "@AFixt/security"
+    reason: >-
+      minimatch <11.0.1 denial of service via pattern amplification. Medium, and
+      needs an attacker-controlled pattern. Patterns here come from repo config
+      and CLI calls (eslint plugins, npm-run-all, glob, sequelize-cli >
+      js-beautify > editorconfig); no request data reaches them. The fix is an
+      11.x major those ranges reject.
+    added: 2026-11-02
+    # Aligned with osv-scanner.toml `ignoreUntil = 2026-11-13`.
+    expires: 2026-11-13
     status: active
 
   # --- container / Dockerfile / IaC scanning (ADR-0016, issue #60) --------

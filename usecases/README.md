@@ -54,6 +54,18 @@ their delta in `steps_override`, so they omit it.
   `extends:` + `steps_override:` + `from_step:` rather than copying the parent's
   steps.
 
+## Targeting required fields
+
+Since 1.0.1 every name matches exactly. A quoted `field "X"` becomes
+`getByLabel('X', { exact: true })`, which compares against the label's _text_.
+MUI appends an `aria-hidden` asterisk to the label of every `required` field, so
+that text is `X *` while the accessible name stays `X`, and the exact match
+finds nothing. For a required field, target by role instead:
+
+- Text, email and multiline inputs: `textbox "X"` (matches the accessible name).
+- Password inputs have no ARIA role, so no role form exists: use
+  `field contains "X"`, and keep `X` unique on the page.
+
 ## Workflow
 
 1. **Write the `.uc.yaml` first.** It is the source of truth for behavior.
