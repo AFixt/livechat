@@ -175,7 +175,11 @@ openApiRegistry.registerPath({
   method: 'post',
   path: '/invitations',
   summary: 'Invite a user',
-  description: `${adminNote} Registration is only possible against one of these.`,
+  description:
+    `${adminNote} Registration is only possible against one of these. ` +
+    'A tenant-scoped admin can invite only into their own tenant: an omitted `tenantId` means ' +
+    'their tenant, and naming another one is a 403. A global invitation (`tenantId: null`) ' +
+    'requires `super_admin`, and the role can be no higher than the inviter’s own.',
   tags: ['invitations'],
   security: bearerSecurity(),
   request: { body: body(createInvitationInputSchema) },

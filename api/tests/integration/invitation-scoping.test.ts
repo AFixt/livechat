@@ -144,6 +144,23 @@ describe.skipIf(!integrationDbUp)('invitations are confined to the caller’s te
         .set('Authorization', `Bearer ${adminToken}`);
       expect(res.status).toBe(403);
     });
+
+    test('shows a global super_admin every tenant’s invitations', async () => {
+      if (harness === null) return;
+      await createUser('invite-list-super@example.com', 'super_admin', null);
+      const token = await login('invite-list-super@example.com');
+      const res = await request(harness.app)
+        .get('/api/v1/invitations')
+        .set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ email: 'own-invitee@example.com' }),
+          expect.objectContaining({ email: 'other-invitee@example.com' }),
+          expect.objectContaining({ email: 'global-invitee@example.com' }),
+        ]),
+      );
+    });
   });
 
   describe('revoke', () => {
@@ -183,6 +200,13 @@ describe.skipIf(!integrationDbUp)('invitations are confined to the caller’s te
       expect(await Invitation.count({ where: { email: 'takeover@example.com' } })).toBe(0);
     });
 
+    test('refuses a tenant admin inviting a super_admin into their own tenant', async () => {
+      if (harness === null) return;
+      const res = await invite({ email: 'tenanted-super@example.com', role: 'super_admin' });
+      expect(res.status).toBe(403);
+      expect(await Invitation.count({ where: { email: 'tenanted-super@example.com' } })).toBe(0);
+    });
+
     test('refuses a tenant admin inviting into another tenant', async () => {
       if (harness === null) return;
       const res = await invite({
@@ -210,6 +234,7 @@ describe.skipIf(!integrationDbUp)('invitations are confined to the caller’s te
         .set('Authorization', `Bearer ${token}`)
         .send({ email: 'global-staff@example.com', role: 'staff', tenantId: null });
       expect(res.status).toBe(403);
+      expect(await Invitation.count({ where: { email: 'global-staff@example.com' } })).toBe(0);
     });
 
     test('lets a super_admin invite a global super_admin', async () => {
