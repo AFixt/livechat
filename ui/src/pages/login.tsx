@@ -17,6 +17,17 @@ import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { getApi } from '../services/api.js';
 import { useAuthStore } from '../store/auth.js';
 
+/**
+ * The server's explanation for a refused sign-in, when it sent one.
+ * @param err - The failed request.
+ * @returns The response envelope's message, or undefined.
+ */
+function forbiddenMessage(err: AxiosError): string | undefined {
+  const body: unknown = err.response?.data;
+  if (typeof body !== 'object' || body === null || !('message' in body)) return undefined;
+  return typeof body.message === 'string' && body.message !== '' ? body.message : undefined;
+}
+
 interface LoginResponse {
   success: boolean;
   data: { user: UserSafe; accessToken: string; refreshToken: string };
@@ -57,7 +68,9 @@ export function LoginPage(): React.JSX.Element {
       if (err instanceof AxiosError && err.response?.status === 401) {
         setApiError(t('auth.errors.invalidCredentials'));
       } else if (err instanceof AxiosError && err.response?.status === 403) {
-        setApiError(t('auth.errors.locked'));
+        // 403 covers a locked account, an inactive account and an inactive or
+        // expired tenant (#197); the server's message says which one.
+        setApiError(forbiddenMessage(err) ?? t('auth.errors.locked'));
       } else {
         setApiError(t('app.error'));
       }

@@ -48,6 +48,13 @@ export function buildAuthRouter(deps: AuthRouterDeps): Router {
   const authLimit: RequestHandler =
     deps.skipRateLimit === true ? noopMiddleware : createAuthLimiter(deps.redis);
   const requireAuth: RequestHandler = authenticate({ env: deps.env, redis: deps.redis });
+  // Logout skips only the tenant check (#197): a suspended tenant's user must
+  // still be able to end their session, or it revives on reactivation.
+  const requireAuthForLogout: RequestHandler = authenticate({
+    env: deps.env,
+    redis: deps.redis,
+    checkTenant: false,
+  });
 
   router.post(
     '/register',
@@ -107,7 +114,7 @@ export function buildAuthRouter(deps: AuthRouterDeps): Router {
 
   router.post(
     '/logout',
-    requireAuth,
+    requireAuthForLogout,
     asyncHandler(async (req, res) => {
       if (req.user === undefined || req.tokenJti === undefined) return;
       await deps.auth.logout(req.user.id, req.tokenJti);

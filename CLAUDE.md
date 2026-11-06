@@ -171,8 +171,10 @@ replacements.
   if needed (many-to-many).
 - **AuditLog** — every auth + admin action.
 - **Middlewares:** `authenticate` (verifies JWT, checks blacklist, loads user,
-  enforces `tenant.expires_at`) and `authorize.requireRole(...roles)` /
-  `requireTenantAccess()` / `requireStaffOrAdmin()`.
+  enforces tenant `status` and `expires_at` via `assertTenantUsable`, which
+  login, refresh and the staff socket also apply) and
+  `authorize.requireRole(...roles)` / `requireTenantAccess()` /
+  `requireStaffOrAdmin()`.
 - **Socket.IO auth:** JWT on handshake (not cookies). On connect: join
   `user:{id}`, `staff` if staff+, `tenant:{id}` if tenanted.
 

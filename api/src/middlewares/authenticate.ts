@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 
-import { Tenant, User } from '../models/index.js';
+import { User } from '../models/index.js';
+import { assertTenantUsable } from '../services/tenant-access.js';
 import { ApiError } from '../utils/api-error.js';
 
 import type { Env } from '../config/env.js';
@@ -19,6 +20,12 @@ declare module 'express-serve-static-core' {
 interface AuthDeps {
   env: Pick<Env, 'JWT_ACCESS_SECRET'>;
   redis: Redis;
+  /**
+   * Enforce the tenant lifecycle rule (#197). True everywhere except logout,
+   * so a user of a suspended tenant can still end their session — otherwise
+   * it would survive, and revive when the tenant is reactivated.
+   */
+  checkTenant?: boolean;
 }
 
 interface AccessTokenPayload {
@@ -57,24 +64,6 @@ function verifyAccess(token: string, secret: string): AccessTokenPayload {
   }
 }
 
-/**
- * Enforce tenant expiration for non-super-admin users. No-op for super_admin
- * and for tenantless users.
- * @param user - Authenticated user.
- */
-async function assertTenantActive(user: User): Promise<void> {
-  if (user.tenantId === null || user.role === 'super_admin') return;
-  const tenant = await Tenant.findByPk(user.tenantId, {
-    attributes: ['id', 'expiresAt', 'status'],
-  });
-  if (tenant?.expiresAt == null) return;
-  if (new Date() > new Date(tenant.expiresAt)) {
-    throw ApiError.forbidden(
-      "Your organization's access has expired. Please contact your administrator.",
-    );
-  }
-}
-
 /** The authenticated principal resolved from an access token. */
 export interface AuthenticatedAccess {
   /** The loaded, active User. */
@@ -85,10 +74,10 @@ export interface AuthenticatedAccess {
 
 /**
  * Verify an access token the whole way: signature, Redis JTI blacklist,
- * user existence + `active` status, and tenant expiry. Shared by the HTTP
- * {@link authenticate} middleware and the Socket.IO handshake so the two can
- * never diverge (issue #72) — a blacklisted, deactivated, or expired-tenant
- * token is refused on both paths.
+ * user existence + `active` status, and tenant status + expiry. Shared by the
+ * HTTP {@link authenticate} middleware and the Socket.IO handshake so the two
+ * can never diverge (issue #72) — a blacklisted, deactivated, or
+ * suspended/expired-tenant token is refused on both paths.
  * @param deps - Env + Redis dependencies.
  * @param token - The raw access token (no `Bearer ` prefix).
  * @returns The authenticated user and the token's JTI.
@@ -107,14 +96,14 @@ export async function authenticateAccessToken(
   if (user === null) throw ApiError.unauthorized('User not found');
   if (user.status !== 'active') throw ApiError.forbidden('Account is not active');
 
-  await assertTenantActive(user);
+  if (deps.checkTenant !== false) await assertTenantUsable(user);
 
   return { user, jti: decoded.jti };
 }
 
 /**
  * Authenticate the bearer JWT, reject blacklisted or expired tokens, load
- * the User, and enforce tenant expiration for non-super-admin accounts.
+ * the User, and enforce the tenant lifecycle rule for tenant users.
  * @param deps - Env + Redis dependencies.
  * @returns Express middleware.
  */
