@@ -93,12 +93,10 @@ export function initModels(sequelize: Sequelize): void {
 export {
   AuditLog,
   Chat,
-  ChatEvent,
   ChatMessage,
   ConsentRecord,
   Invitation,
   JwtBlacklist,
-  StaffTenant,
   Tenant,
   User,
   UserSession,

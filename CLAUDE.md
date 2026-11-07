@@ -108,8 +108,11 @@ Per issue #1 — the full stack is the mandate, not a suggestion:
   `promise`, `n`, `jsdoc`, `no-secrets`
 - Prettier + `prettier-plugin-organize-imports`
 - Stylelint + `stylelint-config-standard` + `@double-great/stylelint-a11y`
-- `markdownlint-cli2`
+- `markdownlint-cli` (config `.markdownlint.jsonc`, ignores
+  `.markdownlintignore`)
 - `jscpd` (dup detection, `--threshold 1 --min-tokens 50`)
+- [Knip](https://knip.dev) (unused files, exports and dependencies; kept at
+  zero, exceptions with reasons in `knip.jsonc`)
 - `lychee` (Markdown link check)
 - `license-checker-rseidelsohn` (allowlist-only licenses)
 - `size-limit` (build gate)
@@ -168,8 +171,10 @@ replacements.
   if needed (many-to-many).
 - **AuditLog** — every auth + admin action.
 - **Middlewares:** `authenticate` (verifies JWT, checks blacklist, loads user,
-  enforces `tenant.expires_at`) and `authorize.requireRole(...roles)` /
-  `requireTenantAccess()` / `requireStaffOrAdmin()`.
+  enforces tenant `status` and `expires_at` via `assertTenantUsable`, which
+  login, refresh and the staff socket also apply) and
+  `authorize.requireRole(...roles)` / `requireTenantAccess()` /
+  `requireStaffOrAdmin()`.
 - **Socket.IO auth:** JWT on handshake (not cookies). On connect: join
   `user:{id}`, `staff` if staff+, `tenant:{id}` if tenanted.
 
@@ -205,9 +210,10 @@ following the `@afixt/usecase-runner` DSL.
 - `@afixt/usecase-runner validate usecases/` runs in pre-push and CI.
 - Organize as: `usecases/widget/<flow>.uc.yaml`,
   `usecases/support/<flow>.uc.yaml`, `usecases/admin/<flow>.uc.yaml`. Negative
-  and extension cases (`type: negative` / `type: extension`) are required for
-  error paths and state variants (no-support-available, support-initiated,
-  restart-chat, etc.).
+  cases (`type: negative`) are required for error paths, and alternate-flow
+  cases (`type: positive`, named `<flow>--<variant>`) for state variants
+  (no-support-available, support-initiated, restart-chat, etc.). There is no
+  `type: extension` — usecase-runner 1.0.1 rejects it.
 - **Coverage rule for PRs:** if a PR adds or modifies a user interaction without
   a matching `.uc.yaml` change, CI fails.
 
@@ -240,7 +246,8 @@ See `AFixt/usecase-runner/spec.md` for DSL reference and
 Once scaffolded, root-level scripts mirror the house pattern:
 
 - `npm run dev` — run api, ui, widget in parallel (concurrently)
-- `npm run check` — `lint` + `typecheck` + `stylelint` + `markdownlint`
+- `npm run check` — `lint` + `typecheck` + `knip` + `stylelint` +
+  `markdownlint` + `usecases:validate`
 - `npm run check:all` — `check` + `test` + `build` + `size` + `dupes` +
   `links` + `security` + `license:check` (pre-push gate)
 - `npm test` — Vitest across workspaces

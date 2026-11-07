@@ -185,5 +185,3 @@ function CreateInvitationDialog(props: CreateInvitationDialogProps): React.JSX.E
     </FormDialog>
   );
 }
-
-export default AdminInvitationsPage;

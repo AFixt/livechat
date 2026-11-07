@@ -15,7 +15,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  * - `delete` hard-deletes the visitor session; the `ON DELETE CASCADE` foreign
  *   keys remove its chats, messages and events too.
  */
-export type RetentionStrategy = 'anonymize' | 'delete';
+type RetentionStrategy = 'anonymize' | 'delete';
 
 /**
  * Personal-data columns cleared by the `anonymize` strategy. Defined in
@@ -96,8 +96,3 @@ export function createDataRetentionService(deps: DataRetentionDeps) {
 
   return { purgeExpiredVisitorData };
 }
-
-/**
- * Shape of the data-retention service.
- */
-export type DataRetentionService = ReturnType<typeof createDataRetentionService>;

@@ -15,29 +15,29 @@ test.describe('Visitor sees the offline state when no support is available', () 
     await page.goto('http://localhost:5175/');
 
     // Step 2: Locate text "Our support team isn't online right now. Leave us your email and we'll reply." (no-support.uc.yaml:1)
-    await expect(page.getByText('Our support team isn\'t online right now. Leave us your email and we\'ll reply.')).toBeVisible();
+    await expect(page.getByText('Our support team isn\'t online right now. Leave us your email and we\'ll reply.', { exact: true })).toBeVisible();
 
     // Step 3: Locate field "Email address" (no-support.uc.yaml:2)
-    await expect(page.getByLabel('Email address')).toBeVisible();
+    await expect(page.getByLabel('Email address', { exact: true })).toBeVisible();
 
     // Step 4: Focus field "Email address" (no-support.uc.yaml:3)
-    const step4_el = page.getByLabel('Email address');
+    const step4_el = page.getByLabel('Email address', { exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Enter field "Email address" value "visitor@example.com" (no-support.uc.yaml:4)
-    await page.getByLabel('Email address').fill('visitor@example.com');
+    await page.getByLabel('Email address', { exact: true }).fill('visitor@example.com');
 
     // Step 6: Locate button "Send" (no-support.uc.yaml:5)
-    await expect(page.getByRole('button', { name: 'Send' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeVisible();
 
     // Step 7: Focus button "Send" (no-support.uc.yaml:6)
-    const step7_el = page.getByRole('button', { name: 'Send' });
+    const step7_el = page.getByRole('button', { name: 'Send', exact: true });
     await step7_el.focus();
     await expect(step7_el).toBeFocused();
 
     // Step 8: Activate button "Send" (no-support.uc.yaml:7)
-    await page.getByRole('button', { name: 'Send' }).click();
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
 
   });
 });

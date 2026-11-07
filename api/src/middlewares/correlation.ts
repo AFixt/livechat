@@ -5,7 +5,7 @@ import type { RequestHandler } from 'express';
 /**
  * Name of the header that carries the correlation ID in both directions.
  */
-export const CORRELATION_HEADER = 'x-correlation-id';
+const CORRELATION_HEADER = 'x-correlation-id';
 
 declare module 'express-serve-static-core' {
   interface Request {

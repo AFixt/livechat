@@ -33,6 +33,12 @@ describe('createLogger', () => {
         'token',
         'refreshToken',
         'accessToken',
+        'to',
+        'email',
+        '*.email',
+        'err.rejected',
+        'err.rejectedErrors',
+        'err.response',
       ],
       remove: true,
     });

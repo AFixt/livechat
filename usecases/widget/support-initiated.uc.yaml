@@ -1,6 +1,6 @@
 id: widget-support-initiated
 title: "Visitor sees the invitation when support starts a chat"
-type: extension
+type: positive
 description: |
   §5.1.5 — when a support agent proactively starts a chat with a visitor, the
   widget surfaces an invitation dialog. Accepting moves the visitor into the

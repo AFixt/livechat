@@ -14,21 +14,21 @@ test.describe('Support staff signs out', () => {
     await page.goto('http://localhost:5174/');
 
     // Step 2: Locate button "Log out" (logout.uc.yaml:1)
-    await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Log out', exact: true })).toBeVisible();
 
     // Step 3: Focus button "Log out" (logout.uc.yaml:2)
-    const step3_el = page.getByRole('button', { name: 'Log out' });
+    const step3_el = page.getByRole('button', { name: 'Log out', exact: true });
     await step3_el.focus();
     await expect(step3_el).toBeFocused();
 
     // Step 4: Activate button "Log out" (logout.uc.yaml:3)
-    await page.getByRole('button', { name: 'Log out' }).click();
+    await page.getByRole('button', { name: 'Log out', exact: true }).click();
 
     // Step 5: Verify url "http://localhost:5174/login" (logout.uc.yaml:4)
     await expect(page).toHaveURL('http://localhost:5174/login');
 
     // Step 6: Locate heading "Sign in" (logout.uc.yaml:5)
-    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
 
   });
 });

@@ -35,7 +35,7 @@ const cspReportUriBodySchema = z
  * Classic `Content-Type: application/csp-report` payload:
  * `{ "csp-report": { ... } }`.
  */
-export const cspReportUriSchema = z.object({ 'csp-report': cspReportUriBodySchema }).strip();
+const cspReportUriSchema = z.object({ 'csp-report': cspReportUriBodySchema }).strip();
 
 /**
  * Body of a Reporting-API (`report-to`) CSP violation entry. Same information
@@ -76,7 +76,7 @@ const cspReportToEntrySchema = z
  * Reporting-API (`Content-Type: application/reports+json`) payload: a bounded
  * array of report envelopes. Capped at 50 to keep a single POST small.
  */
-export const cspReportToSchema = z.array(cspReportToEntrySchema).min(1).max(50);
+const cspReportToSchema = z.array(cspReportToEntrySchema).min(1).max(50);
 
 /**
  * Accepted CSP-report body — either the classic `report-uri` object or the

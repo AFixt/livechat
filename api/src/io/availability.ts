@@ -12,9 +12,7 @@ const VISITOR_NS = '/visitor';
  * @param tenantId - Tenant UUID.
  * @returns The parsed schedule, or `null` when unconfigured/unknown.
  */
-export async function loadSupportHours(
-  tenantId: string,
-): Promise<ReturnType<typeof parseSupportHours>> {
+async function loadSupportHours(tenantId: string): Promise<ReturnType<typeof parseSupportHours>> {
   const tenant = await Tenant.findByPk(tenantId, { attributes: ['settings'] });
   return parseSupportHours(tenant?.settings?.supportHours);
 }

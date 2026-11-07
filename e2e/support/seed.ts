@@ -44,7 +44,7 @@ for (const t of Object.values(TENANTS)) {
     name: t.name,
     slug: t.slug,
     domain: null,
-    status: 'active',
+    status: t.status,
     expiresAt: null,
     settings: null,
     allowedOrigins: null,

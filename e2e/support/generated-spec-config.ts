@@ -15,7 +15,7 @@ import { defineConfig } from '@playwright/test';
 import type { PlaywrightTestConfig } from '@playwright/test';
 
 /** True when running under CI, which forbids `.only` and enables retries. */
-export const isCI = Boolean(process.env.CI);
+const isCI = Boolean(process.env.CI);
 
 /**
  * Dev-stack ports the generated usecase specs hard-code in their
@@ -31,7 +31,7 @@ export const DEV_STACK_PORTS = { api: 23001, console: 5174, widget: 5175 } as co
  * @param extra - Additional env entries for a specific suite.
  * @returns A process-env-shaped record for the api child process.
  */
-export function buildApiEnv(extra: Record<string, string> = {}): Record<string, string> {
+function buildApiEnv(extra: Record<string, string> = {}): Record<string, string> {
   return {
     NODE_ENV: 'test',
     PORT: String(DEV_STACK_PORTS.api),

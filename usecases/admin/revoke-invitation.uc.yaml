@@ -1,6 +1,6 @@
 id: admin-revoke-invitation
 title: "Admin revokes a pending invitation"
-type: extension
+type: positive
 description: |
   A pending invitation's row exposes a Revoke action. Revoking flips the
   invitation's status to revoked, after which its token can no longer be

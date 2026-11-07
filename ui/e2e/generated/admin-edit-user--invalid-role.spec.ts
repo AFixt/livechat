@@ -15,36 +15,38 @@ test.describe('Editing a user rejects an invalid role with an accessible error',
     await page.goto('http://localhost:5174/admin/users');
 
     // Step 2: Locate heading "Users" (edit-user--invalid-role.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
 
     // Step 3: Locate button "Edit" (edit-user--invalid-role.uc.yaml:2)
-    await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
 
     // Step 4: Focus button "Edit" (edit-user--invalid-role.uc.yaml:3)
-    const step4_el = page.getByRole('button', { name: 'Edit' });
+    const step4_el = page.getByRole('button', { name: 'Edit', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Activate button "Edit" (edit-user--invalid-role.uc.yaml:4)
-    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
 
     // Step 6: Enter field "Role" value "not-a-real-role" (edit-user--invalid-role.uc.yaml:1)
-    await page.getByLabel('Role').fill('not-a-real-role');
+    await page.getByLabel('Role', { exact: true }).fill('not-a-real-role');
 
     // Step 7: Activate button "Save" (edit-user--invalid-role.uc.yaml:2)
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     // Step 8: Verify field_error "Role" (edit-user--invalid-role.uc.yaml:3)
-    const fieldErrorEl = page.getByLabel('Role');
-    await expect(fieldErrorEl).toHaveAttribute('aria-invalid', 'true');
-    const fieldErrorId = await fieldErrorEl.evaluate((el) => {
-      const describedBy = el.getAttribute('aria-describedby') || el.getAttribute('aria-errormessage');
-      return describedBy;
-    });
-    expect(fieldErrorId).toBeTruthy();
-    if (fieldErrorId) {
-      const errorMsg = page.locator('#' + fieldErrorId.split(' ')[0]);
-      await expect(errorMsg).toBeVisible();
+    {
+      const fieldErrorEl = page.getByLabel('Role', { exact: true });
+      await expect(fieldErrorEl).toHaveAttribute('aria-invalid', 'true');
+      const fieldErrorRef = await fieldErrorEl.evaluate((el) => {
+        const refs = el.getAttribute('aria-describedby') || el.getAttribute('aria-errormessage') || '';
+        const id = refs.trim().split(/\s+/)[0];
+        return id ? '#' + CSS.escape(id) : null;
+      });
+      expect(fieldErrorRef, 'aria-describedby or aria-errormessage').toBeTruthy();
+      if (fieldErrorRef) {
+        await expect(page.locator(fieldErrorRef)).toBeVisible();
+      }
     }
 
   });

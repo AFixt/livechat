@@ -23,7 +23,10 @@ console actions, admin flows — MUST have a corresponding `.uc.yaml` file under
 - Organization: `usecases/widget/<flow>.uc.yaml`,
   `usecases/support/<flow>.uc.yaml`, `usecases/admin/<flow>.uc.yaml`.
 - Required coverage: one positive case per user flow; negative cases for
-  validation errors and error paths; extension cases for state variants.
+  validation errors and error paths; alternate-flow cases for state variants.
+  (Amended 2026-10-27: alternate flows are `type: positive` cases named
+  `<flow>--<variant>`, because `@afixt/usecase-runner` 1.0.1 removed
+  `type: extension`.)
 - `npm run usecases:validate` runs in `npm run check` and in CI.
 - `npm run usecases:generate` produces Playwright `.spec.ts` files into
   `ui/e2e/generated/` and `widget/e2e/generated/`. Generated specs are committed

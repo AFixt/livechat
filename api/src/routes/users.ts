@@ -2,6 +2,7 @@ import { updateUserInputSchema, type UpdateUserInput } from '@livechat/shared';
 
 import { assertTenantAccess, resolveTenantFilter } from '../middlewares/authorize.js';
 import { parsedBody, validate } from '../middlewares/validate.js';
+import { ApiError } from '../utils/api-error.js';
 import { asyncHandler } from '../utils/async-handler.js';
 import { recordAudit } from '../utils/audit.js';
 
@@ -57,7 +58,27 @@ export function buildUsersRouter(deps: UsersRouterDeps): Router {
       const existing = await deps.user.getById(id);
       assertTenantAccess(req, existing.tenantId);
       const body = parsedBody(req, updateUserInputSchema) satisfies UpdateUserInput;
-      const user = await deps.user.update(id, body);
+      if (req.user === undefined) return;
+      let user;
+      try {
+        user = await deps.user.update(id, body, req.user);
+      } catch (error) {
+        // A refused role change is an attempted escalation: audit it (#195).
+        if (error instanceof ApiError && error.status === 403) {
+          await recordAudit(deps.audit, req, {
+            action: 'user.update_denied',
+            resourceType: 'user',
+            resourceId: id,
+            tenantId: existing.tenantId,
+            metadata: {
+              fields: Object.keys(body),
+              requestedRole: body.role,
+              reason: error.message,
+            },
+          });
+        }
+        throw error;
+      }
       await recordAudit(deps.audit, req, {
         action: 'user.update',
         resourceType: 'user',

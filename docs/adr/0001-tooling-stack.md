@@ -27,7 +27,8 @@ Adopt the tooling stack described in issue #1 verbatim:
   `import-x`, `promise`, `n`, `jsdoc`, `no-secrets`
 - Prettier with `prettier-plugin-organize-imports`
 - Stylelint with `@double-great/stylelint-a11y`
-- `markdownlint-cli2`
+- `markdownlint-cli2` (replaced by `markdownlint-cli` in #189: same markdownlint
+  engine, without the `braces` dependency path)
 - `jscpd`, `lychee`, `license-checker-rseidelsohn`
 - Vitest (unit + integration), Playwright (E2E), supertest (API routes), msw
   (HTTP mocking)
