@@ -268,7 +268,25 @@ Once scaffolded, root-level scripts mirror the house pattern:
 
 ## Reviewing PRs
 
-Whenever I ask to review a PR (pull request), use the `pr-review` skill.
+Whenever I ask to review a PR (pull request), use the **`pr-review-auto`**
+command. It runs the full `pr-review` workflow, and then — only on an `Approve`
+or `Approve with comments` verdict — resolves every finding including Minors and
+Nits, re-reviews its own fixes, and merges after confirmation. On
+`Request changes` or `Needs clarification` it records the verdict and stops:
+Blockers and gating Majors are never auto-fixed.
+
+Reach for the bare `pr-review` skill only when you explicitly want a review with
+no fix-and-merge phase. For a PR that remediates an accessibility issue, use
+`rem-pr-review`.
+
+Two gate behaviours that are easy to misread as malfunctions:
+
+- The recorded verdict **pins the head SHA**, so any push after recording
+  invalidates it. That is deliberate — a re-pushed branch has not been reviewed.
+  Record after the final push, and re-record if you push again.
+- **Approving your own PR is refused**, so a change you wrote yourself needs
+  someone else's sign-off to merge. Never clear a blocked merge by recording a
+  verdict you did not reach; a blocked merge is usually the gate working.
 
 ## axe-core is banned
 
