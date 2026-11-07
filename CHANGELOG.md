@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
 
+## [0.4.2] - 2026-11-07
+
+### Security
+
+- **Tenant admins can no longer grant roles above their own.** `PATCH
+  /users/:id` only checked that the target was in the caller's tenant, so a
+  tenant admin could promote anyone, including themselves, to `super_admin`.
+  `services/role-policy.ts` is now the single role ceiling, enforced in
+  `user-service.update`. ([#195], [#200])
+- **Invitations are confined to the caller's tenant and role ceiling.** Any
+  admin could list every invitation on the platform, revoke any invitation by
+  id, and invite a global `super_admin`. Listing is tenant-filtered, revoking
+  another tenant's invitation is a 403, and a tenant-scoped inviter is pinned
+  to their own tenant and to roles at or below their own. ([#196], [#201])
+- **Suspended and archived tenants are refused on every access path.**
+  `assertTenantActive` loaded the tenant's status but never read it, and
+  login and refresh never checked the tenant at all. One check in
+  `services/tenant-access.ts` now gates registration, login, token refresh,
+  every authenticated request and the socket handshake. ([#197], [#199])
+- **Failed email sends no longer log the recipient's address.** The log line
+  carries a non-identifying reference (`user:<id>`, `invitation:<id>`,
+  `chat:<id>`) and the nodemailer error is narrowed to `{ code,
+  responseCode }`, since its message can carry the address too. ([#184],
+  [#185])
+- **Dependency advisories cleared:** `follow-redirects` 1.16.0 → 1.16.2
+  (GHSA-8r9p-f939-6h3c, GHSA-q3jh-wrc6-jgq8, GHSA-mrwp-f3q8-3g9p), `zod`
+  4.4.3 → 4.6.7 (GHSA-mrhx-c7xc-m3w5), `axios` 1.18.1 → 1.20.0 in `ui`,
+  `nodemailer` 9.0.3 → 10.1.4 in `api`, `proxy-addr` 2.0.7 → 2.0.8
+  (GHSA-jqcg-44mw-7w3h), `vite` 7.3.7, `express-rate-limit` 8.7.1, and
+  `basic-ftp` overridden to 6.2.1 (GHSA-c475-qrg2-pj4r, dev only).
+  ([#186], [#187], [#188], [#190], [#192], [#193], [#194], [#198], [#202])
+- **`markdownlint-cli2` is replaced with `markdownlint-cli` 0.49.1**, removing
+  the dev-only `braces` path for GHSA-vfj7-8cjw-p6xm. ([#189], [#191])
+
+### Fixed
+
+- The support login page announces the server's reason for a 403 instead of
+  always saying the account is temporarily locked, so a suspended tenant's
+  user is told why. ([#197], [#199])
+- `format:check` now runs in the `check` chain, so Prettier drift fails the
+  gate instead of landing unnoticed. ([#180], [#182], [#183])
+- `scripts/secret-scan.sh` runs from a linked git worktree and scans the
+  worktree's own HEAD, so a pre-push from a worktree can pass and still sees
+  every commit it sends.
+- `@afixt/usecase-runner` is re-pinned to 1.0.1 after the registry reset, so
+  `npm ci` works on a fresh checkout again. ([#198])
+
+### Changed
+
+- [Knip](https://knip.dev) now runs across all five workspaces as part of
+  `check`, with every exception documented in `knip.jsonc`. ([#177], [#179])
+
 ## [0.4.1] - 2026-08-29
 
 ### Fixed
@@ -1091,7 +1143,8 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
   ships with Node 22, and effective on toolchain upgrade.
 - `body-parser` bumped to 2.3.0, clearing OSV `GHSA-v422-hmwv-36x6`.
 
-[Unreleased]: https://github.com/AFixt/livechat/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/AFixt/livechat/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/AFixt/livechat/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/AFixt/livechat/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/AFixt/livechat/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/AFixt/livechat/compare/v0.3.0...v0.3.1
@@ -1135,3 +1188,27 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
 [#171]: https://github.com/AFixt/livechat/pull/171
 [#172]: https://github.com/AFixt/livechat/pull/172
 [#173]: https://github.com/AFixt/livechat/pull/173
+[#177]: https://github.com/AFixt/livechat/issues/177
+[#179]: https://github.com/AFixt/livechat/pull/179
+[#180]: https://github.com/AFixt/livechat/issues/180
+[#182]: https://github.com/AFixt/livechat/issues/182
+[#183]: https://github.com/AFixt/livechat/pull/183
+[#184]: https://github.com/AFixt/livechat/issues/184
+[#185]: https://github.com/AFixt/livechat/pull/185
+[#186]: https://github.com/AFixt/livechat/issues/186
+[#187]: https://github.com/AFixt/livechat/pull/187
+[#188]: https://github.com/AFixt/livechat/issues/188
+[#189]: https://github.com/AFixt/livechat/issues/189
+[#190]: https://github.com/AFixt/livechat/pull/190
+[#191]: https://github.com/AFixt/livechat/pull/191
+[#192]: https://github.com/AFixt/livechat/issues/192
+[#193]: https://github.com/AFixt/livechat/issues/193
+[#194]: https://github.com/AFixt/livechat/issues/194
+[#195]: https://github.com/AFixt/livechat/issues/195
+[#196]: https://github.com/AFixt/livechat/issues/196
+[#197]: https://github.com/AFixt/livechat/issues/197
+[#198]: https://github.com/AFixt/livechat/pull/198
+[#199]: https://github.com/AFixt/livechat/pull/199
+[#200]: https://github.com/AFixt/livechat/pull/200
+[#201]: https://github.com/AFixt/livechat/pull/201
+[#202]: https://github.com/AFixt/livechat/issues/202
