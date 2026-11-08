@@ -284,9 +284,14 @@ Two gate behaviours that are easy to misread as malfunctions:
 - The recorded verdict **pins the head SHA**, so any push after recording
   invalidates it. That is deliberate — a re-pushed branch has not been reviewed.
   Record after the final push, and re-record if you push again.
-- **Approving your own PR is refused**, so a change you wrote yourself needs
-  someone else's sign-off to merge. Never clear a blocked merge by recording a
-  verdict you did not reach; a blocked merge is usually the gate working.
+- **GitHub refuses approval of your own PR.** livechat's `develop` and `main`
+  require no approving review, so this does not block the merge: the local
+  review gate falls back to the recorded verdict alone and prints a notice
+  saying so. That notice is expected on a self-authored PR, not a failure. What
+  does block a `develop` merge is an unresolved review thread
+  (`required_conversation_resolution`), which shows as BLOCKED with no failing
+  check. Never clear a blocked merge by recording a verdict you did not reach; a
+  blocked merge is usually the gate working.
 
 ## axe-core is banned
 
