@@ -15,41 +15,41 @@ test.describe('Super admin opens a tenant\'s settings surface', () => {
     await page.goto('http://localhost:5174/admin/tenants');
 
     // Step 2: Locate heading "Tenants" (edit-tenant-settings.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Tenants' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Tenants', exact: true })).toBeVisible();
 
     // Step 3: Locate button "Edit" (edit-tenant-settings.uc.yaml:2)
-    await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
 
     // Step 4: Focus button "Edit" (edit-tenant-settings.uc.yaml:3)
-    const step4_el = page.getByRole('button', { name: 'Edit' });
+    const step4_el = page.getByRole('button', { name: 'Edit', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Activate button "Edit" (edit-tenant-settings.uc.yaml:4)
-    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
 
     // Step 6: Locate heading "Embed snippet" (edit-tenant-settings.uc.yaml:5)
-    await expect(page.getByRole('heading', { name: 'Embed snippet' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Embed snippet', exact: true })).toBeVisible();
 
     // Step 7: Locate heading "Allowed origins" (edit-tenant-settings.uc.yaml:6)
-    await expect(page.getByRole('heading', { name: 'Allowed origins' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Allowed origins', exact: true })).toBeVisible();
 
     // Step 8: Locate field "Allowed origins" (edit-tenant-settings.uc.yaml:7)
-    await expect(page.getByLabel('Allowed origins')).toBeVisible();
+    await expect(page.getByLabel('Allowed origins', { exact: true })).toBeVisible();
 
     // Step 9: Focus field "Allowed origins" (edit-tenant-settings.uc.yaml:8)
-    const step9_el = page.getByLabel('Allowed origins');
+    const step9_el = page.getByLabel('Allowed origins', { exact: true });
     await step9_el.focus();
     await expect(step9_el).toBeFocused();
 
     // Step 10: Enter field "Allowed origins" value "https://example.com" (edit-tenant-settings.uc.yaml:9)
-    await page.getByLabel('Allowed origins').fill('https://example.com');
+    await page.getByLabel('Allowed origins', { exact: true }).fill('https://example.com');
 
     // Step 11: Locate button "Save" (edit-tenant-settings.uc.yaml:10)
-    await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 
     // Step 12: Locate heading "Rotate embed secret" (edit-tenant-settings.uc.yaml:11)
-    await expect(page.getByRole('heading', { name: 'Rotate embed secret' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Rotate embed secret', exact: true })).toBeVisible();
 
   });
 });

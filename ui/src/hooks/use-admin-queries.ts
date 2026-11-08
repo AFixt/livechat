@@ -77,6 +77,14 @@ export function useCreateTenant() {
 
 /**
  * Mutation: patch a tenant. Invalidates the tenants list on success.
+ *
+ * No screen calls it yet, so Knip reports it as an unused export. It stays
+ * because the path behind it is complete and working — the API exposes the
+ * route and ui/src/services/admin-api.ts has the client — so this is a
+ * missing screen, not dead code. Deleting it would also strand updateTenant
+ * and UpdateTenantInput one layer down. @public records that deliberately.
+ *
+ * @public
  * @returns The mutation.
  */
 export function useUpdateTenant() {

@@ -6,6 +6,7 @@ import { ApiError } from '../utils/api-error.js';
 import { createInvitationService } from './invitation-service.js';
 
 import type { EmailService } from './email-service.js';
+import type { RoleGrantor } from './role-policy.js';
 import type { CreateInvitationInput } from '@livechat/shared';
 
 function fakeEmail(): EmailService {
@@ -17,6 +18,9 @@ function fakeEmail(): EmailService {
 afterEach(() => {
   vi.restoreAllMocks();
 });
+
+/** A global super_admin: allowed to issue any invitation. */
+const INVITER: RoleGrantor = { id: 'inviter-1', role: 'super_admin', tenantId: null };
 
 describe('invitation-service', () => {
   describe('create', () => {
@@ -34,7 +38,7 @@ describe('invitation-service', () => {
         role: 'staff',
         expiresInDays: 7,
       };
-      const result = await service.create(input, 'inviter-1');
+      const result = await service.create(input, INVITER);
 
       expect(result).toBe(created);
       expect(createSpy).toHaveBeenCalledExactlyOnceWith(
@@ -46,11 +50,7 @@ describe('invitation-service', () => {
           invitedBy: 'inviter-1',
         }),
       );
-      expect(email.sendInvitationEmail).toHaveBeenCalledExactlyOnceWith(
-        'new@example.com',
-        'New Person',
-        expect.any(String),
-      );
+      expect(email.sendInvitationEmail).toHaveBeenCalledExactlyOnceWith(created);
     });
 
     it('creates an untenanted invitation without checking the tenant', async () => {
@@ -66,15 +66,11 @@ describe('invitation-service', () => {
         role: 'staff',
         expiresInDays: 3,
       };
-      const result = await service.create(input, 'inviter-1');
+      const result = await service.create(input, INVITER);
 
       expect(result).toBe(created);
       expect(findByPk).not.toHaveBeenCalled();
-      expect(email.sendInvitationEmail).toHaveBeenCalledExactlyOnceWith(
-        'global@example.com',
-        null,
-        expect.any(String),
-      );
+      expect(email.sendInvitationEmail).toHaveBeenCalledExactlyOnceWith(created);
     });
 
     it('throws 400 when the given tenantId does not exist', async () => {
@@ -90,7 +86,7 @@ describe('invitation-service', () => {
         expiresInDays: 7,
       };
 
-      await expect(service.create(input, 'inviter-1')).rejects.toMatchObject({
+      await expect(service.create(input, INVITER)).rejects.toMatchObject({
         status: 400,
         message: 'Tenant not found',
       });
@@ -134,7 +130,7 @@ describe('invitation-service', () => {
       } as unknown as Invitation);
       const service = createInvitationService({ email: fakeEmail() });
 
-      await service.revoke('inv-1');
+      await service.revoke('inv-1', undefined);
 
       expect(update).toHaveBeenCalledExactlyOnceWith({ status: 'revoked' });
     });
@@ -143,7 +139,7 @@ describe('invitation-service', () => {
       vi.spyOn(Invitation, 'findByPk').mockResolvedValue(null);
       const service = createInvitationService({ email: fakeEmail() });
 
-      await expect(service.revoke('missing')).rejects.toMatchObject({
+      await expect(service.revoke('missing', undefined)).rejects.toMatchObject({
         status: 404,
         message: 'Invitation not found',
       });
@@ -157,8 +153,8 @@ describe('invitation-service', () => {
       } as unknown as Invitation);
       const service = createInvitationService({ email: fakeEmail() });
 
-      await expect(service.revoke('inv-2')).rejects.toBeInstanceOf(ApiError);
-      await expect(service.revoke('inv-2')).rejects.toMatchObject({
+      await expect(service.revoke('inv-2', undefined)).rejects.toBeInstanceOf(ApiError);
+      await expect(service.revoke('inv-2', undefined)).rejects.toMatchObject({
         status: 400,
         message: 'Cannot revoke a accepted invitation',
       });

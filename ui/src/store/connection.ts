@@ -9,7 +9,7 @@ import { create } from 'zustand';
  * - `reconnected` — the socket just came back; a transient confirmation is
  *   shown and announced before the banner clears itself back to `connected`.
  */
-export type ConnectionStatus = 'connected' | 'reconnecting' | 'reconnected';
+type ConnectionStatus = 'connected' | 'reconnecting' | 'reconnected';
 
 interface ConnectionState {
   /** Current staff-socket connection status. */

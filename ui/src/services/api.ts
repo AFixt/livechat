@@ -6,7 +6,7 @@ import { useAuthStore } from '../store/auth.js';
  * API base URL for the livechat backend — proxied by Vite in dev, same-origin
  * or tenant subdomain in prod.
  */
-export const API_BASE = '/api/v1';
+const API_BASE = '/api/v1';
 
 let client: AxiosInstance | null = null;
 

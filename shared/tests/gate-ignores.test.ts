@@ -2,8 +2,9 @@
  * Regression guard for the quality-gate ignore lists.
  *
  * These ignore lists are future-failure guards, and they have already failed
- * silently once: every directory entry in `.markdownlint-cli2.jsonc` was
- * written with a bare trailing slash ("dist/", "**\/test-results/"), which
+ * silently once: every directory entry in the markdownlint ignore list (then
+ * `.markdownlint-cli2.jsonc`, now `.markdownlintignore`) was written with a
+ * bare trailing slash ("dist/", "**\/test-results/"), which
  * matches no *file* and therefore ignored nothing — while a comment in the same
  * file asserted the entries existed precisely so a failing e2e run would not
  * block the push. The gate stayed red for a reason nobody could see.
@@ -14,7 +15,8 @@
  * location and asserts the tool still complains. Without that second half the
  * test would pass just as happily against a tool that reported nothing at all.
  *
- * The markdownlint and jscpd cases run hermetically: the repo's real config is
+ * The markdownlint and jscpd cases run hermetically: the repo's real config
+ * (for markdownlint, `.markdownlint.jsonc` plus `.markdownlintignore`) is
  * copied into a throwaway directory, so the assertions never depend on the
  * contents of this repository.
  *
@@ -50,12 +52,12 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 function findRepoRoot(start: string): string {
   let dir = start;
   for (let i = 0; i < 8; i += 1) {
-    if (existsSync(join(dir, '.markdownlint-cli2.jsonc'))) return dir;
+    if (existsSync(join(dir, '.markdownlintignore'))) return dir;
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
-  throw new Error('could not locate .markdownlint-cli2.jsonc from ' + start);
+  throw new Error('could not locate .markdownlintignore from ' + start);
 }
 
 const REPO_ROOT = findRepoRoot(HERE);
@@ -104,25 +106,25 @@ describe('markdownlint ignore list', () => {
   /**
    * Run the repo's real markdownlint config over a throwaway tree.
    * @param dirs - Directories to seed with a non-compliant file.
-   * @returns Combined stdout+stderr from markdownlint-cli2.
+   * @returns Combined stdout+stderr from markdownlint-cli.
    */
   function runAgainst(dirs: string[]): string {
     const root = scratch('mdl-ignores-');
-    copyFileSync(
-      join(REPO_ROOT, '.markdownlint-cli2.jsonc'),
-      join(root, '.markdownlint-cli2.jsonc'),
-    );
+    // markdownlint-cli reads both from the working directory by default; the
+    // ignore list is the file under test, the config makes the run realistic.
+    for (const file of ['.markdownlint.jsonc', '.markdownlintignore']) {
+      copyFileSync(join(REPO_ROOT, file), join(root, file));
+    }
     for (const d of dirs) {
       mkdirSync(join(root, d), { recursive: true });
       writeFileSync(join(root, d, 'probe.md'), BAD_MARKDOWN);
     }
     // Same argv the `markdownlint` npm script uses, so this exercises the real
     // invocation rather than a convenient approximation.
-    const run = spawnSync(
-      join(REPO_ROOT, 'node_modules', '.bin', 'markdownlint-cli2'),
-      ['**/*.md', '#**/node_modules/**'],
-      { cwd: root, encoding: 'utf8' },
-    );
+    const run = spawnSync(join(REPO_ROOT, 'node_modules', '.bin', 'markdownlint'), ['**/*.md'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
     return [run.stdout, run.stderr].join('');
   }
 
@@ -142,6 +144,30 @@ describe('markdownlint ignore list', () => {
     for (const dir of IGNORED_MARKDOWN_DIRS) {
       expect(output, `${dir}/ should be ignored`).not.toContain(`${dir}/probe.md`);
     }
+  });
+});
+
+describe('prettier ignore list', () => {
+  it('ignores lychee/ but still checks real Markdown', () => {
+    const root = scratch('prettier-ignores-');
+    // Only the ignore list is under test; prettier's defaults format the probe.
+    copyFileSync(join(REPO_ROOT, '.prettierignore'), join(root, '.prettierignore'));
+    // Badly formatted: prettier rewrites `*` bullets to `-` and drops the
+    // blank-line run, so `--check` reports any file holding it.
+    const badlyFormatted = '# Probe\n\n\n\n* one\n* two\n';
+    for (const d of ['lychee', LINTED_DIR]) {
+      mkdirSync(join(root, d), { recursive: true });
+      writeFileSync(join(root, d, 'out.md'), badlyFormatted);
+    }
+    // Same argv as the `format:check` npm script.
+    const run = spawnSync(join(REPO_ROOT, 'node_modules', '.bin', 'prettier'), ['--check', '.'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+    const output = [run.stdout, run.stderr].join('');
+    // Control: the un-ignored copy is reported, so the run really checked files.
+    expect(output).toContain(`${LINTED_DIR}/out.md`);
+    expect(output, 'lychee/ should be ignored').not.toContain('lychee/out.md');
   });
 });
 

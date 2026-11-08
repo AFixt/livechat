@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Returning visitor is offered to resume a prior conversation', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('widget-restart: Returning visitor is offered to resume a prior conversation (extension)', async ({ page }) => {
+  test('widget-restart: Returning visitor is offered to resume a prior conversation (positive)', async ({ page }) => {
     // Preconditions:
     //   - The visitor has a prior, unfinished chat in the same session.
 
@@ -14,18 +14,18 @@ test.describe('Returning visitor is offered to resume a prior conversation', () 
     await page.goto('http://localhost:5175/');
 
     // Step 2: Locate text "Welcome back. Continue your conversation?" (restart.uc.yaml:1)
-    await expect(page.getByText('Welcome back. Continue your conversation?')).toBeVisible();
+    await expect(page.getByText('Welcome back. Continue your conversation?', { exact: true })).toBeVisible();
 
     // Step 3: Locate button "Resume chat" (restart.uc.yaml:2)
-    await expect(page.getByRole('button', { name: 'Resume chat' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Resume chat', exact: true })).toBeVisible();
 
     // Step 4: Focus button "Resume chat" (restart.uc.yaml:3)
-    const step4_el = page.getByRole('button', { name: 'Resume chat' });
+    const step4_el = page.getByRole('button', { name: 'Resume chat', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Activate button "Resume chat" (restart.uc.yaml:4)
-    await page.getByRole('button', { name: 'Resume chat' }).click();
+    await page.getByRole('button', { name: 'Resume chat', exact: true }).click();
 
   });
 });

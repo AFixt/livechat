@@ -12,6 +12,10 @@ description: |
 
 start_location: "http://localhost:5174/settings/availability"
 
+expected_result: >-
+  The operator's availability is stored as Available, the visible status text
+  updates, and the change is announced through the live region.
+
 preconditions:
   - A staff user is authenticated (see support-login.uc.yaml).
 

@@ -15,21 +15,21 @@ test.describe('Operator ends a visitor\'s session from the console', () => {
     await page.goto('http://localhost:5174/');
 
     // Step 2: Locate heading "Visitors on site" (end-visitor-session.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Visitors on site' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Visitors on site', exact: true })).toBeVisible();
 
     // Step 3: Locate button "End the session for visitor" (end-visitor-session.uc.yaml:2)
-    await expect(page.getByRole('button', { name: 'End the session for visitor' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'End the session for visitor', exact: true })).toBeVisible();
 
     // Step 4: Focus button "End the session for visitor" (end-visitor-session.uc.yaml:3)
-    const step4_el = page.getByRole('button', { name: 'End the session for visitor' });
+    const step4_el = page.getByRole('button', { name: 'End the session for visitor', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Activate button "End the session for visitor" (end-visitor-session.uc.yaml:4)
-    await page.getByRole('button', { name: 'End the session for visitor' }).click();
+    await page.getByRole('button', { name: 'End the session for visitor', exact: true }).click();
 
     // Step 6: Verify text "Session ended for visitor" (end-visitor-session.uc.yaml:5)
-    await expect(page.getByText('Session ended for visitor')).toBeVisible();
+    await expect(page.getByText('Session ended for visitor', { exact: true })).toBeVisible();
 
   });
 });

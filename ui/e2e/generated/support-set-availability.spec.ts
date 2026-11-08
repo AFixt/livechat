@@ -14,21 +14,21 @@ test.describe('Operator sets their availability to available', () => {
     await page.goto('http://localhost:5174/settings/availability');
 
     // Step 2: Locate heading "Availability" (set-availability.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Availability' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Availability', exact: true })).toBeVisible();
 
     // Step 3: Locate checkbox "Available" (set-availability.uc.yaml:2)
-    await expect(page.getByRole('checkbox', { name: 'Available' })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Available', exact: true })).toBeVisible();
 
     // Step 4: Focus checkbox "Available" (set-availability.uc.yaml:3)
-    const step4_el = page.getByRole('checkbox', { name: 'Available' });
+    const step4_el = page.getByRole('checkbox', { name: 'Available', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Select checkbox "Available" (set-availability.uc.yaml:4)
-    await page.getByRole('checkbox', { name: 'Available' }).check();
+    await page.getByRole('checkbox', { name: 'Available', exact: true }).check();
 
     // Step 6: Verify text "You are available." (set-availability.uc.yaml:5)
-    await expect(page.getByText('You are available.')).toBeVisible();
+    await expect(page.getByText('You are available.', { exact: true })).toBeVisible();
 
   });
 });

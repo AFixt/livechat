@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Returning visitor resumes a prior conversation while untracked', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('widget-restart-without-consent: Returning visitor resumes a prior conversation while untracked (extension)', async ({ page }) => {
+  test('widget-restart-without-consent: Returning visitor resumes a prior conversation while untracked (positive)', async ({ page }) => {
     // Preconditions:
     //   - The visitor has a prior, unfinished chat in the same session.
     //   - The visitor has not granted presence consent, so no tracked visitor session exists and the presence socket is closed.
@@ -15,18 +15,18 @@ test.describe('Returning visitor resumes a prior conversation while untracked', 
     await page.goto('http://localhost:5175/');
 
     // Step 2: Locate text "Welcome back. Continue your conversation?" (restart--without-consent.uc.yaml:1)
-    await expect(page.getByText('Welcome back. Continue your conversation?')).toBeVisible();
+    await expect(page.getByText('Welcome back. Continue your conversation?', { exact: true })).toBeVisible();
 
     // Step 3: Locate button "Resume chat" (restart--without-consent.uc.yaml:2)
-    await expect(page.getByRole('button', { name: 'Resume chat' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Resume chat', exact: true })).toBeVisible();
 
     // Step 4: Focus button "Resume chat" (restart--without-consent.uc.yaml:3)
-    const step4_el = page.getByRole('button', { name: 'Resume chat' });
+    const step4_el = page.getByRole('button', { name: 'Resume chat', exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Activate button "Resume chat" (restart--without-consent.uc.yaml:4)
-    await page.getByRole('button', { name: 'Resume chat' }).click();
+    await page.getByRole('button', { name: 'Resume chat', exact: true }).click();
 
   });
 });

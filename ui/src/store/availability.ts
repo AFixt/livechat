@@ -4,7 +4,7 @@ import { create } from 'zustand';
  * The operator's own availability as reflected in the console. `unknown` is
  * the pre-connect state before the server has echoed `availability:self`.
  */
-export type ConsoleAvailability = 'available' | 'away' | 'unknown';
+type ConsoleAvailability = 'available' | 'away' | 'unknown';
 
 interface AvailabilityState {
   /** The current operator's own availability. */

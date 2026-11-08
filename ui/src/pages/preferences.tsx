@@ -41,5 +41,3 @@ export function PreferencesPage(): React.JSX.Element {
     </Stack>
   );
 }
-
-export default PreferencesPage;

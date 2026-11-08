@@ -3,7 +3,7 @@ import type { CookieOptions, Request } from 'express';
 /** The visitor session cookie name. */
 export const VISITOR_COOKIE_NAME = 'livechat_visitor';
 /** Visitor cookie lifetime — 30 days, how long a returning visitor keeps the same session. */
-export const VISITOR_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const VISITOR_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Header the widget sends the session value in when the browser blocks the

@@ -207,5 +207,3 @@ function TenantRow(props: TenantRowProps): React.JSX.Element {
     </>
   );
 }
-
-export default AdminTenantsPage;

@@ -14,13 +14,13 @@ test.describe('Admin views the invitations list', () => {
     await page.goto('http://localhost:5174/admin/invitations');
 
     // Step 2: Locate heading "Invitations" (view-invitations.uc.yaml:1)
-    await expect(page.getByRole('heading', { name: 'Invitations' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Invitations', exact: true })).toBeVisible();
 
     // Step 3: Locate button "Invite user" (view-invitations.uc.yaml:2)
-    await expect(page.getByRole('button', { name: 'Invite user' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Invite user', exact: true })).toBeVisible();
 
     // Step 4: Locate table "Invitations" (view-invitations.uc.yaml:3)
-    await expect(page.getByRole('table', { name: 'Invitations' })).toBeVisible();
+    await expect(page.getByRole('table', { name: 'Invitations', exact: true })).toBeVisible();
 
     // Step 5: Note Column headers Email, Role, Tenant, Status, Expires at, and Actions must be real columnheader cells; tighten to explicit columnheader locates once usecase-runner ships that role token (in its spec.md, absent from 1.3.2). (view-invitations.uc.yaml:4)
     // Note: Column headers Email, Role, Tenant, Status, Expires at, and Actions must be real columnheader cells; tighten to explicit columnheader locates once usecase-runner ships that role token (in its spec.md, absent from 1.3.2).

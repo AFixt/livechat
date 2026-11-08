@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import { Invitation, JwtBlacklist, User, UserSession } from '../models/index.js';
 import { ApiError } from '../utils/api-error.js';
 
+import { assertTenantUsable } from './tenant-access.js';
 import { generateAccessToken, generateRefreshToken } from './tokens.js';
 
 import type { EmailService } from './email-service.js';
@@ -74,6 +75,8 @@ export function createAuthService(deps: AuthDeps) {
         where: { email: input.email.toLowerCase() },
       });
       if (existing !== null) throw ApiError.conflict('Email already registered');
+      // An account in a suspended tenant could never sign in (#197).
+      await assertTenantUsable({ role: invitation.role, tenantId: invitation.tenantId });
 
       const verificationToken = randomBytes(32).toString('hex');
       const user = await User.create({
@@ -114,6 +117,9 @@ export function createAuthService(deps: AuthDeps) {
         await user.incrementFailedAttempts();
         throw ApiError.unauthorized('Invalid email or password');
       }
+      // After the password check, so only a caller holding the password
+      // learns the tenant is suspended or expired (#197).
+      await assertTenantUsable(user);
       await user.resetFailedAttempts();
       user.lastLoginAt = new Date();
       await user.save();
@@ -192,6 +198,9 @@ export function createAuthService(deps: AuthDeps) {
       if (user?.status !== 'active') {
         throw ApiError.unauthorized('User not found or inactive');
       }
+      // Without this a suspended tenant's refresh token would keep minting
+      // access tokens for the whole session window (#197).
+      await assertTenantUsable(user);
       const access = generateAccessToken(user, deps.env);
       const next = generateRefreshToken(user, deps.env);
       const hash = await bcrypt.hash(next.token, 10);

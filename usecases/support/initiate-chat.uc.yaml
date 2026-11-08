@@ -1,6 +1,6 @@
 id: support-initiate-chat
 title: "Operator starts a chat with a visitor from the presence list"
-type: extension
+type: positive
 description: |
   §5.1.5 (operator side) — each visitor in the "Visitors on site" list is an
   activatable control that starts a support-initiated chat with that visitor

@@ -55,11 +55,11 @@ Husky runs on pre-push.
 
 ### `@afixt/*` packages and `NPM_TOKEN`
 
-This repo installs private `@afixt/*` scoped packages (`usecase-runner`,
-`a11y-assert`). In CI, npm authenticates via an **organization-level** GitHub
-Actions secret named `NPM_TOKEN` — `actions/setup-node` writes a runner-local
-`.npmrc` from it, which is why no auth token is committed to this repo's
-`.npmrc` (local installs keep using your own credentials).
+This repo installs private `@afixt/*` scoped packages (`usecase-runner`). In CI,
+npm authenticates via an **organization-level** GitHub Actions secret named
+`NPM_TOKEN` — `actions/setup-node` writes a runner-local `.npmrc` from it, which
+is why no auth token is committed to this repo's `.npmrc` (local installs keep
+using your own credentials).
 
 If installing an `@afixt/*` package returns **404, that is an authentication
 problem, not a missing package**. The usual cause is a stale **repo-level**
@@ -73,11 +73,35 @@ From the repo root:
 | Script              | Purpose                                                                                  |
 | ------------------- | ---------------------------------------------------------------------------------------- |
 | `npm run dev`       | Run api, ui, widget in parallel                                                          |
-| `npm run check`     | lint + typecheck + stylelint + markdownlint + usecases:validate                          |
+| `npm run knip`      | Unused files, exports and dependencies; kept at zero                                     |
+| `npm run check`     | lint + typecheck + knip + stylelint + markdownlint + usecases:validate                   |
 | `npm run check:all` | `check` + test + build + size + dupes + links + security + license:check (pre-push gate) |
 | `npm test`          | Vitest across workspaces                                                                 |
 | `npm run test:e2e`  | Generate Playwright specs from `usecases/` and run them                                  |
 | `docker compose up` | MySQL + Redis + MailHog + MinIO + api + ui + widget-preview                              |
+
+### Unused files, exports and dependencies
+
+[Knip](https://knip.dev) is part of `check`, so it runs on pre-push and in CI
+through `check:all`. ESLint sees one file at a time, so it cannot tell that an
+export is imported by nobody, that a module is orphaned, or that a dependency is
+unused across five workspaces. The report is kept at **zero**, so any output is
+something the current change introduced.
+
+`knip.jsonc` carries the exceptions, each with its reason written next to it.
+Two are worth knowing about because they are invisible to any static tool:
+
+- **`mysql2`** is never imported. Sequelize `require()`s the driver for the
+  configured dialect from inside its own connection manager. Drop it and every
+  integration test dies at construction with _"Please install mysql2 package
+  manually"_ — nothing catches it until the suite runs.
+- **The migrations and `db/config.cjs`** are loaded by path from `.sequelizerc`,
+  never imported. They read as 20 orphaned files.
+
+When Knip reports something, fix the cause. Only add an exception when the
+finding is genuinely a false positive, and write the reason beside it — and
+after adding an `entry`, **re-run Knip and work from the new report**: putting
+files into the module graph changes what counts as used.
 
 ## Contributing
 

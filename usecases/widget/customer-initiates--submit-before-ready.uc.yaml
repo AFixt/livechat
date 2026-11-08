@@ -1,7 +1,7 @@
 id: widget-customer-initiates--submit-before-ready
 title: "Visitor submits the start-chat form before the session is ready"
 extends: widget-customer-initiates
-type: extension
+type: positive
 description: |
   §5.1.3 / issue #129 — the widget renders the start-chat form immediately, but
   a visitor session only exists after several sequential API round-trips. A

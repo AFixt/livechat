@@ -151,5 +151,3 @@ function EditUserDialog(props: EditUserDialogProps): React.JSX.Element | null {
     </FormDialog>
   );
 }
-
-export default AdminUsersPage;

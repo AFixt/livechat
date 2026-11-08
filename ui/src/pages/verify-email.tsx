@@ -14,5 +14,3 @@ export function VerifyEmailPage(): React.JSX.Element {
     </Typography>
   );
 }
-
-export default VerifyEmailPage;

@@ -1,7 +1,7 @@
 id: widget-typing-indicator
 title: "Visitor sees that support is typing"
 extends: widget-actively-chatting
-type: extension
+type: positive
 description: |
   §5.1.6 / issue #80 — while a support agent is composing a reply, the widget
   shows a typing cue. It is rendered in a `role="status"` live region, so it is

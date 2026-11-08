@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Visitor is offered an email transcript when support ends the chat', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('widget-chat-ended: Visitor is offered an email transcript when support ends the chat (extension)', async ({ page }) => {
+  test('widget-chat-ended: Visitor is offered an email transcript when support ends the chat (positive)', async ({ page }) => {
     // Preconditions:
     //   - The visitor was in an active chat that a support agent has just ended.
 
@@ -14,32 +14,32 @@ test.describe('Visitor is offered an email transcript when support ends the chat
     await page.goto('http://localhost:5175/');
 
     // Step 2: Locate text "Chat ended. Would you like an email copy of this conversation?" (chat-ended.uc.yaml:1)
-    await expect(page.getByText('Chat ended. Would you like an email copy of this conversation?')).toBeVisible();
+    await expect(page.getByText('Chat ended. Would you like an email copy of this conversation?', { exact: true })).toBeVisible();
 
     // Step 3: Locate field "Email address (optional)" (chat-ended.uc.yaml:2)
-    await expect(page.getByLabel('Email address (optional)')).toBeVisible();
+    await expect(page.getByLabel('Email address (optional)', { exact: true })).toBeVisible();
 
     // Step 4: Focus field "Email address (optional)" (chat-ended.uc.yaml:3)
-    const step4_el = page.getByLabel('Email address (optional)');
+    const step4_el = page.getByLabel('Email address (optional)', { exact: true });
     await step4_el.focus();
     await expect(step4_el).toBeFocused();
 
     // Step 5: Enter field "Email address (optional)" value "visitor@example.com" (chat-ended.uc.yaml:4)
-    await page.getByLabel('Email address (optional)').fill('visitor@example.com');
+    await page.getByLabel('Email address (optional)', { exact: true }).fill('visitor@example.com');
 
     // Step 6: Locate button "Send me the transcript" (chat-ended.uc.yaml:5)
-    await expect(page.getByRole('button', { name: 'Send me the transcript' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send me the transcript', exact: true })).toBeVisible();
 
     // Step 7: Focus button "Send me the transcript" (chat-ended.uc.yaml:6)
-    const step7_el = page.getByRole('button', { name: 'Send me the transcript' });
+    const step7_el = page.getByRole('button', { name: 'Send me the transcript', exact: true });
     await step7_el.focus();
     await expect(step7_el).toBeFocused();
 
     // Step 8: Activate button "Send me the transcript" (chat-ended.uc.yaml:7)
-    await page.getByRole('button', { name: 'Send me the transcript' }).click();
+    await page.getByRole('button', { name: 'Send me the transcript', exact: true }).click();
 
     // Step 9: Locate button "Chat with support" (chat-ended.uc.yaml:8)
-    await expect(page.getByRole('button', { name: 'Chat with support' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Chat with support', exact: true })).toBeVisible();
 
   });
 });
