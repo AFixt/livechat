@@ -38,6 +38,10 @@ Architecture decisions referenced below live in [`docs/adr/`](docs/adr/).
   (GHSA-jqcg-44mw-7w3h), `vite` 7.3.7, `express-rate-limit` 8.7.1, and
   `basic-ftp` overridden to 6.2.1 (GHSA-c475-qrg2-pj4r, dev only).
   ([#186], [#187], [#188], [#190], [#192], [#193], [#194], [#198], [#202])
+- **`mysql2` 3.22.2 → 3.23.1 and `qs` 6.15.3 → 6.16.1 in the production
+  tree**, clearing the osv-scanner advisories that had blocked every push. The
+  dev-only `fast-uri`, `browserslist` and `postcss-selector-parser` overrides
+  are raised to their patched releases. ([#178])
 - **`markdownlint-cli2` is replaced with `markdownlint-cli` 0.49.1**, removing
   the dev-only `braces` path for GHSA-vfj7-8cjw-p6xm. ([#189], [#191])
 
@@ -1189,6 +1193,7 @@ had never carried any of it. The product is pre-1.0 and not yet deployed.
 [#172]: https://github.com/AFixt/livechat/pull/172
 [#173]: https://github.com/AFixt/livechat/pull/173
 [#177]: https://github.com/AFixt/livechat/issues/177
+[#178]: https://github.com/AFixt/livechat/pull/178
 [#179]: https://github.com/AFixt/livechat/pull/179
 [#180]: https://github.com/AFixt/livechat/issues/180
 [#182]: https://github.com/AFixt/livechat/issues/182
