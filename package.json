@@ -112,6 +112,7 @@
     "security:exceptions": "bash scripts/check-exceptions.sh",
     "security:report": "bash scripts/security-report.sh",
     "security:api-fuzz": "bash scripts/api-fuzz.sh",
+    "security:zap": "bash scripts/zap-baseline.sh",
     "security:hadolint": "bash scripts/hadolint.sh",
     "security:trivy": "bash scripts/trivy.sh",
     "security:trivy:image": "bash scripts/trivy-image.sh",
