@@ -13,8 +13,8 @@ Everything below runs from the repo root. The gating scanners are wired into
 
 | Tool              | npm script            | Config / source                  | What it checks                                               |
 | ----------------- | --------------------- | -------------------------------- | ------------------------------------------------------------ |
-| npm audit         | `security:audit`      | `scripts/npm-audit.sh`           | Known-vulnerable dependencies (high/critical).               |
-| osv-scanner       | `security:osv`        | `osv-scanner.toml`               | OSV advisories against the lockfile.                         |
+| npm audit         | `security:audit`      | `scripts/npm-audit.sh`           | Known-vulnerable production dependencies (high/critical).    |
+| osv-scanner       | `security:osv`        | `scripts/osv-production.sh`      | OSV advisories against the production lockfile entries.      |
 | semgrep           | `security:semgrep`    | `scripts/semgrep.sh`             | SAST — OWASP Top Ten, Node/TS security rules.                |
 | trufflehog        | `security:secrets`    | `package.json`                   | Verified secrets in git history.                             |
 | exception expiry  | `security:exceptions` | `scripts/check-exceptions.sh`    | Expired entries in the exception registry.                   |

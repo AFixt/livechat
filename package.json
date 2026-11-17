@@ -102,7 +102,7 @@
     "lhci": "lhci autorun",
     "load": "artillery run scripts/load/visitor-burst.yml",
     "security:audit": "bash scripts/npm-audit.sh",
-    "security:osv": "osv-scanner --lockfile=package-lock.json",
+    "security:osv": "bash scripts/osv-production.sh",
     "security:semgrep": "bash scripts/semgrep.sh",
     "security:secrets": "bash scripts/secret-scan.sh verified",
     "security:secrets:suspected": "bash scripts/secret-scan.sh suspected",

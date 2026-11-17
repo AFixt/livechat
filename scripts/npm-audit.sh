@@ -10,6 +10,12 @@
 # advisory against a pinned dep therefore still turns the gate red — only the
 # specific, justified, time-limited exceptions pass.
 #
+# Production dependencies only (`--omit=dev`), per Karl's fleet ruling of
+# 2026-11-17: pre-push dependency-audit gates scan the tree that ships. A
+# dev-only advisory with no fixed release (picomatch GHSA-fc5q-39xc-vjpf,
+# reached only through lint/build tooling) otherwise blocked every push, develop
+# included, with nothing in this repository able to clear it.
+#
 # Keep this list in lockstep with osv-scanner.toml.
 set -euo pipefail
 
@@ -34,7 +40,7 @@ tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 
 # npm audit exits non-zero when it finds anything; capture the report regardless.
-npm audit --workspaces --include-workspace-root --json >"$tmp" 2>/dev/null || true
+npm audit --omit=dev --workspaces --include-workspace-root --json >"$tmp" 2>/dev/null || true
 
 node -e '
 const fs = require("fs");
