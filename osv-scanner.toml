@@ -4,57 +4,63 @@
 
 [[IgnoredVulns]]
 id = "GHSA-jmr9-qjv8-65gv"
-ignoreUntil = 2026-11-13
-# extract-zip 2.0.1 (CVSS 8.6). No fixed version exists — 2.0.1 is the latest
-# published release, and osv reports the advisory as `last_affected: 2.0.1` with
-# no `fixed` event. Dev-only: pulled transitively via @puppeteer/browsers, used
-# by the Lighthouse/estimo performance tooling (estimo, find-chrome-bin) — never
-# in the production api/ui/widget runtime. Nothing to update to; tracked in #51.
-# Revisit at ignoreUntil: adopt a fixed extract-zip the moment one ships, or drop
-# the perf tooling that drags it in.
-reason = "No fixed version published (2.0.1 is latest); dev-only via @puppeteer/browsers perf tooling, not in production runtime. Tracked in #51."
+ignoreUntil = 2027-02-17
+# extract-zip 2.0.1 (CVSS 8.6). No fixed version exists — 2.0.1 is still the
+# latest published release, and osv reports the advisory as `last_affected:
+# 2.0.1` with no `fixed` event (re-checked 2026-11-17). Dev-only: ui >
+# @size-limit/preset-app > @size-limit/time > estimo, whose puppeteer-core
+# 24.22.0 and find-chrome-bin 2.0.4 both pin @puppeteer/browsers 2.10.10
+# exactly. estimo 3.0.5 and find-chrome-bin 2.0.4 are both still the latest
+# releases, and @puppeteer/browsers 2.13.2 (the newest 2.x) still depends on
+# extract-zip ^2.0.1. Only @puppeteer/browsers 3.x drops it, and forcing a
+# major onto two exact pins is not a safe override. Never in the production
+# api/ui/widget runtime. Tracked in #51. Revisit at ignoreUntil: adopt a fixed
+# extract-zip, or an estimo that moves to @puppeteer/browsers 3.x.
+reason = "No fixed version published (2.0.1 is latest, re-checked 2026-11-17); dev-only via estimo, whose deps pin @puppeteer/browsers 2.10.10 exactly. Tracked in #51."
 
 [[IgnoredVulns]]
 id = "GHSA-7pqw-9j4j-h8q3"
-ignoreUntil = 2026-11-13
+ignoreUntil = 2027-02-17
 # extract-zip 2.0.1: arbitrary file write through symlink archive entries. Same
-# package, flaw class (CWE-22), path and lack of a fix as GHSA-jmr9 above. The
-# only archive extracted on that path is the Chrome build @puppeteer/browsers
-# downloads for estimo — not attacker-supplied input. @puppeteer/browsers 3.x
-# drops extract-zip, but find-chrome-bin and estimo's puppeteer-core both pin
-# 2.10.10 exactly. Tracked in #51.
-reason = "No fixed version published (2.0.1 is latest); dev-only via @puppeteer/browsers perf tooling extracting Google's Chrome download, not in production runtime. Tracked in #51."
-
-[[IgnoredVulns]]
-id = "GHSA-vfj7-8cjw-p6xm"
-ignoreUntil = 2026-11-13
-# braces <=3.0.3 (CVSS 8.7): stack exhaustion from deeply nested brace patterns.
-# No fixed version exists (3.0.3 is the latest release; osv lists no `fixed`
-# event). Dev-only: reached through micromatch/fast-glob in lint-staged,
-# stylelint and jscpd (@jscpd/finder), which expand only the glob patterns
-# written in this repository's own config and CLI calls. (markdownlint-cli2 was
-# a fourth path until #189 swapped it for markdownlint-cli, which globs with
-# tinyglobby and does not reach braces.) No request data reaches them,
-# and nothing in the api/ui/widget runtime depends on braces. Revisit at
-# ignoreUntil: adopt a fixed braces the moment one ships.
-reason = "No fixed version published (3.0.3 is latest); dev-only via lint-staged/stylelint/jscpd globbing over repo-authored patterns, not in production runtime."
+# package, flaw class (CWE-22), path and lack of a fix as GHSA-jmr9 above
+# (re-checked 2026-11-17). The only archive extracted on that path is the
+# Chrome build @puppeteer/browsers downloads for estimo — not attacker-supplied
+# input. Tracked in #51.
+reason = "No fixed version published (2.0.1 is latest, re-checked 2026-11-17); dev-only via estimo extracting Google's Chrome download, not in production runtime. Tracked in #51."
 
 [[IgnoredVulns]]
 id = "GHSA-3g3m-2fjr-6pw4"
-ignoreUntil = 2026-11-13
+ignoreUntil = 2027-01-17
 # glob 9.0.0-14.0.1 (medium): an aborted walk keeps traversing in the background.
-# Published 2026-10-30, already in develop's lockfile. Needs a caller passing an
-# AbortSignal; no code here does. Reached through @afixt/usecase-runner,
-# read-package-json (dev) and sequelize-cli > js-beautify, which glob
-# repo-authored paths from the CLI. The fix is a major (14.x) those ranges reject.
-reason = "Needs an AbortSignal caller, none here; the fix is a major the dependents' ranges reject. Adopt once they move."
+# Fixed in 14.0.2, but no consumer here can take it (re-checked 2026-11-17):
+#   - glob 10.5.0 (production install): api > sequelize-cli 6.6.5 pins
+#     js-beautify 1.15.4 exactly, which wants glob ^10.4.2. sequelize-cli 6.6.5
+#     is the latest release, and even js-beautify 2.0.3 is on glob ^13.0.6.
+#   - glob 10.5.0 (dev): license-checker-rseidelsohn 4.4.2 >
+#     read-installed-packages > read-package-json 6.0.4 (deprecated; 7.0.1 is
+#     still on glob ^10.2.2).
+#   - glob 13.0.6 (dev): @afixt/usecase-runner 1.0.1 (1.2.0 moves to ^14.0.3,
+#     but the other two paths keep the advisory open either way).
+# Exploiting it needs a caller passing an AbortSignal; none of these does, and
+# all of them glob repo-authored paths from the CLI. Forcing glob 14 across those
+# ranges is a major the dependents have not adopted.
+reason = "Needs an AbortSignal caller, none here; sequelize-cli (latest) pins js-beautify on glob 10 and read-package-json is deprecated on glob 10. Re-checked 2026-11-17."
 
 [[IgnoredVulns]]
 id = "GHSA-g3hv-75wg-m249"
-ignoreUntil = 2026-11-13
-# minimatch <11.0.1 (medium): pattern amplification. Published 2026-10-30, already
-# in develop's lockfile. Needs an attacker-controlled pattern. The patterns here
-# come from repo config and CLI calls: the eslint plugins, npm-run-all, glob, and
-# sequelize-cli > js-beautify > editorconfig (dev-time CLI). No request data
-# reaches them. The fix is a major (11.x) those ranges reject.
-reason = "Needs an attacker-controlled glob pattern, none reach minimatch here; the fix is a major the dependents' ranges reject. Adopt once they move."
+ignoreUntil = 2027-01-17
+# minimatch >=7.0.0 <11.0.1 (medium): pattern amplification. Fixed in 11.0.1, but
+# the latest releases of several consumers still reject 11.x (re-checked
+# 2026-11-17):
+#   - minimatch 10.2.5 (dev): eslint-plugin-sonarjs (4.2.2 latest, ^10.2.6) and
+#     markdownlint-cli (0.50.0 latest, ~10.2.6), plus
+#     @typescript-eslint/typescript-estree 8.59.0, eslint-plugin-import-x 4.16.2
+#     and glob 13.0.6, whose newer releases do accept 11.x.
+#   - minimatch 9.0.9 (production install): api > sequelize-cli 6.6.5 >
+#     js-beautify 1.15.4 (exact pin) > editorconfig 1.0.7 and glob 10.5.0;
+#     also read-package-json's glob 10.5.0 (dev).
+# A forced override is not safe: minimatch 11 removes makeRe(), which
+# eslint-plugin-import-x 4.16.2's no-internal-modules rule imports. Exploiting
+# it needs an attacker-controlled pattern; the patterns here come from repo
+# config and CLI calls, and no request data reaches them.
+reason = "Needs an attacker-controlled glob pattern, none reach minimatch here; sonarjs, markdownlint-cli and sequelize-cli's js-beautify (all latest) still reject 11.x. Re-checked 2026-11-17."

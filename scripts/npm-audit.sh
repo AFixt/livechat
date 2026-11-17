@@ -15,11 +15,12 @@ set -euo pipefail
 
 # Accepted advisories — id → why + review date.
 #   GHSA-jmr9-qjv8-65gv  extract-zip 2.0.1 unvalidated symlink path traversal.
-#     No fixed version exists (2.0.1 is the latest published release). Dev-only:
-#     pulled transitively via @puppeteer/browsers by the Lighthouse/estimo
-#     performance tooling — never in the production api/ui/widget runtime.
-#     Tracked in #51. Revisit 2026-11-13: adopt a fixed extract-zip once one
-#     ships, or drop the perf tooling that drags it in.
+#     No fixed version exists (2.0.1 is still the latest published release,
+#     re-checked 2026-11-17). Dev-only: ui > @size-limit/time > estimo, whose
+#     puppeteer-core 24.22.0 and find-chrome-bin 2.0.4 both pin
+#     @puppeteer/browsers 2.10.10 exactly — never in the production
+#     api/ui/widget runtime. Tracked in #51. Revisit 2027-02-17: adopt a fixed
+#     extract-zip once one ships, or an estimo on @puppeteer/browsers 3.x.
 #   GHSA-7pqw-9j4j-h8q3  extract-zip 2.0.1 arbitrary file write through symlink
 #     archive entries. Same package, same flaw class (CWE-22), same path in, same
 #     lack of a fix as the entry above. The only archive extracted on that path
@@ -27,14 +28,7 @@ set -euo pipefail
 #     attacker-supplied input. @puppeteer/browsers 3.x drops extract-zip, but
 #     find-chrome-bin and estimo's puppeteer-core both pin 2.10.10 exactly.
 #     Tracked in #51; same review date.
-#   GHSA-vfj7-8cjw-p6xm  braces <=3.0.3 stack exhaustion from deeply nested brace
-#     patterns. No fixed version exists (3.0.3 is the latest release). Dev-only:
-#     reached through micromatch/fast-glob in lint-staged, stylelint and jscpd
-#     (markdownlint-cli2 left with #189), which expand only the glob patterns
-#     written in this repository's own config and CLI calls. No request data reaches them, and
-#     nothing in the api/ui/widget runtime depends on braces. Revisit
-#     2026-11-13: adopt a fixed braces once one ships.
-export ALLOW="GHSA-jmr9-qjv8-65gv,GHSA-7pqw-9j4j-h8q3,GHSA-vfj7-8cjw-p6xm"
+export ALLOW="GHSA-jmr9-qjv8-65gv,GHSA-7pqw-9j4j-h8q3"
 
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT

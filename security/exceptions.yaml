@@ -148,37 +148,20 @@ exceptions:
     reason: >-
       extract-zip 2.0.1 unvalidated symlink path traversal (GHSA-jmr9) and
       arbitrary file write through symlink archive entries (GHSA-7pqw, added
-      2026-10-04 — same package, flaw class and path). No fixed version exists
-      (2.0.1 is latest). Dev-only: transitive via @puppeteer/browsers in the
-      Lighthouse/estimo perf tooling, never in the production runtime; the only
-      archive it extracts is Google's Chrome download. @puppeteer/browsers 3.x
-      drops extract-zip, but find-chrome-bin and estimo's puppeteer-core both
-      pin 2.10.10 exactly.
+      2026-10-04 — same package, flaw class and path). Renewed 2026-11-17: no
+      fixed version exists (2.0.1 is still latest; neither advisory has a fixed
+      event). Dev-only: ui > @size-limit/time > estimo 3.0.5, whose
+      puppeteer-core 24.22.0 and find-chrome-bin 2.0.4 both pin
+      @puppeteer/browsers 2.10.10 exactly; all three are still the latest
+      releases on their lines, and @puppeteer/browsers 2.13.2 still needs
+      extract-zip. Only @puppeteer/browsers 3.x drops it. Never in the
+      production runtime; the only archive it extracts is Google's Chrome
+      download.
     added: 2026-08-15
-    # Aligned with osv-scanner.toml `ignoreUntil = 2026-11-13`.
-    expires: 2026-11-13
+    # Aligned with osv-scanner.toml `ignoreUntil = 2027-02-17`.
+    expires: 2027-02-17
     status: active
     issue: 51
-
-  - id: dep-braces-nested-pattern-dos
-    tool: npm-audit, osv-scanner
-    source: scripts/npm-audit.sh (ALLOW) + osv-scanner.toml (IgnoredVulns)
-    rules:
-      - GHSA-vfj7-8cjw-p6xm
-    owner: "@AFixt/security"
-    reason: >-
-      braces <=3.0.3 stack exhaustion from deeply nested brace patterns. No
-      fixed version exists (3.0.3 is latest). Dev-only: reached through
-      micromatch/fast-glob in lint-staged, stylelint and jscpd
-      (markdownlint-cli2 left with #189), which expand only the glob patterns
-      written in this repository's own
-      config and CLI calls. No request data reaches them, and nothing in the
-      runtime depends on braces.
-    added: 2026-10-04
-    # Aligned with osv-scanner.toml `ignoreUntil = 2026-11-13`.
-    expires: 2026-11-13
-    status: active
-    issue: 186
 
   - id: dep-glob-abort-signal-traversal
     tool: osv-scanner
@@ -188,13 +171,15 @@ exceptions:
     owner: "@AFixt/security"
     reason: >-
       glob 9.0.0-14.0.1 keeps traversing after an aborted walk. Medium, and
-      needs a caller passing an AbortSignal; no code here does. Reached through
-      usecase-runner, read-package-json and sequelize-cli > js-beautify, which
-      glob repo-authored paths from the CLI. The fix is a 14.x major those
-      ranges reject.
+      needs a caller passing an AbortSignal; no code here does. Renewed
+      2026-11-17: 14.0.2 fixes it, but api > sequelize-cli 6.6.5 (latest) pins
+      js-beautify 1.15.4 exactly, on glob ^10.4.2 (even js-beautify 2.0.3 is on
+      ^13.0.6), and license-checker-rseidelsohn > read-package-json 6.0.4 is
+      deprecated on glob ^10.2.2. @afixt/usecase-runner 1.2.0 would move its
+      own copy to 14.x, but that alone cannot clear the advisory.
     added: 2026-11-02
-    # Aligned with osv-scanner.toml `ignoreUntil = 2026-11-13`.
-    expires: 2026-11-13
+    # Aligned with osv-scanner.toml `ignoreUntil = 2027-01-17`.
+    expires: 2027-01-17
     status: active
 
   - id: dep-minimatch-pattern-amplification
@@ -204,14 +189,17 @@ exceptions:
       - GHSA-g3hv-75wg-m249
     owner: "@AFixt/security"
     reason: >-
-      minimatch <11.0.1 denial of service via pattern amplification. Medium, and
-      needs an attacker-controlled pattern. Patterns here come from repo config
-      and CLI calls (eslint plugins, npm-run-all, glob, sequelize-cli >
-      js-beautify > editorconfig); no request data reaches them. The fix is an
-      11.x major those ranges reject.
+      minimatch 7.0.0 to below 11.0.1, denial of service via pattern
+      amplification. Medium, and needs an attacker-controlled pattern; the
+      patterns here come from repo config and CLI calls, and no request data
+      reaches them. Renewed 2026-11-17: 11.0.1 fixes it, but the latest
+      eslint-plugin-sonarjs (4.2.2, ^10.2.6) and markdownlint-cli (0.50.0,
+      ~10.2.6) still reject 11.x, and sequelize-cli's exact js-beautify pin
+      holds editorconfig and glob on minimatch 9. A forced override is unsafe:
+      11.x removes makeRe(), which eslint-plugin-import-x 4.16.2 imports.
     added: 2026-11-02
-    # Aligned with osv-scanner.toml `ignoreUntil = 2026-11-13`.
-    expires: 2026-11-13
+    # Aligned with osv-scanner.toml `ignoreUntil = 2027-01-17`.
+    expires: 2027-01-17
     status: active
 
   # --- container / Dockerfile / IaC scanning (ADR-0016, issue #60) --------
