@@ -38,6 +38,9 @@ ZAP_SKIP_BUILD=1 npm run security:zap      # reuse an existing ui/dist
 ZAP_TARGET_URL=https://your-preview-url.example.com npm run security:zap
 ```
 
+For a server on this machine, use `http://host.docker.internal:<port>`:
+`localhost` inside the ZAP container is the container itself.
+
 The exit status is the job's verdict: 0 clean, 1 when a `FAIL` rule fires.
 Verified against the shipped config on 2026-11-17: `FAIL-NEW: 0`, exit 0; with
 both clickjacking protections removed, `FAIL-NEW: 1` (10020), exit 1 (#205).

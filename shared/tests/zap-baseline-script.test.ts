@@ -64,6 +64,7 @@ const DOCKER_STUB = [
   'case "$1" in',
   '  info) exit "${STUB_DOCKER_INFO_EXIT:-0}" ;;',
   '  run)',
+  '    if [ "$2" = -d ] && [ -n "${STUB_NGINX_RUN_EXIT:-}" ]; then exit "$STUB_NGINX_RUN_EXIT"; fi',
   '    for arg in "$@"; do',
   '      if [ "$arg" = zap-baseline.py ]; then exit "${STUB_ZAP_EXIT:-0}"; fi',
   '    done',
@@ -168,6 +169,17 @@ describe('zap-baseline.sh (#205)', () => {
     expect(output).toContain('ZAP exited 1');
     // Cleanup still runs on the failing path.
     expect(calls.some((call) => call.startsWith('rm -f livechat-zap-ui-'))).toBe(true);
+  });
+
+  it('cleans up the container and network when nginx fails to start', () => {
+    // A failed `docker run -d` still leaves a Created container on the network.
+    const root = fixture();
+    const { status, calls } = runScript(root, { ZAP_SKIP_BUILD: '1', STUB_NGINX_RUN_EXIT: '125' });
+
+    expect(status).toBe(125);
+    expect(calls.some((call) => call.includes('zap-baseline.py'))).toBe(false);
+    expect(calls.some((call) => call.startsWith('rm -f livechat-zap-ui-'))).toBe(true);
+    expect(calls.some((call) => call.startsWith('network rm livechat-zap-'))).toBe(true);
   });
 
   it('scans ZAP_TARGET_URL directly, with no nginx and no network', () => {

@@ -96,9 +96,10 @@ trap cleanup EXIT
 
 # ZAP reads the rules file from, and writes its reports to, /zap/wrk. Give it a
 # scratch copy rather than mounting .github/zap writable. The image runs as the
-# `zap` user, whose uid will not match ours on Linux, hence the open mode.
+# `zap` user, whose uid will not match ours on Linux, hence the open mode;
+# sticky, so another local user cannot swap rules.tsv in a shared /tmp.
 cp "$RULES_FILE" "$WORK_DIR/rules.tsv"
-chmod 0777 "$WORK_DIR"
+chmod 1777 "$WORK_DIR"
 chmod 0644 "$WORK_DIR/rules.tsv"
 
 network_args=()
@@ -115,16 +116,19 @@ else
     exit 1
   fi
 
-  docker network create "$NETWORK" >/dev/null
+  # Each flag is set BEFORE its command: a create or start that fails part way
+  # still leaves a network or a `Created` container behind, and cleanup's
+  # removals already tolerate a name that does not exist.
   network_created=1
+  docker network create "$NETWORK" >/dev/null
   network_args=(--network "$NETWORK")
 
   echo "zap-baseline: serving ui/dist through ui/nginx.conf (${NGINX_IMAGE})" >&2
+  target_started=1
   docker run -d --name "$TARGET_CONTAINER" "${network_args[@]}" \
     -v "$ROOT/ui/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
     -v "$ROOT/ui/dist:/usr/share/nginx/html:ro" \
     "$NGINX_IMAGE" >/dev/null
-  target_started=1
 
   # Wait for nginx from inside the network, which is where ZAP will be.
   ready=""
