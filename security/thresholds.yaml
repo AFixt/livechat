@@ -25,11 +25,14 @@ gates:
     blocks_at: high # high + critical fail; moderate/low are informational
     warns_at: [moderate, low]
     allowlist: scripts/npm-audit.sh (ALLOW) — mirrored in osv-scanner.toml
+    scope: production # `--omit=dev`; fleet ruling 2026-11-17
     gated: true
 
   osv-scanner:
     config: osv-scanner.toml
+    script: scripts/osv-production.sh
     npm: security:osv
+    scope: production # lockfile minus `"dev": true` entries; fleet ruling 2026-11-17
     blocks_at: any # any advisory not in IgnoredVulns fails
     allowlist: osv-scanner.toml (IgnoredVulns, each with ignoreUntil)
     gated: true
