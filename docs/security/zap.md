@@ -22,8 +22,31 @@ at `FAIL` threshold and writes the rest as warnings.
 
 ### Locally
 
-Point the official baseline image at any reachable URL, mounting the same rule
-file the CI job uses so local and CI verdicts match:
+`npm run security:zap`
+([`scripts/zap-baseline.sh`](../../scripts/zap-baseline.sh)) runs the `zap-pr`
+job without GitHub Actions: it builds, serves `ui/dist` through `ui/nginx.conf`
+in the same `nginx:1.27-alpine` image, and runs `zap-baseline.py` against it
+with the job's `rules.tsv` and `-a -j -I`. It needs Docker (it skips with a
+message when Docker is not running) and is not part of `check:all`, because the
+image is large and the AJAX spider takes minutes. Run it before merging a change
+to `ui/nginx.conf`, the console's headers, or `rules.tsv`. Reports land in
+`reports/zap/`.
+
+```bash
+npm run security:zap                       # build, serve, scan
+ZAP_SKIP_BUILD=1 npm run security:zap      # reuse an existing ui/dist
+ZAP_TARGET_URL=https://your-preview-url.example.com npm run security:zap
+```
+
+For a server on this machine, use `http://host.docker.internal:<port>`:
+`localhost` inside the ZAP container is the container itself.
+
+The exit status is the job's verdict: 0 clean, 1 when a `FAIL` rule fires.
+Verified against the shipped config on 2026-11-17: `FAIL-NEW: 0`, exit 0; with
+both clickjacking protections removed, `FAIL-NEW: 1` (10020), exit 1 (#205).
+
+To run the image by hand instead, point it at any reachable URL, mounting the
+same rule file the CI job uses so local and CI verdicts match:
 
 ```bash
 docker run --rm -v "$(pwd)/.github/zap:/zap/wrk:ro" \
