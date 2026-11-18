@@ -120,3 +120,5 @@ turns the build red by design — that is the forcing function that stops
   lands with issue #63 (link once both PRs merge).
 - [ADR-0011](../adr/0011-security-baseline-governance.md) — the governance
   decision.
+- [ADR-0022](../adr/0022-dependency-audit-production-scope.md) — why the
+  dependency-audit gates scan production dependencies only.
