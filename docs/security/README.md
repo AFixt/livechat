@@ -13,8 +13,8 @@ Everything below runs from the repo root. The gating scanners are wired into
 
 | Tool              | npm script            | Config / source                  | What it checks                                               |
 | ----------------- | --------------------- | -------------------------------- | ------------------------------------------------------------ |
-| npm audit         | `security:audit`      | `scripts/npm-audit.sh`           | Known-vulnerable dependencies (high/critical).               |
-| osv-scanner       | `security:osv`        | `osv-scanner.toml`               | OSV advisories against the lockfile.                         |
+| npm audit         | `security:audit`      | `scripts/npm-audit.sh`           | Known-vulnerable production dependencies (high/critical).    |
+| osv-scanner       | `security:osv`        | `scripts/osv-production.sh`      | OSV advisories against the production lockfile entries.      |
 | semgrep           | `security:semgrep`    | `scripts/semgrep.sh`             | SAST — OWASP Top Ten, Node/TS security rules.                |
 | trufflehog        | `security:secrets`    | `package.json`                   | Verified secrets in git history.                             |
 | exception expiry  | `security:exceptions` | `scripts/check-exceptions.sh`    | Expired entries in the exception registry.                   |
@@ -120,3 +120,5 @@ turns the build red by design — that is the forcing function that stops
   lands with issue #63 (link once both PRs merge).
 - [ADR-0011](../adr/0011-security-baseline-governance.md) — the governance
   decision.
+- [ADR-0022](../adr/0022-dependency-audit-production-scope.md) — why the
+  dependency-audit gates scan production dependencies only.
