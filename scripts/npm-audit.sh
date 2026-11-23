@@ -34,7 +34,7 @@ set -euo pipefail
 #     written in this repository's own config and CLI calls. No request data reaches them, and
 #     nothing in the api/ui/widget runtime depends on braces. Revisit
 #     2026-11-13: adopt a fixed braces once one ships.
-export ALLOW="GHSA-jmr9-qjv8-65gv,GHSA-7pqw-9j4j-h8q3,GHSA-vfj7-8cjw-p6xm"
+export ALLOW="GHSA-jmr9-qjv8-65gv,GHSA-7pqw-9j4j-h8q3"
 
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
